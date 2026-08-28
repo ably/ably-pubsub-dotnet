@@ -388,6 +388,65 @@ namespace IO.Ably.Tests.Realtime
                 completed.Should().BeTrue("channel should have become Suspended again");
             }
 
+            [Fact]
+            [Trait("spec", "RTL3d1")]
+            [Trait("spec", "RTL3d")]
+            public async Task WhenConnectedIsEmittedExternally_TheRTL3dTransitionsShouldAlreadyBeApplied()
+            {
+                // RTL3d1: "The RTL3d channel state transitions must be applied before the CONNECTED
+                // connection state change is emitted to external listeners." Nothing implements it
+                // directly - it holds because Connection.NotifyUpdate runs the internal handlers,
+                // where RealtimeChannels fans the change out to every channel, before the emit.
+                //
+                // An ATTACHED channel on a successful resume is the case that needs it, and the one
+                // a conditional reattach would miss. With no SynchronizationContext - the default,
+                // and what every server-side host has - NotifyExternalClients invokes inline, so
+                // anything done after SetState is visible to the application too late.
+                var client = await GetConnectedClient(opts =>
+                    opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+                var channel = (RealtimeChannel)client.Channels.Get("test".AddRandomSuffix());
+                channel.SetChannelState(ChannelState.Attached);
+                await client.ProcessCommands();
+
+                client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
+                await client.WaitForState(ConnectionState.Disconnected);
+                await client.ProcessCommands();
+
+                ChannelState? seenByExternalListener = null;
+                client.Connection.On(ConnectionEvent.Connected, _ => seenByExternalListener = channel.State);
+
+                // The same connectionId the client already holds, so this is an RTN15c6 resume.
+                client.Workflow.QueueCommand(SetConnectedStateCommand.Create(ConnectedProtocolMessage, false));
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                seenByExternalListener.Should().Be(ChannelState.Attaching);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL3c")]
+            public async Task WhenConnectionIsSuspended_ADetachingChannelShouldNotBeStranded()
+            {
+                // RTL3c names only ATTACHING and ATTACHED, so DETACHING is ably-js parity rather than
+                // a spec requirement - propogateConnectionInterruption maps suspended over
+                // ['attaching','attached','detaching','suspended']. It matters because the handler
+                // fails the DetachedAwaiter first, leaving the channel with no DETACHED coming.
+                var (client, channel) = await GetClientAndChannel();
+
+                ((RealtimeChannel)channel).SetChannelState(ChannelState.Detaching);
+                await client.ProcessCommands();
+
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(new ErrorInfo("why it suspended", 12345)));
+                await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Suspended);
+
+                // And the connection's own reason, not a constant - ably-js passes change.reason.
+                channel.ErrorReason.Message.Should().Be("why it suspended");
+            }
+
             [Theory]
             [InlineData(ChannelState.Attached)]
             [InlineData(ChannelState.Attaching)]
@@ -399,10 +458,12 @@ namespace IO.Ably.Tests.Realtime
 
                 ((RealtimeChannel)channel).SetChannelState(state);
 
-                client.Close();
-
+                // Driven straight to SUSPENDED, with no Close() first: CLOSING detaches channels per
+                // RTN11b/RTL3b, so closing would race the suspend for the outcome, and RTL3c is
+                // about entering SUSPENDED anyway.
                 client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(null));
                 await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
 
                 // Assert
                 channel.State.Should().Be(ChannelState.Suspended);

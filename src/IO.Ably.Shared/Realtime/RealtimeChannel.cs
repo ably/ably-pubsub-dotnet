@@ -58,8 +58,6 @@ namespace IO.Ably.Realtime
 
         internal AblyRealtime RealtimeClient { get; }
 
-        private string PreviousConnectionId { get; set; }
-
         private ConnectionState ConnectionState => Connection.State;
 
         private IConnectionManager ConnectionManager => RealtimeClient.ConnectionManager;
@@ -147,46 +145,59 @@ namespace IO.Ably.Realtime
 
         internal void ConnectionStateChanged(ConnectionStateChange connectionStateChange)
         {
-            var connectionRefreshed = PreviousConnectionId != Connection.Id;
-            if (connectionRefreshed)
-            {
-                PreviousConnectionId = Connection.Id;
-            }
-
             switch (connectionStateChange.Current)
             {
                 case ConnectionState.Connected:
-                    if (State == ChannelState.Suspended)
-                    {
-                        Attach();
-                    }
 
-                    if (State == ChannelState.Attaching && AttachedAwaiter.Waiting == false)
+                    /*
+                     * (RTN24) An update arrives on the connection we already hold, so it must not
+                     * touch channel state at all - RTL3d governs *entering* CONNECTED. ably-js
+                     * touches no channel on a mid-connection CONNECTED either.
+                     */
+                    if (connectionStateChange.Event == ConnectionEvent.Update)
                     {
-                        Attach(null, emitUpdate: true);
+                        break;
                     }
 
                     /*
-                     * Connection state is only maintained server-side for a brief period,
-                     * given by the connectionStateTtl in the connectionDetails (2 minutes at time of writing, see CD2f).
-                     * If a client has been disconnected for longer than the connectionStateTtl
-                     * it should clear the local connection state and any connection attempts should be made as for a fresh connection
+                     * (RTL3d, RTN19b, RTN15c6, RTN15c7, RTN15g3) On entering CONNECTED, every
+                     * channel that was attached or pending needs its ATTACH - or its DETACH - sent
+                     * again, because the previous transport will never answer.
                      *
-                     * (RTN15g3) When a connection attempt succeeds after the connection state has been cleared in this way,
-                     * channels that were previously ATTACHED, ATTACHING, or SUSPENDED must be automatically reattached,
-                     * just as if the connection was a resume attempt which failed per RTN15c3
+                     * The two branches have different owners. RTL3d names ATTACHING, ATTACHED and
+                     * SUSPENDED and asks for an RTL4c attach. DETACHING is not in that list and is
+                     * not a state transition at all - it is RTN19b, "if there are any pending
+                     * channels i.e. in the ATTACHING or DETACHING state, the respective ATTACH or
+                     * DETACH message should be resent". ably-js splits it the same way, with
+                     * checkPendingState handling both pending operations and notifyState the
+                     * reattach.
                      *
-                     * Given the above, if the channel is ATTACHED and the connection is fresh
-                     * then set the channel to ATTACHING to trigger an ATTACH attempt
+                     * RTL3d1 requires all of this to be applied before CONNECTED reaches external
+                     * listeners, and is why it lives here rather than in HandleConnectedCommand:
+                     * Connection.NotifyUpdate runs the internal handlers, which is what calls this,
+                     * before handing the emit to NotifyExternalClients.
+                     *
+                     * Unconditional, deliberately. This used to be gated on the connectionId having
+                     * changed, which silently skipped the RTN15g3 reattach: RTN15g empties
+                     * Connection.Id *before* the CONNECTING transition, so by the time CONNECTED
+                     * arrived the id being compared against had already gone and the channel
+                     * concluded nothing had changed. The channel stayed locally ATTACHED on a brand
+                     * new connection with no server-side attachment - permanently silent.
+                     *
+                     * Whether the connection was resumed belongs inside the ATTACH, in channelSerial
+                     * and the ATTACH_RESUME flag, rather than in a decision about whether to send
+                     * one at all. ably-js reattaches unconditionally for the same reason.
                      */
-                    if (State == ChannelState.Attached && connectionRefreshed)
+                    switch (State)
                     {
-                        Attach(null, force: true, emitUpdate: false);
-                    }
-
-                    if (State == ChannelState.Detaching && DetachedAwaiter.Waiting == false)
-                    {
-                        Detach(null, force: true, emitUpdate: true);
+                        case ChannelState.Suspended:
+                        case ChannelState.Attaching:
+                        case ChannelState.Attached:
+                            Attach(null, force: true, emitUpdate: false);
+                            break;
+                        case ChannelState.Detaching:
+                            Detach(null, force: true, emitUpdate: true);
+                            break;
                     }
 
                     break;
@@ -194,21 +205,43 @@ namespace IO.Ably.Realtime
                     AttachedAwaiter.Fail(new ErrorInfo("Connection is Disconnected"));
                     DetachedAwaiter.Fail(new ErrorInfo("Connection is Disconnected"));
                     break;
+                case ConnectionState.Closing:
+
+                    // RTN11b - on connect() while CLOSING, channels "first transition to DETACHED,
+                    // following RTL3b, and then reinitialize ... per RTN11d". Done at the connection
+                    // transition rather than inside RTN11d so a close() with no connect() behind it
+                    // is covered too. See DetachForConnectionGoingAway for the states involved.
+                    DetachForConnectionGoingAway(
+                        new ErrorInfo("Connection is closing", ErrorCodes.ChannelOperationFailed));
+
+                    break;
                 case ConnectionState.Closed:
-                    AttachedAwaiter.Fail(new ErrorInfo("Connection is closed"));
-                    DetachedAwaiter.Fail(new ErrorInfo("Connection is closed"));
-                    if (State == ChannelState.Attached || State == ChannelState.Attaching)
-                    {
-                        Detach();
-                    }
+
+                    // The same four states as CLOSING, for the same RTP5a reason. CLOSED is
+                    // reachable without CLOSING: ConnectionSuspendedState.Close() queues
+                    // SetClosedStateCommand directly.
+                    DetachForConnectionGoingAway(
+                        new ErrorInfo("Connection is closed", ErrorCodes.ChannelOperationFailed));
 
                     break;
                 case ConnectionState.Suspended:
                     AttachedAwaiter.Fail(new ErrorInfo("Connection is suspended"));
                     DetachedAwaiter.Fail(new ErrorInfo("Connection is suspended"));
-                    if (State == ChannelState.Attached || State == ChannelState.Attaching)
+
+                    // RTL3c names only ATTACHING and ATTACHED; DETACHING is ably-js parity rather
+                    // than a spec requirement - propogateConnectionInterruption maps suspended over
+                    // ['attaching','attached','detaching','suspended']. It matters because the lines
+                    // above have just failed the awaiter that would have finished a detach, leaving
+                    // the channel in DETACHING with no DETACHED coming and no callback.
+                    //
+                    // The connection's own reason is carried rather than a constant, as ably-js does
+                    // by passing change.reason into notifyState.
+                    if (State == ChannelState.Attached || State == ChannelState.Attaching ||
+                        State == ChannelState.Detaching)
                     {
-                        SetChannelState(ChannelState.Suspended, ErrorInfo.ReasonSuspended);
+                        SetChannelState(
+                            ChannelState.Suspended,
+                            connectionStateChange.Reason ?? ErrorInfo.ReasonSuspended);
                     }
 
                     break;
@@ -220,6 +253,39 @@ namespace IO.Ably.Realtime
                     }
 
                     break;
+            }
+        }
+
+        /// <summary>
+        /// RTN11b/RTL3b - the connection is going away, so a channel that is attached or pending has
+        /// to detach. RTP5a clears the presence maps on entering DETACHED, which is why all four
+        /// pending states are covered and not just the two RTL3b names: a channel left SUSPENDED or
+        /// DETACHING carries its members from the abandoned connection into the next one.
+        /// </summary>
+        /// <param name="awaiterError">reported to anyone waiting on an attach or detach that this
+        /// transition abandons. Deliberately not carried into the channel state: RTL24 lists RTN11d,
+        /// RTL3a, RTL4g and RTL14 as the sources of RealtimeChannel#errorReason, and a connection
+        /// close is none of them.</param>
+        private void DetachForConnectionGoingAway(ErrorInfo awaiterError)
+        {
+            AttachedAwaiter.Fail(awaiterError);
+
+            if (State == ChannelState.Attached || State == ChannelState.Attaching ||
+                State == ChannelState.Suspended)
+            {
+                DetachedAwaiter.Fail(awaiterError);
+                Detach(null, force: false, emitUpdate: false);
+            }
+            else if (State == ChannelState.Detaching)
+            {
+                // DetachedAwaiter is deliberately left alone: the detach the caller asked for is
+                // about to complete, so the DETACHED transition below finishes it as a success.
+                // ably-js resolves detach() here for the same reason.
+                SetChannelState(ChannelState.Detached);
+            }
+            else
+            {
+                DetachedAwaiter.Fail(awaiterError);
             }
         }
 
@@ -396,18 +462,17 @@ namespace IO.Ably.Realtime
             {
                 SetChannelState(ChannelState.Detaching, emitUpdate);
 
-                if (ConnectionState == ConnectionState.Closed || ConnectionState == ConnectionState.Connecting ||
-                    ConnectionState == ConnectionState.Suspended)
+                // RTL5l - "if the connection state is anything other than CONNECTED and none of the
+                // preceding channel state conditions apply, the channel transitions immediately to
+                // the DETACHED state". Tested as anything-but-CONNECTED rather than enumerated, so
+                // DISCONNECTED cannot fall through to the RTL6c2 queue.
+                if (ConnectionState != ConnectionState.Connected)
                 {
                     SetChannelState(ChannelState.Detached);
                 }
-                else if (ConnectionState != ConnectionState.Failed)
-                {
-                    SendMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Detach, Name));
-                }
                 else
                 {
-                    Logger.Warning($"#{Name}. Cannot send Detach messages when connection is in Failed State");
+                    SendMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Detach, Name));
                 }
             }
             else
@@ -664,8 +729,11 @@ namespace IO.Ably.Realtime
                 Logger.Debug($"HandleStateChange state change from {State} to {state}");
             }
 
-            // RTP5a1
-            if (state == ChannelState.Detached || state == ChannelState.Suspended || state == ChannelState.Failed)
+            // RTL15b2 - "If the channel enters the DETACHED or FAILED state, it must clear its
+            // channelSerial. (Unlike previous spec versions, it must not clear it when entering the
+            // SUSPENDED state)." Retaining it in SUSPENDED lets a channel suspended by an RTL4f
+            // attach timeout carry its serial on the reattach RTL4c1 asks for.
+            if (state == ChannelState.Detached || state == ChannelState.Failed)
             {
                 Properties.ChannelSerial = null;
             }
