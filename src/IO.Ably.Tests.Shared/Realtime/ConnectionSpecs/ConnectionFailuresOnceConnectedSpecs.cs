@@ -254,6 +254,75 @@ namespace IO.Ably.Tests.Realtime
             client.State.WaitingForAck.Should().HaveCount(2);
         }
 
+        [Fact]
+        [Trait("spec", "RTN15h2")]
+        [Trait("spec", "RTN15h3")]
+        public async Task WithTokenError_ShouldNotAlsoGrantTheNonTokenImmediateReconnect()
+        {
+            // RTN15h3's immediate reconnect is for "an error other than a token error". RTN15h2 owns
+            // token errors and reconnects of its own accord, so granting a retry here as well gives
+            // two overlapping attempts - and the second reaches FAILED where RTN15h2 requires
+            // DISCONNECTED.
+            var client = await SetupConnectedClient(ConnectedClientErrors.FailRenewal);
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = _tokenErrorInfo,
+            });
+
+            await client.ProcessCommands();
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(0);
+            client.Connection.State.Should().Be(ConnectionState.Disconnected);
+        }
+
+        // UTS: realtime/unit/RTN15h3/non-token-error-resume-0
+        [Fact]
+        [Trait("spec", "RTN15h3")]
+        public async Task WithNonTokenDisconnected_ShouldReconnectImmediately()
+        {
+            var client = await GetConnectedClient(opts =>
+                opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo("Something else went wrong", 50000),
+            });
+
+            await client.ProcessCommands();
+
+            // Immediately, not in ten minutes.
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
+            client.Connection.State.Should().Be(ConnectionState.Connecting);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN15h3")]
+        [Trait("spec", "RTN17j")]
+        public async Task WhenAConnectionSucceeds_ShouldClearTheImmediateRetryBudget()
+        {
+            // The budget that bounds RTN17j's traversal is per failure run, cleared by
+            // UpdateAttemptState's Connected case. Without that a client which spent its retries once
+            // would never get an immediate reconnect again, leaving RTN15h3 unimplemented from the
+            // second disconnect onwards.
+            var client = await GetConnectedClient(opts =>
+                opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo("Something else went wrong", 50000),
+            });
+            await client.ProcessCommands();
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
+
+            client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+            await client.WaitForState(ConnectionState.Connected);
+            await client.ProcessCommands();
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(0);
+        }
+
         [Flags]
         private enum ConnectedClientErrors
         {

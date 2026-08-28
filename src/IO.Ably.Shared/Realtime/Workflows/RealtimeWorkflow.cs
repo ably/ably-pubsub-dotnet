@@ -883,13 +883,37 @@ namespace IO.Ably.Realtime.Workflow
 
                             var defaultRealtimeHost = Client.Options.FullRealtimeHost();
 
-                            // Always retry on defaultPrimaryHost first when connecting command triggered by Disconnected/Suspended state timeout.
+                            // RTN17 - every attempt considers a fallback, including the timer driven
+                            // ones. Excluding those would lock a client out once the immediate retry
+                            // budget is spent, since every remaining attempt is timer driven and so
+                            // pinned to the primary.
+                            //
+                            // Asked speculatively, which costs nothing: GetHost only reads state, and
+                            // RTN17i is its job - it returns to the primary whenever the last host
+                            // was a fallback.
+                            var candidateHost = AttemptsHelpers.GetHost(State, defaultRealtimeHost);
                             var connectingHost = defaultRealtimeHost;
 
-                            // Otherwise use host fallbacks if connecting command triggered by other commands
-                            if (cmd.TriggeredByMessage.Contains("OnTimeOut()") == false)
+                            // RTN17j - the connectivity check comes before the decision to use an
+                            // alternative host. If the internet is unreachable the problem is not this
+                            // host, so stay on the primary rather than working through fallbacks that
+                            // cannot answer either.
+                            //
+                            // The answer is carried on the command, so it cannot outlive the decision
+                            // it was taken for or be picked up by a CONNECTING another path queued.
+                            // Held on the workflow it would have no bound, because the command loop
+                            // abandons a nested batch once its depth guard trips.
+                            //
+                            // Note HandleConnectingTokenError reaches CreateTransport through
+                            // AttemptANewConnection without a check - an RTN17j hole this does not
+                            // close.
+                            var alreadyConfirmed = cmd.ConnectivityConfirmed;
+
+                            if (candidateHost == defaultRealtimeHost ||
+                                alreadyConfirmed == true ||
+                                (alreadyConfirmed == null && await Client.RestClient.CanConnectToAbly()))
                             {
-                               connectingHost = AttemptsHelpers.GetHost(State, defaultRealtimeHost);
+                                connectingHost = candidateHost;
                             }
 
                             SetNewHostInState(connectingHost);
@@ -1013,7 +1037,21 @@ namespace IO.Ably.Realtime.Workflow
 
                         if (retryInstantly)
                         {
-                            return SetConnectingStateCommand.Create().TriggeredBy(command);
+                            State.AttemptsInfo.RecordInstantRetry();
+
+                            // Handed to the command returned on the next line, and only to that one.
+                            // Both this handler and the CONNECTING one need to know whether the
+                            // internet is reachable - one to decide whether to retry now, the other
+                            // whether to accept a fallback - and both were asking, on the workflow's
+                            // single reader thread, one after the other. Two checks at up to
+                            // MaxHttpOpenTimeout each is a loop held for twice as long as it needs to
+                            // be on every failing attempt, and it eats into the RTN14e budget this
+                            // series worked to make punctual.
+                            //
+                            // Carried on the command so it cannot go stale or be consumed by anything
+                            // else. A timer driven retry carries no answer and takes its own check.
+                            return SetConnectingStateCommand.Create(connectivityConfirmed: connectivityAnswer)
+                                .TriggeredBy(command);
                         }
 
                         async Task<bool> CheckInstantRetryFlag()
@@ -1023,9 +1061,42 @@ namespace IO.Ably.Realtime.Workflow
                                 return true;
                             }
 
-                            if ((cmd.Error != null && cmd.Error.IsRetryableStatusCode()) || cmd.Exception != null)
+                            // RTN17j sanctions reconnecting immediately, rather than waiting out the
+                            // disconnected retry timeout, to work through the fallback domains. It
+                            // does not sanction doing so without end, and every failed attempt
+                            // produces another DISCONNECTED carrying an exception that qualifies
+                            // again - so the traversal is bounded by the number of domains to
+                            // traverse. Past that we are in RTN14d, where attempts are periodic and
+                            // spaced per RTB1, and host selection continues at that slower pace.
+                            var domainCount = 1 + State.Connection.FallbackHosts.Count;
+                            if (State.AttemptsInfo.InstantRetryCount >= domainCount)
                             {
-                                return await Client.RestClient.CanConnectToAbly();
+                                return false;
+                            }
+
+                            // RTN15a and RTN15h3 - an unexpected transport drop or a non-token
+                            // DISCONNECTED both earn an immediate reconnect. The first two tests
+                            // cover the drop, the third the DISCONNECTED, which carries no status
+                            // code of its own.
+                            //
+                            // Token errors are excluded because RTN15h3 is the "error other than a
+                            // token error" clause: RTN15h2 owns them and has already queued its own
+                            // CONNECTING behind this command, so granting a retry here too gives two
+                            // overlapping attempts.
+                            //
+                            // Gated on the connectivity check, because the retry this grants is
+                            // where host selection happens and RTN17j requires a check before an
+                            // alternative host is used.
+                            var reconnectImmediately = cmd.Exception != null
+                                                       || (cmd.Error != null && cmd.Error.IsRetryableStatusCode())
+                                                       || (State.Connection.State == ConnectionState.Connected
+                                                           && cmd.Error?.IsTokenError != true);
+
+                            if (reconnectImmediately)
+                            {
+                                // Remembered so the CONNECTING behind this command does not repeat it.
+                                connectivityAnswer = await Client.RestClient.CanConnectToAbly();
+                                return connectivityAnswer.Value;
                             }
 
                             return false;
@@ -1123,7 +1194,7 @@ namespace IO.Ably.Realtime.Workflow
                         return;
                     }
 
-                    State.AttemptsInfo.UpdateAttemptState(newState, Logger);
+                    State.AttemptsInfo.UpdateAttemptState(newState, State.Connection.State, Logger);
                     State.Connection.CurrentStateObject.AbortTimer();
                 }
 

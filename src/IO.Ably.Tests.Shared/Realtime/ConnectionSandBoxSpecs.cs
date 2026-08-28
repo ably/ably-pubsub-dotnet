@@ -270,6 +270,12 @@ namespace IO.Ably.Tests.Realtime
             {
                 await realtime.WaitForState(state);
 
+                // Drained before the watch is armed: the retry that put us in this state may still
+                // have a CONNECTING queued behind it, and that would read as a reconnect close()
+                // failed to abort rather than one it never had the chance to.
+                await realtime.ProcessCommands();
+                realtime.Connection.State.Should().Be(state);
+
                 var reconnectAwaiter = new TaskCompletionAwaiter(5000);
                 realtime.Connection.On(args =>
                 {
@@ -284,18 +290,58 @@ namespace IO.Ably.Tests.Realtime
                 await realtime.WaitForState(ConnectionState.Closed);
                 realtime.Connection.State.Should().Be(ConnectionState.Closed);
 
+                // This covers the path rather than the abort. SetState aborts the outgoing state's
+                // timer on every transition, so RTN12d's "aborts the retry process" cannot be broken
+                // without also breaking the transition to CLOSED, which WaitForState above catches
+                // first. The abort is pinned where it can actually be observed failing, on the state
+                // objects, by DisconnectedStateSpecs and SuspendedStateSpecs.
                 var didReconnect = await reconnectAwaiter.Task;
                 didReconnect.Should().BeFalse($"should not attempt a reconnect for state {state}");
             }
 
-            // setup a new client and put into a DISCONNECTED state
+            // Set up a client that is genuinely stuck in DISCONNECTED. Forcing the state is no longer
+            // enough by itself: RTN15h3 grants a non-token DISCONNECTED arriving while CONNECTED an
+            // immediate reconnect, and against a healthy sandbox that reconnect succeeds - so the
+            // client is CONNECTED again before close() can be called, and the assertions race it.
+            // Failing every reconnect attempt is what a client stuck in DISCONNECTED actually looks
+            // like, and it is the only situation in which RTN12d's "aborts the retry process" has a
+            // retry to abort.
+            var failConnects = false;
+            var throwingTransports = new TestTransportFactory(t => t.ThrowOnConnect = failConnects);
+
             var client = await GetRealtimeClient(protocol, (opts, _) =>
             {
+                // Kept short deliberately. Stability comes from draining the queue below, not from
+                // a long timeout - and the retry has to be due inside the window the assertion
+                // watches, or a close() that failed to abort it would go unnoticed.
                 opts.DisconnectedRetryTimeout = TimeSpan.FromSeconds(2);
+                opts.TransportFactory = throwingTransports;
             });
 
             await client.WaitForState(ConnectionState.Connected);
+
+            failConnects = true;
             client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(new ErrorInfo("force disconnect")));
+
+            // The immediate retries are bounded by the number of domains to traverse, and until that
+            // budget is spent the client is legitimately still cycling through CONNECTING - which is
+            // not the state RTN12d is about. Wait for it to run out before closing.
+            var domainCount = 1 + client.State.Connection.FallbackHosts.Count;
+            var budgetDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
+            while (client.State.AttemptsInfo.InstantRetryCount < domainCount
+                   && DateTimeOffset.UtcNow < budgetDeadline)
+            {
+                await Task.Delay(50);
+            }
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(
+                domainCount,
+                "the client cannot sit still in DISCONNECTED until the immediate retries are spent");
+
+            // The budget is recorded when the retry is granted, not when its attempt finishes, so
+            // the last CONNECTING is still in flight here. Let it fail before closing.
+            await client.WaitForState(ConnectionState.Disconnected);
+            await client.ProcessCommands();
 
             await AssertsClosesAndDoesNotReconnect(client, ConnectionState.Disconnected);
 

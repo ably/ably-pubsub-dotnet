@@ -154,21 +154,30 @@ namespace IO.Ably.Realtime.Workflow
 
     internal class SetConnectingStateCommand : RealtimeCommand
     {
-        private SetConnectingStateCommand(bool clearConnectionKey, bool retryAuth)
+        private SetConnectingStateCommand(bool clearConnectionKey, bool retryAuth, bool? connectivityConfirmed)
         {
             ClearConnectionKey = clearConnectionKey;
             RetryAuth = retryAuth;
+            ConnectivityConfirmed = connectivityConfirmed;
         }
 
         public bool ClearConnectionKey { get; }
 
         public bool RetryAuth { get; }
 
-        public static SetConnectingStateCommand Create(bool clearConnectionKey = false, bool retryAuth = false) => new SetConnectingStateCommand(clearConnectionKey, retryAuth);
+        /// <summary>
+        /// The connectivity answer already obtained by the DISCONNECTED that queued this command, so
+        /// the RTN17j check is not paid for twice in one cycle. Null when there is no answer on hand
+        /// - a timer driven retry, or a caller's Connect() - and those take their own.
+        /// </summary>
+        public bool? ConnectivityConfirmed { get; }
+
+        public static SetConnectingStateCommand Create(bool clearConnectionKey = false, bool retryAuth = false, bool? connectivityConfirmed = null) =>
+            new SetConnectingStateCommand(clearConnectionKey, retryAuth, connectivityConfirmed);
 
         protected override string ExplainData()
         {
-            return string.Empty;
+            return ConnectivityConfirmed.HasValue ? $"ConnectivityConfirmed: {ConnectivityConfirmed}" : string.Empty;
         }
     }
 
