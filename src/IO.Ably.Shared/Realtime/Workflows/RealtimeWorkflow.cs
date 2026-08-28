@@ -363,6 +363,17 @@ namespace IO.Ably.Realtime.Workflow
             switch (command)
             {
                 case ConnectCommand _:
+
+                    // RTN11d - connect() out of CLOSED or FAILED starts afresh. The channel half,
+                    // back to INITIALIZED with errorReason unset, is done per channel by the command
+                    // queued below; Id and Key are already emptied on entering CLOSED or FAILED.
+                    if (State.Connection.State == ConnectionState.Closed ||
+                        State.Connection.State == ConnectionState.Failed)
+                    {
+                        State.Connection.ErrorReason = null;
+                        State.Connection.MessageSerial = 0;
+                    }
+
                     var nextCommand = ConnectionManager.Connect();
                     var initFailedChannelsOnConnect =
                         ChannelCommand.CreateForAllChannels(InitialiseFailedChannelsOnConnect.Create().TriggeredBy(command));
@@ -952,14 +963,36 @@ namespace IO.Ably.Realtime.Workflow
 
                     case SetFailedStateCommand cmd:
 
-                        ClearAckQueueAndFailMessages(ErrorInfo.ReasonFailed);
-
                         var error = TransformIfTokenErrorAndNotRetryable();
                         var failedState = new ConnectionFailedState(ConnectionManager, error, Logger);
-                        SetState(failedState);
-                        State.Connection.ClearKeyAndId(); // RTN8c, RTN9c
 
-                        ConnectionManager.DestroyTransport();
+                        // RTN7e - the queued messages are failed with "an error representing the
+                        // reason for the state change", taken off the state object so it is this
+                        // transition's reason even if SetState early-returns. In the finally, after
+                        // the transition, so a publisher's callback sees the state it is being told
+                        // about and a throwing transition cannot strand the messages uncalled.
+                        // ably-js orders it the same way: enactStateChange then failQueuedMessages.
+                        //
+                        // RTN7e - the queued messages are failed with "an error representing the
+                        // reason for the state change", taken off the state object so it is this
+                        // transition's reason even if SetState early-returns. In the finally, after
+                        // the transition, so a publisher's callback sees the state it is being told
+                        // about and a throwing transition cannot strand the messages uncalled.
+                        // ably-js orders it the same way: enactStateChange then failQueuedMessages.
+                        //
+                        // RTN8d and RTN9d share that finally: the connection has entered the state
+                        // by the time SetState rethrows, so a throw must not leave it reporting a
+                        // terminal state while still holding a resumable key and a live transport.
+                        try
+                        {
+                            SetState(failedState);
+                        }
+                        finally
+                        {
+                            ClearAckQueueAndFailMessages(failedState.Error);
+                            State.Connection.ClearKeyAndId(); // RTN8d, RTN9d
+                            ConnectionManager.DestroyTransport();
+                        }
 
                         ErrorInfo TransformIfTokenErrorAndNotRetryable()
                         {
@@ -1111,7 +1144,7 @@ namespace IO.Ably.Realtime.Workflow
 
                         var closingState = new ConnectionClosingState(ConnectionManager, connectedTransport, Logger);
                         SetState(closingState);
-                        State.Connection.ClearKeyAndId(); // RTN8c, RTN9c
+                        State.Connection.ClearKeyAndId(); // RTN8d, RTN9d
 
                         if (connectedTransport)
                         {
@@ -1129,27 +1162,49 @@ namespace IO.Ably.Realtime.Workflow
                             State.Connection.ClearKey();
                         }
 
-                        ClearAckQueueAndFailMessages(ErrorInfo.ReasonSuspended);
-
                         var suspendedState = new ConnectionSuspendedState(ConnectionManager, cmd.Error, Logger);
-                        SetState(suspendedState);
-                        State.Connection.ClearKeyAndId(); // RTN8c, RTN9c
+
+                        // RTN7e and the teardown - see the note on the FAILED case.
+                        try
+                        {
+                            SetState(suspendedState);
+                        }
+                        finally
+                        {
+                            ClearAckQueueAndFailMessages(suspendedState.Error);
+
+                            // Deliberately NOT RTN8d/RTN9d, which name only CLOSED, CLOSING and
+                            // FAILED. Clearing here is this library's pre-6.1.0 behaviour, kept
+                            // because it is coupled to the connectionStateTtl freshness check that
+                            // also predates 6.1.0.
+                            State.Connection.ClearKeyAndId();
+
+                            // Needed here as well as in the DISCONNECTED handler, which diverts to
+                            // this case before reaching its own DestroyTransport. A surviving
+                            // transport keeps its listener for up to suspendedRetryTimeout.
+                            ConnectionManager.DestroyTransport();
+                        }
 
                         break;
 
                     case SetClosedStateCommand cmd:
-
-                        ClearAckQueueAndFailMessages(ErrorInfo.ReasonClosed);
 
                         var closedState = new ConnectionClosedState(ConnectionManager, cmd.Error, Logger)
                         {
                             Exception = cmd.Exception,
                         };
 
-                        SetState(closedState);
-                        State.Connection.ClearKeyAndId(); // RTN8c, RTN9c
-
-                        ConnectionManager.DestroyTransport();
+                        // RTN7e and the teardown - see the note on the FAILED case.
+                        try
+                        {
+                            SetState(closedState);
+                        }
+                        finally
+                        {
+                            ClearAckQueueAndFailMessages(closedState.Error);
+                            State.Connection.ClearKeyAndId(); // RTN8d, RTN9d
+                            ConnectionManager.DestroyTransport();
+                        }
 
                         break;
                 }
@@ -1180,6 +1235,8 @@ namespace IO.Ably.Realtime.Workflow
                 Logger.Debug(message);
             }
 
+            var notified = false;
+
             try
             {
                 if (newState.IsUpdate == false)
@@ -1207,13 +1264,28 @@ namespace IO.Ably.Realtime.Workflow
                     Logger.Debug($"xx {newState.State}: Skipping attaching.");
                 }
 
+                notified = true;
                 UpdateStateAndNotifyConnection(newState);
             }
-            catch (AblyException ex)
+            catch (Exception ex)
             {
-                Logger.Error("Error attaching to context", ex);
+                // Everything, not just AblyException: anything else thrown by StartTimer or the
+                // state object would reach the command loop, which logs and drops it, leaving the
+                // connection with no transport, no timer and no state change emitted. The transition
+                // is still completed below and the exception still rethrown.
+                Logger.Error($"Error attaching to context while changing state to {newState.State}", ex);
 
-                UpdateStateAndNotifyConnection(newState);
+                // Only if the notify has not already happened. A throw during the transition lands
+                // here after the state change has been emitted - StartTimer is one source, and a
+                // negative retry timeout reaches System.Threading.Timer. Not a channel's
+                // ConnectionStateChanged, which RealtimeChannels guards per channel. Re-emitting is harmless for an ordinary transition, which the
+                // same-state check swallows, but an RTN24 update has no such check and was emitted
+                // twice. The flag is set before the call so a throw from inside it does not trigger
+                // a second attempt either.
+                if (notified == false)
+                {
+                    UpdateStateAndNotifyConnection(newState);
+                }
 
                 newState.AbortTimer();
 

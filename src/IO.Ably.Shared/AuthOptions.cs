@@ -13,6 +13,13 @@ namespace IO.Ably
         /// <summary>
         /// The callback used to get a new <see cref="IO.Ably.TokenDetails"/> or <see cref="IO.Ably.TokenRequest"/>.
         /// AuthCallback is used by internally by <see cref="IO.Ably.AblyAuth"/>.RequestTokenAsync.
+        /// <para>
+        /// The callback is bounded by <see cref="ClientOptions.RealtimeRequestTimeout"/> per RSA4c,
+        /// but cannot be cancelled: one that overruns is abandoned and keeps running, so a later auth
+        /// attempt may invoke it again concurrently and implementations must tolerate that. A result
+        /// returned after the bound is discarded, and each abandoned invocation holds a thread pool
+        /// worker until it returns.
+        /// </para>
         /// </summary>
         public Func<TokenParams, Task<object>> AuthCallback { get; set; }
 

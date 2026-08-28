@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 using IO.Ably.Realtime;
@@ -321,6 +322,104 @@ namespace IO.Ably.Tests.Realtime
             await client.ProcessCommands();
 
             client.State.AttemptsInfo.InstantRetryCount.Should().Be(0);
+        }
+
+        [Fact]
+        [Trait("spec", "RSA4c")]
+        public async Task WithASynchronouslyBlockingAuthCallback_ShouldStillBoundTheAttempt()
+        {
+            // RSA4c - TimeoutAfter extends an already-created Task, so the callback has to be invoked
+            // through Task.Run to be bounded at all. A callback whose body runs synchronously - the
+            // most ordinary C# shape - would otherwise block before there is anything to bound and
+            // hold the workflow's single reader thread for as long as it takes.
+            var released = new ManualResetEventSlim(false);
+            var client = GetClientWithFakeTransport(opts =>
+            {
+                opts.Key = ValidKey;
+                opts.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(200);
+                opts.AuthCallback = _ =>
+                {
+                    released.Wait(TimeSpan.FromSeconds(30));
+                    return Task.FromResult<object>(new TokenDetails("blocked"));
+                };
+            });
+
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                var error = await Assert.ThrowsAsync<AblyException>(() => client.Auth.AuthorizeAsync());
+                sw.Stop();
+
+                // The specific failure, not merely any failure - a bare IsFaulted check would also
+                // have been satisfied by an unrelated fast fault.
+                error.ErrorInfo.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
+                error.ErrorInfo.Cause.Should().NotBeNull();
+                error.ErrorInfo.Cause.Code.Should().Be(ErrorCodes.ClientCallbackError);
+
+                // Comfortably inside the 30s the callback blocks for, and comfortably outside the
+                // 200ms bound so a loaded run does not flake.
+                sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                released.Set();
+            }
+        }
+
+        [Fact]
+        [Trait("spec", "RSA4c1")]
+        public async Task WhenTheAuthCallbackFails_ShouldSetTheCauseNotOnlyTheInnerException()
+        {
+            // RSA4c1 wants an ErrorInfo "with code 80019, statusCode 401, and cause set to the
+            // underlying cause". The four argument overload assigns InnerException instead, which is
+            // not the spec's field and is not serialised as one.
+            var client = GetClientWithFakeTransport(opts =>
+            {
+                opts.Key = ValidKey;
+                opts.AuthCallback = _ => throw new AblyException(new ErrorInfo("the underlying cause", 40100));
+            });
+
+            var error = await Assert.ThrowsAsync<AblyException>(() => client.Auth.AuthorizeAsync());
+
+            error.ErrorInfo.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
+            error.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            error.ErrorInfo.Cause.Should().NotBeNull();
+            error.ErrorInfo.Cause.Message.Should().Be("the underlying cause");
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [Trait("spec", "TO3l11")]
+        public void WithANonPositiveRealtimeRequestTimeout_ShouldReject(int seconds)
+        {
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromSeconds(seconds));
+        }
+
+        [Fact]
+        [Trait("spec", "TO3l11")]
+        public void WithARealtimeRequestTimeoutTooLargeForATimer_ShouldReject()
+        {
+            // TimeSpan.MaxValue is the idiomatic "never time out", and it reaches Task.Delay through
+            // TimeoutAfter, which rejects anything over uint.MaxValue - 1 ms - surfacing as a code-0
+            // error out of Authorize(). Rejected up front instead.
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.MaxValue);
+
+            // uint.MaxValue - 1 is Task.Delay's limit on .NET 6+ only: it is above what net46, Mono
+            // and Xamarin accept, and above what CountdownTimer's cast to int can carry into
+            // System.Threading.Timer on any framework.
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1));
+
+            // Just inside the limit is still allowed.
+            options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(int.MaxValue);
+            options.RealtimeRequestTimeout.TotalMilliseconds.Should().Be(int.MaxValue);
         }
 
         [Flags]

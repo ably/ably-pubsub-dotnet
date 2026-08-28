@@ -295,6 +295,51 @@ namespace IO.Ably
         /// </summary>
         public TimeSpan ChannelRetryTimeout { get; set; } = Defaults.ChannelRetryTimeout;
 
+        private TimeSpan _realtimeRequestTimeout = Defaults.RealtimeRequestTimeout;
+
+        /// <summary>
+        /// How long the library waits for Ably to answer before treating a realtime request as
+        /// having failed. Applies while establishing a connection, while awaiting a response to a
+        /// Heartbeat, Connect, Attach, Detach or Close, and as part of the RTN23a idle timeout.
+        /// Default: 10s. Must be a positive interval, and values beyond a minute or so are rarely
+        /// useful. Disabling the timeout is not supported - the timeouts this value drives are all
+        /// required to fire - so both Timeout.InfiniteTimeSpan and TimeSpan.MaxValue are rejected.
+        /// TO3l11 - https://sdk.ably.com/builds/ably/specification/main/features/#TO3l11.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">when set to zero, a negative value, or an
+        /// interval too large for the underlying timers to fire.</exception>
+        public TimeSpan RealtimeRequestTimeout
+        {
+            get => _realtimeRequestTimeout;
+
+            set
+            {
+                // A non-positive value fails quietly rather than loudly: zero turns the RTN14c
+                // connect timeout into a hot reconnect loop, and a negative one stops the timer
+                // firing at all. Timeout.InfiniteTimeSpan is -1ms, so the lower bound catches it -
+                // which matters, because both Task.Delay and System.Threading.Timer accept it as
+                // genuine infinity and it would disable RTN14c, RTN12b, RTL4f, RTL5f and RSA4c.
+                //
+                // The upper bound is the tightest limit across the sinks this value reaches on every
+                // framework shipped: Task.Delay allows uint.MaxValue - 1 ms on .NET 6+ but only
+                // Int32.MaxValue on .NET Framework, Mono and Xamarin, and CountdownTimer casts to
+                // int for System.Threading.Timer. So Int32.MaxValue ms - a bound on the arithmetic,
+                // not a supported configuration, which is why the message names the useful range.
+                if (value <= TimeSpan.Zero || value.TotalMilliseconds > int.MaxValue)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(RealtimeRequestTimeout),
+                        value,
+                        "RealtimeRequestTimeout must be a positive interval. The default is 10s; " +
+                        "values beyond a minute or so are rarely useful. Disabling the timeout is " +
+                        "not supported - the connect, close, attach, detach and auth timeouts it " +
+                        "drives are all required to fire.");
+                }
+
+                _realtimeRequestTimeout = value;
+            }
+        }
+
         /// <summary>
         /// Timeout for opening an http request.
         /// Default: 4s.
@@ -435,8 +480,6 @@ namespace IO.Ably
         internal ILogger Logger { get; set; } = DefaultLogger.LoggerInstance;
 
         internal bool SkipInternetCheck { get; set; }
-
-        internal TimeSpan RealtimeRequestTimeout { get; set; } = Defaults.RealtimeRequestTimeout;
 
         /// <summary>
         /// Default constructor for ClientOptions.

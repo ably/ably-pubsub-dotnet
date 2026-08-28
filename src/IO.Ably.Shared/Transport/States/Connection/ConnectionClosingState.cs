@@ -10,7 +10,6 @@ namespace IO.Ably.Transport.States.Connection
     {
         public override ErrorInfo DefaultErrorInfo => ErrorInfo.ReasonClosed;
 
-        private const int CloseTimeout = 1000;
         private readonly bool _connectedTransport;
         private readonly ICountdownTimer _timer;
 
@@ -62,7 +61,9 @@ namespace IO.Ably.Transport.States.Connection
         {
             if (_connectedTransport)
             {
-                _timer.Start(TimeSpan.FromMilliseconds(CloseTimeout), OnTimeOut);
+                // RTN12b - the wait for the CLOSED message is realtimeRequestTimeout, which TO3l11
+                // makes a client option.
+                _timer.Start(Context.DefaultTimeout, OnTimeOut);
             }
         }
 

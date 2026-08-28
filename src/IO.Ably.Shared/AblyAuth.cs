@@ -305,11 +305,27 @@ namespace IO.Ably
                 bool shouldCatch = true;
                 try
                 {
-                    var callbackResult = await authOptions.AuthCallback(tokenParams);
+                    // RSA4c bounds an auth attempt by realtimeRequestTimeout. This one is awaited on
+                    // the realtime workflow's single reader thread, so an authCallback that never
+                    // returns would stall channel state, inbound messages and the idle monitor.
+                    //
+                    // Task.Run rather than awaiting the delegate directly: TimeoutAfter extends an
+                    // already-created Task, so a callback whose body runs synchronously - the most
+                    // ordinary shape in C# - would block before there is anything to bound. It
+                    // cannot cancel the callback; an abandoned one runs to completion.
+                    var callbackResult = await Task.Run(() => authOptions.AuthCallback(tokenParams))
+                        .TimeoutAfter(Options.RealtimeRequestTimeout, null);
 
                     if (callbackResult == null)
                     {
-                        throw new AblyException("AuthCallback returned null", ErrorCodes.ClientAuthProviderRequestFailed);
+                        // Covers a callback that returned null and one that timed out - TimeoutAfter
+                        // yields null for both, and the wrapper below replaces the message anyway.
+                        // ClientCallbackError, not ClientAuthProviderRequestFailed: the wrapper
+                        // rethrows as 80019 per RSA4c1 with this as the cause, so 80019 here would
+                        // duplicate its own parent. ably-js uses 40170 for the same case.
+                        throw new AblyException(
+                            $"AuthCallback returned null or did not return within {Options.RealtimeRequestTimeout.TotalSeconds}s",
+                            ErrorCodes.ClientCallbackError);
                     }
 
                     if (callbackResult is TokenDetails)
@@ -341,12 +357,17 @@ namespace IO.Ably
                             : HttpStatusCode.Unauthorized;
                     }
 
+                    // RSA4c1 wants the cause "set to the underlying cause". The four argument overload
+                    // assigns InnerException instead, which is not the spec's field and is not
+                    // serialised as one.
                     throw new AblyException(
                         new ErrorInfo(
                             "Error calling AuthCallback, token request failed. See inner exception for details.",
                             ErrorCodes.ClientAuthProviderRequestFailed,
                             statusCode,
-                            ex),
+                            href: null,
+                            cause: (ex as AblyException)?.ErrorInfo ?? new ErrorInfo(ex.Message),
+                            innerException: ex),
                         ex);
                 }
             }
