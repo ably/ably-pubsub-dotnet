@@ -496,20 +496,12 @@ namespace IO.Ably.Realtime.Workflow
                     }
 
                 case HandleConnectingDisconnectedCommand cmd:
-                    if (State.ShouldSuspend(Now))
-                    {
-                        return SetSuspendedStateCommand.Create(
-                                cmd.Error ?? ErrorInfo.ReasonSuspended,
-                                clearConnectionKey: true)
-                            .TriggeredBy(cmd);
-                    }
-                    else
-                    {
-                        return SetDisconnectedStateCommand.Create(
-                                cmd.Error ?? ErrorInfo.ReasonDisconnected,
-                                clearConnectionKey: true)
-                            .TriggeredBy(cmd);
-                    }
+
+                    // Suspending is decided in the SetDisconnectedStateCommand handler, for every path.
+                    return SetDisconnectedStateCommand.Create(
+                            cmd.Error ?? ErrorInfo.ReasonDisconnected,
+                            clearConnectionKey: true)
+                        .TriggeredBy(cmd);
 
                 case HandleConnectingErrorCommand cmd:
                     var error = cmd.Error ?? cmd.Exception?.ErrorInfo ?? ErrorInfo.ReasonUnknown;
@@ -522,14 +514,6 @@ namespace IO.Ably.Realtime.Workflow
 
                     if (error.IsRetryableStatusCode())
                     {
-                        if (State.ShouldSuspend(Now))
-                        {
-                            return SetSuspendedStateCommand.Create(
-                                    error,
-                                    clearConnectionKey: true)
-                                .TriggeredBy(cmd);
-                        }
-
                         return SetDisconnectedStateCommand.Create(
                                 error,
                                 clearConnectionKey: true)
@@ -968,11 +952,30 @@ namespace IO.Ably.Realtime.Workflow
                         break;
                     case SetDisconnectedStateCommand cmd:
 
+                        // RTN14e - measured here because this is the one place every path into
+                        // DISCONNECTED converges. Checking only the two connection-attempt failure
+                        // handlers misses the token and auth retry paths, which do not pass through
+                        // either: a client whose token source keeps failing would loop CONNECTING and
+                        // DISCONNECTED indefinitely without ever suspending.
+                        //
+                        // Ordered before CheckInstantRetryFlag so that suspending beats retrying.
+                        //
+                        // SkipAttach is excluded: the caller has already queued the next command, so
+                        // diverting would emit SUSPENDED and then immediately CONNECTING.
+                        if (cmd.SkipAttach == false && State.ShouldSuspend(Now))
+                        {
+                            return SetSuspendedStateCommand.Create(
+                                    cmd.Error ?? ErrorInfo.ReasonSuspended,
+                                    clearConnectionKey: true)
+                                .TriggeredBy(command);
+                        }
+
                         if (cmd.ClearConnectionKey)
                         {
                             State.Connection.ClearKey();
                         }
 
+                        bool? connectivityAnswer = null;
                         var retryInstantly = await CheckInstantRetryFlag();
 
                         var disconnectedState = new ConnectionDisconnectedState(ConnectionManager, cmd.Error, Logger)
@@ -980,6 +983,14 @@ namespace IO.Ably.Realtime.Workflow
                             RetryInstantly = retryInstantly,
                             Exception = cmd.Exception,
                         };
+
+                        if (cmd.SkipAttach)
+                        {
+                            // RTN14d - retryIn must be the delay actually waited. skipAttach means
+                            // the caller has already queued the next command, so there is no wait,
+                            // and StartTimer, which records the real figure, never runs.
+                            disconnectedState.RetryIn = TimeSpan.Zero;
+                        }
 
                         SetState(disconnectedState, skipTimer: cmd.SkipAttach);
 

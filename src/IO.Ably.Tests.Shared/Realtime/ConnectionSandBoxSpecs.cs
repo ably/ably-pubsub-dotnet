@@ -962,7 +962,7 @@ namespace IO.Ably.Tests.Realtime
         [ProtocolData]
         [Trait("spec", "RTN15g")]
         [Trait("spec", "RTN15g1")]
-        // "RTN15g2" It can't implement that spec item because RTN23a is not even implemented
+        [Trait("spec", "RTN15g2")]
         [Trait("spec", "RTN15g3")]
         public async Task WhenDisconnectedPastTTL_ShouldNotResume_ShouldClearConnectionStateAndAttemptNewConnection(Protocol protocol)
         {
@@ -974,9 +974,14 @@ namespace IO.Ably.Tests.Realtime
 
             await client.WaitForState(ConnectionState.Connected);
 
-            client.State.Connection.ConnectionStateTtl = TimeSpan.FromSeconds(1);
+            // No ttl override: winding ConfirmedAliveAt back below is enough to force the stale
+            // path against the real 120s ttl plus the server's 15s maxIdleInterval. Shortening the
+            // ttl as well made this test fail, because the RTN14e clamp in
+            // ConnectionDisconnectedState.StartTimer then clamps the retry backoff down to the
+            // remaining ttl - about a second - so the reconnect happened far sooner than the
+            // DisconnectedRetryTimeout this test asserts against. A 1s ttl would also trip
+            // ShouldSuspend on the retry and land in SUSPENDED instead of CONNECTED.
             string initialConnectionId = client.Connection.Id;
-            TimeSpan connectionStateTtl = client.Connection.ConnectionStateTtl;
 
             var aliveAt1 = client.Connection.ConfirmedAliveAt;
             var aliveAt2 = aliveAt1;
@@ -1006,6 +1011,15 @@ namespace IO.Ably.Tests.Realtime
                 client.Connection.Once(ConnectionEvent.Disconnected, change2 =>
                 {
                     disconnectedAt = DateTime.UtcNow;
+
+                    // RTN15g2 - the staleness window is connectionStateTtl plus the real
+                    // maxIdleInterval the server sent, which is 15s against a live endpoint. A
+                    // shortened ttl alone is therefore not enough to push us outside it before the
+                    // retry fires, so wind the last known activity back instead. Deliberately done
+                    // here rather than while still Connected: from Connected this would trip the
+                    // RTN23a idle monitor and race the disconnect this test is arranging.
+                    client.State.Connection.SetConfirmedAlive(DateTimeOffset.UtcNow.AddMinutes(-30));
+
                     channels[1].Attach();
                     client.Connection.Once(ConnectionEvent.Connecting, change3 =>
                     {
@@ -1030,7 +1044,6 @@ namespace IO.Ably.Tests.Realtime
 
             initialConnectionId.Should().NotBeNullOrEmpty();
             initialConnectionId.Should().NotBe(newConnectionId);
-            connectionStateTtl.Should().Be(TimeSpan.FromSeconds(1));
             aliveAt1.Value.Should().BeBefore(aliveAt2.Value);
 
             await channels[0].WaitForAttachedState();
