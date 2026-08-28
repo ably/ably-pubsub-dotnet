@@ -485,24 +485,27 @@ namespace IO.Ably.Realtime.Workflow
         }
     }
 
+    /// <summary>
+    /// A periodic tick asking the workflow to check whether the current transport has gone idle for
+    /// longer than RTN23a allows. Carries no state: the handler reads RealtimeState on the workflow
+    /// thread rather than the timer sampling it off-thread.
+    /// </summary>
     internal class HeartbeatMonitorCommand : RealtimeCommand
     {
-        private HeartbeatMonitorCommand(DateTimeOffset? confirmedAliveAt, TimeSpan connectionStateTtl)
+        private HeartbeatMonitorCommand(DateTimeOffset queuedAt)
         {
-            ConfirmedAliveAt = confirmedAliveAt;
-            ConnectionStateTtl = connectionStateTtl;
+            QueuedAt = queuedAt;
         }
 
-        public DateTimeOffset? ConfirmedAliveAt { get; }
+        /// <summary>
+        /// When this tick was queued, which is the moment idleness is judged against. Reading the
+        /// clock in the handler would charge any wait behind a slow command to the transport.
+        /// </summary>
+        public DateTimeOffset QueuedAt { get; }
 
-        public TimeSpan ConnectionStateTtl { get; }
+        public static HeartbeatMonitorCommand Create(DateTimeOffset queuedAt) =>
+            new HeartbeatMonitorCommand(queuedAt);
 
-        public static HeartbeatMonitorCommand Create(DateTimeOffset? confirmedAliveAt, TimeSpan connectionStateTtl) =>
-            new HeartbeatMonitorCommand(confirmedAliveAt, connectionStateTtl);
-
-        protected override string ExplainData()
-        {
-            return $"ConfirmedAliveAt: {ConfirmedAliveAt}. ConnectionStateTtl {ConnectionStateTtl}";
-        }
+        protected override string ExplainData() => $"QueuedAt: {QueuedAt:O}";
     }
 }

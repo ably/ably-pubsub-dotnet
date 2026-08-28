@@ -52,6 +52,37 @@ namespace IO.Ably.Tests.Realtime
                 .WhoseValue.Should().Be(echo.ToString().ToLower());
         }
 
+        // UTS: realtime/unit/RTN23a/heartbeats-true-query-param-0
+        [Fact]
+        [Trait("spec", "RTN23b")]
+        public async Task ShouldRequestProtocolHeartbeats()
+        {
+            // RTN23b - ClientWebSocket cannot observe an incoming websocket ping frame, so protocol
+            // messages are the only activity RTN23a can measure.
+            _ = await GetConnectedClient();
+
+            LastCreatedTransport.Parameters.GetParams()
+                .Should().ContainKey("heartbeats")
+                .WhoseValue.Should().Be("true");
+        }
+
+        [Fact]
+        [Trait("spec", "RTN23b")]
+        [Trait("spec", "RTC1f1")]
+        public async Task WithHeartbeatsInTransportParams_ShouldLetTheCallerOverrideIt()
+        {
+            // RTN23b makes the param optional, so a caller can still turn it off. Pinned because it
+            // works by virtue of how AdditionalParameters are merged rather than anything explicit.
+            _ = await GetConnectedClient(options => options.TransportParams = new Dictionary<string, object>
+            {
+                { "heartbeats", false },
+            });
+
+            LastCreatedTransport.Parameters.GetParams()
+                .Should().ContainKey("heartbeats")
+                .WhoseValue.Should().Be("false");
+        }
+
         [Fact]
         [Trait("spec", "RTN2d")]
         public async Task WithClientId_ShouldSetTransportClientIdCorrectly()

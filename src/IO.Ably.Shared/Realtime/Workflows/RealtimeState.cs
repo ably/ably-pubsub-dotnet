@@ -41,6 +41,14 @@ namespace IO.Ably.Realtime.Workflow
             public TimeSpan ConnectionStateTtl { get; internal set; } = Defaults.ConnectionStateTtl;
 
             /// <summary>
+            /// The maximum period of inactivity the server promises in the server to client
+            /// direction, from the connectionDetails of the most recent Connected message.
+            /// Null when the server declines to make that promise, in which case no idle
+            /// timeout is applied (CD2h).
+            /// </summary>
+            public TimeSpan? MaxIdleInterval { get; internal set; }
+
+            /// <summary>
             ///     Information relating to the transition to the current state,
             ///     as an Ably ErrorInfo object. This contains an error code and
             ///     message and, in the failed state in particular, provides diagnostic
@@ -74,16 +82,76 @@ namespace IO.Ably.Realtime.Workflow
 
             public bool HasConnectionStateTtlPassed(Func<DateTimeOffset> now)
             {
-                return ConfirmedAliveAt?.Add(ConnectionStateTtl) < now();
+                if (ConfirmedAliveAt.HasValue == false)
+                {
+                    // Nothing has ever been received on this client, so there is no connection
+                    // state to consider stale.
+                    return false;
+                }
+
+                // RTN15g2 - the window is connectionStateTtl plus maxIdleInterval, measured from
+                // the last known sign of activity from Ably rather than from when we left the
+                // Connected state. A device that slept may only have left Connected moments ago
+                // having last actually heard from Ably hours earlier.
+                // Clamped at zero rather than coalesced, because nothing between the wire and here
+                // validates the sign: TimeSpanJsonConverter will hand back a negative TimeSpan for a
+                // negative number and Update assigns it as-is. A negative value would make the
+                // subtraction below throw OverflowException, which is precisely the failure this
+                // method was rewritten to remove - the throw escapes HandleSetStateCommand's
+                // AblyException-only catch, gets logged and dropped by the command loop, and leaves
+                // the client wedged in DISCONNECTED with no transport and no retry. The RTN23a
+                // monitor already treats a non-positive interval as no promise at all.
+                var maxIdleInterval = MaxIdleInterval > TimeSpan.Zero ? MaxIdleInterval.Value : TimeSpan.Zero;
+
+                if (ConnectionStateTtl >= TimeSpan.MaxValue - maxIdleInterval)
+                {
+                    // The window cannot be represented, so it can never elapse.
+                    return false;
+                }
+
+                // Deliberately a subtraction rather than ConfirmedAliveAt + window. Adding to a
+                // DateTimeOffset throws ArgumentOutOfRangeException once the result runs past
+                // DateTimeOffset.MaxValue, and that exception escaped into the command loop where
+                // it was logged and dropped - silently abandoning whichever state transition was
+                // in progress. Comparing two durations cannot fail that way.
+                return now() - ConfirmedAliveAt.Value > ConnectionStateTtl + maxIdleInterval;
             }
 
-            public void Update(ConnectionInfo info)
+            public void Update(ConnectionInfo info, bool isUpdate)
             {
+                // Guarded differently on purpose. connectionId is a top-level field and always
+                // meaningful, per RTN8b. connectionKey lives inside connectionDetails, and RTN21
+                // scopes an override to "the attributes within ConnectionDetails" - so a CONNECTED
+                // carrying none overrides no key, and emptying it would leave a live connection with
+                // nothing to resume with under RTN15b. Clearing the key belongs to ClearKey and
+                // ClearKeyAndId, at the points that mean it.
                 Id = info.ConnectionId;
-                Key = info.ConnectionKey;
+
+                if (info.ConnectionKey.IsNotEmpty())
+                {
+                    Key = info.ConnectionKey;
+                }
+
                 if (info.ConnectionStateTtl.HasValue)
                 {
                     ConnectionStateTtl = info.ConnectionStateTtl.Value;
+                }
+
+                // RTN23a measures against the maxIdleInterval "sent in the connectionDetails of the
+                // most recent CONNECTED message received on that transport", so the promise belongs
+                // to the transport that carried it. Hence the two cases, which isUpdate separates:
+                //
+                //  - A CONNECTED starting a new transport must not inherit the old threshold. An
+                //    omitted field is Ably declining to promise anything, so detection stands down.
+                //    Strictly unspecified - RTN23a says the field "will be sent" and CD2h licenses
+                //    arbitrary inactivity for an explicit 0 - but failing open matches CD2h's
+                //    outcome for 0, and ably-js.
+                //  - A CONNECTED arriving while already CONNECTED is an RTN24 update on the
+                //    transport we already hold, so an omitted field is not a withdrawal and the
+                //    previous value stands. ably-js keeps it with the same guard.
+                if (isUpdate == false || info.MaxIdleInterval.HasValue)
+                {
+                    MaxIdleInterval = info.MaxIdleInterval;
                 }
             }
 

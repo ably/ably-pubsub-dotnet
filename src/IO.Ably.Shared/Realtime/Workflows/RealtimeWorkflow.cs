@@ -34,6 +34,11 @@ namespace IO.Ably.Realtime.Workflow
         // way of figuring out when processing has finished
         private volatile bool _processingCommand;
         private bool _heartbeatMonitorDisconnectRequested;
+
+        // Null until first asked. See ProtocolHeartbeatsNotRequestedByCaller.
+        private bool? _protocolHeartbeatsNotRequested;
+
+        private bool _warnedIdleCheckInactive;
         private bool _disposedValue;
 
         private AblyRealtime Client { get; }
@@ -108,7 +113,7 @@ namespace IO.Ably.Realtime.Workflow
                 {
                     while (true)
                     {
-                        QueueCommand(HeartbeatMonitorCommand.Create(Connection.ConfirmedAliveAt, Connection.ConnectionStateTtl).TriggeredBy("AblyRealtime.HeartbeatMonitor()"));
+                        QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("AblyRealtime.HeartbeatMonitor()"));
                         await Task.Delay(Client.Options.HeartbeatMonitorDelay, _heartbeatMonitorCancellationTokenSource.Token);
                     }
                 },
@@ -196,7 +201,8 @@ namespace IO.Ably.Realtime.Workflow
 
         internal async Task<IEnumerable<RealtimeCommand>> ProcessCommand(RealtimeCommand command)
         {
-            bool shouldLogCommand = !((command is EmptyCommand) || (command is ListCommand));
+            // Ticks every second, so logging each one would bury everything else at Debug.
+            bool shouldLogCommand = !((command is EmptyCommand) || (command is ListCommand) || (command is HeartbeatMonitorCommand));
             try
             {
                 if (Logger.IsDebug && shouldLogCommand)
@@ -233,7 +239,7 @@ namespace IO.Ably.Realtime.Workflow
                         State.Connection.CurrentStateObject?.AbortTimer();
                         return Enumerable.Empty<RealtimeCommand>();
                     case HeartbeatMonitorCommand cmd:
-                        return await HandleHeartbeatMonitorCommand(cmd);
+                        return HandleHeartbeatMonitorCommand(cmd);
                     default:
                         var next = await ProcessCommandInner(command);
                         return new[]
@@ -251,31 +257,99 @@ namespace IO.Ably.Realtime.Workflow
             }
         }
 
-        private async Task<IEnumerable<RealtimeCommand>> HandleHeartbeatMonitorCommand(HeartbeatMonitorCommand command)
+        /// <summary>
+        /// RTN23a - a transport silent for longer than maxIdleInterval plus realtimeRequestTimeout
+        /// is treated as dead and disconnected. Any inbound message counts as activity, not just
+        /// Heartbeats, which is why ProcessMessage refreshes the timestamp rather than the Heartbeat
+        /// handler. Data we send does not count.
+        /// </summary>
+        private IEnumerable<RealtimeCommand> HandleHeartbeatMonitorCommand(HeartbeatMonitorCommand command)
         {
-            if (!command.ConfirmedAliveAt.HasValue)
+            var connection = State.Connection;
+
+            // Only meaningful while Connected: elsewhere there is no live transport, and
+            // ConfirmedAliveAt may still hold a previous transport's timestamp.
+            if (connection.State != ConnectionState.Connected)
+            {
+                _heartbeatMonitorDisconnectRequested = false;
+
+                // Re-armed per transport, since maxIdleInterval is a per-transport promise.
+                _warnedIdleCheckInactive = false;
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // RTN23b - without protocol heartbeats Ably may satisfy maxIdleInterval with websocket
+            // ping frames, which this library cannot observe, leaving nothing to measure.
+            if (ProtocolHeartbeatsNotRequestedByCaller())
             {
                 return Enumerable.Empty<RealtimeCommand>();
             }
 
-            TimeSpan delta = Now() - command.ConfirmedAliveAt.Value;
-            if (delta > command.ConnectionStateTtl)
+            // No promised idle period to measure against.
+            var maxIdleInterval = connection.MaxIdleInterval;
+            if (maxIdleInterval.HasValue == false || maxIdleInterval.Value <= TimeSpan.Zero)
             {
-                if (!_heartbeatMonitorDisconnectRequested)
+                if (_warnedIdleCheckInactive == false)
                 {
-                    _heartbeatMonitorDisconnectRequested = true;
-                    return new RealtimeCommand[] { SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected).TriggeredBy(command) };
+                    _warnedIdleCheckInactive = true;
+
+                    // Logged because the two causes differ: absent means no CONNECTED carried the
+                    // field, zero is CD2h's explicit "arbitrarily-long levels of inactivity".
+                    Logger.Debug(
+                        maxIdleInterval.HasValue
+                            ? "Ably set maxIdleInterval to 0, so it guarantees no inactivity limit. Idle connection detection is off."
+                            : "No maxIdleInterval received from Ably, so idle connection detection is off.");
                 }
-            }
-            else
-            {
-                if (_heartbeatMonitorDisconnectRequested)
-                {
-                    _heartbeatMonitorDisconnectRequested = false;
-                }
+
+                return Enumerable.Empty<RealtimeCommand>();
             }
 
-            return Enumerable.Empty<RealtimeCommand>();
+            if (connection.ConfirmedAliveAt.HasValue == false)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // Measured to when the tick was queued, not to now. The workflow is a single reader, so
+            // work queued ahead of the tick - an inbound AUTH awaiting the application's
+            // authCallback - would otherwise be charged to the transport.
+            var idleFor = command.QueuedAt - connection.ConfirmedAliveAt.Value;
+
+            // A window that cannot be represented can never elapse. maxIdleInterval is unbounded off
+            // the wire, and an OverflowException here would be logged and dropped by the command
+            // loop, silently killing detection for the life of the connection.
+            if (maxIdleInterval.Value >= TimeSpan.MaxValue - Client.Options.RealtimeRequestTimeout)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // Read live, unlike the two per-transport snapshots above: this term is the caller's own
+            // slack rather than anything Ably promised on this transport, its setter validates the
+            // range, and it is only ever additive.
+            var allowedIdleTime = maxIdleInterval.Value + Client.Options.RealtimeRequestTimeout;
+
+            if (idleFor <= allowedIdleTime)
+            {
+                _heartbeatMonitorDisconnectRequested = false;
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            if (_heartbeatMonitorDisconnectRequested)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            _heartbeatMonitorDisconnectRequested = true;
+
+            var error = ErrorInfo.NoActivityFrom(idleFor);
+            Logger.Warning($"{error.Message} The limit was {allowedIdleTime.TotalSeconds:0.#}s.");
+
+            // RTN15a - a transport we have given up on counts as disconnected unexpectedly, so
+            // RTN15h3's immediate reconnect applies. Requested explicitly because NoActivityFrom
+            // carries 408, which the instant retry check does not recognise on its own.
+            return new RealtimeCommand[]
+            {
+                SetDisconnectedStateCommand.Create(error, retryInstantly: true).TriggeredBy(command),
+            };
         }
 
         /// <summary>
@@ -559,6 +633,79 @@ namespace IO.Ably.Realtime.Workflow
             return EmptyCommand.Instance;
         }
 
+        /// <summary>
+        /// Whether the caller's own transportParams entry has displaced ours, leaving RTN23b's
+        /// protocol heartbeats unrequested. RTN23b guarantees them only for exactly
+        /// `heartbeats=true`; anything else lets Ably use transport-level pings, which
+        /// ClientWebSocket does not surface.
+        /// </summary>
+        /// <returns>true when protocol heartbeats have not been requested.</returns>
+        private bool ProtocolHeartbeatsNotRequestedByCaller()
+        {
+            // Answered once - TransportParams is fixed at client construction.
+            if (_protocolHeartbeatsNotRequested.HasValue)
+            {
+                return _protocolHeartbeatsNotRequested.Value;
+            }
+
+            _protocolHeartbeatsNotRequested = ComputeProtocolHeartbeatsNotRequested();
+            return _protocolHeartbeatsNotRequested.Value;
+        }
+
+        private bool ComputeProtocolHeartbeatsNotRequested()
+        {
+            var transportParams = Client.Options.TransportParams;
+            if (transportParams == null)
+            {
+                return false;
+            }
+
+            // Case-insensitive because DictionaryExtensions.Merge drops our own heartbeats param on a
+            // case-insensitive key match, so "Heartbeats" reaches the wire in place of ours.
+            var callerEntry = transportParams.FirstOrDefault(x => x.Key.EqualsTo("heartbeats"));
+            if (callerEntry.Key == null)
+            {
+                return false;
+            }
+
+            // Two conditions, because Merge has already dropped ours on a case-insensitive key match:
+            //  - the value must be "true"; RTN23b guarantees protocol heartbeats only for that, and
+            //    treats false or unspecified as permission to use any transport-level mechanism.
+            //  - the key must be exactly "heartbeats"; any other spelling is a param Ably ignores,
+            //    which reads as unspecified.
+            string value;
+            try
+            {
+                value = callerEntry.Value?.ToString();
+            }
+            catch (Exception ex)
+            {
+                // Unguarded, a throwing ToString would escape every tick and be dropped by the
+                // command loop, killing RTN23a silently. TransportParams.ConvertValue guards it too.
+                Logger.Error($"Could not read transportParams['{callerEntry.Key}'] as a string.", ex);
+                value = null;
+            }
+
+            var keyIsExact = callerEntry.Key.EqualsTo("heartbeats", caseSensitive: true);
+            var valueIsTrue = value.EqualsTo("true");
+            var disabled = keyIsExact == false || valueIsTrue == false;
+
+            if (disabled)
+            {
+                // Named separately because the two halves need different fixes.
+                var reason = keyIsExact
+                    ? $"transportParams sets heartbeats to '{value}', not 'true'."
+                    : $"transportParams sets '{callerEntry.Key}'; Ably only reads 'heartbeats'.";
+
+                Logger.Warning(
+                    $"{reason} Ably may then keep this connection alive with websocket pings, which " +
+                    "this library cannot see, so idle connection detection is off and a silently " +
+                    "dropped connection will not be detected. Set heartbeats to 'true' to enable it.");
+            }
+
+            return disabled;
+        }
+
         private void SetNewHostInState(string newHost)
         {
             if (IsFallbackHost())
@@ -604,7 +751,7 @@ namespace IO.Ably.Realtime.Workflow
 
             var failedResumeOrRecover = State.Connection.Id != info.ConnectionId && cmd.Message.Error != null; // RTN15c7, RTN16d
 
-            State.Connection.Update(info); // RTN16d, RTN15e
+            State.Connection.Update(info, cmd.IsUpdate); // RTN16d, RTN15e, RTN23a
 
             if (info.ClientId.IsNotEmpty())
             {

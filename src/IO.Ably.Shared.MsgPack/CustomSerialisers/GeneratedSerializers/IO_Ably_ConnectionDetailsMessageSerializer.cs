@@ -35,7 +35,7 @@ namespace IO.Ably.CustomSerialisers {
         }
         
         protected override void PackToCore(MsgPack.Packer packer, IO.Ably.ConnectionDetails objectTree) {
-            packer.PackMapHeader(7);
+            packer.PackMapHeader(8);
             this._serializer0.PackTo(packer, "clientId");
             this._serializer0.PackTo(packer, objectTree.ClientId);
             this._serializer0.PackTo(packer, "connectionKey");
@@ -44,6 +44,8 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer1.PackTo(packer, objectTree.ConnectionStateTtl);
             this._serializer0.PackTo(packer, "maxFrameSize");
             this._serializer2.PackTo(packer, objectTree.MaxFrameSize);
+            this._serializer0.PackTo(packer, "maxIdleInterval");
+            this._serializer1.PackTo(packer, objectTree.MaxIdleInterval);
             this._serializer0.PackTo(packer, "maxInboundRate");
             this._serializer2.PackTo(packer, objectTree.MaxInboundRate);
             this._serializer0.PackTo(packer, "maxMessageSize");
@@ -110,6 +112,33 @@ namespace IO.Ably.CustomSerialisers {
                 }
                 if (nullable2.HasValue) {
                     result.MaxFrameSize = nullable2.Value;
+                }
+                unpacked = (unpacked + 1);
+                System.Nullable<System.TimeSpan> nullableMaxIdleInterval = default(System.Nullable<System.TimeSpan>);
+                if ((unpacked < itemsCount)) {
+                    if ((unpacker.Read() == false)) {
+                        throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(4);
+                    }
+                    if (((unpacker.IsArrayHeader == false)
+                                && (unpacker.IsMapHeader == false))) {
+                        nullableMaxIdleInterval = this._serializer1.UnpackFrom(unpacker);
+                    }
+                    else {
+                        MsgPack.Unpacker disposableMaxIdleInterval = default(MsgPack.Unpacker);
+                        disposableMaxIdleInterval = unpacker.ReadSubtree();
+                        try {
+                            nullableMaxIdleInterval = this._serializer1.UnpackFrom(disposableMaxIdleInterval);
+                        }
+                        finally {
+                            if (((disposableMaxIdleInterval == null)
+                                        == false)) {
+                                disposableMaxIdleInterval.Dispose();
+                            }
+                        }
+                    }
+                }
+                if (nullableMaxIdleInterval.HasValue) {
+                    result.MaxIdleInterval = nullableMaxIdleInterval;
                 }
                 unpacked = (unpacked + 1);
                 System.Nullable<long> nullable3 = default(System.Nullable<long>);
@@ -230,7 +259,35 @@ namespace IO.Ably.CustomSerialisers {
                                                 }
                                             }
                                             else {
-                                                unpacker.Skip();
+                                                if ((key == "maxIdleInterval")) {
+                                                    System.Nullable<System.TimeSpan> nullableMaxIdle = default(System.Nullable<System.TimeSpan>);
+                                                    if ((unpacker.Read() == false)) {
+                                                        throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
+                                                    }
+                                                    if (((unpacker.IsArrayHeader == false)
+                                                                && (unpacker.IsMapHeader == false))) {
+                                                        nullableMaxIdle = this._serializer1.UnpackFrom(unpacker);
+                                                    }
+                                                    else {
+                                                        MsgPack.Unpacker disposableMaxIdle = default(MsgPack.Unpacker);
+                                                        disposableMaxIdle = unpacker.ReadSubtree();
+                                                        try {
+                                                            nullableMaxIdle = this._serializer1.UnpackFrom(disposableMaxIdle);
+                                                        }
+                                                        finally {
+                                                            if (((disposableMaxIdle == null)
+                                                                        == false)) {
+                                                                disposableMaxIdle.Dispose();
+                                                            }
+                                                        }
+                                                    }
+                                                    if (nullableMaxIdle.HasValue) {
+                                                        result.MaxIdleInterval = nullableMaxIdle;
+                                                    }
+                                                }
+                                                else {
+                                                    unpacker.Skip();
+                                                }
                                             }
                                         }
                                     }
