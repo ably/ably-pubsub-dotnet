@@ -407,7 +407,20 @@ namespace IO.Ably.Realtime.Workflow
                     if (State.Connection.CurrentStateObject.CanSend || cmd.Force)
                     {
                         var sendResult = SendMessage(cmd.ProtocolMessage, cmd.Callback);
-                        if (sendResult.IsFailure && State.Connection.CurrentStateObject.CanQueue && Client.Options.QueueMessages)
+
+                        // Never queue a message already awaiting an ACK. One instance in both queues
+                        // would be sent twice on reconnect, and SendMessage's second MsgSerial
+                        // assignment would renumber the copy WaitingForAck reads live, leaving a hole
+                        // in the sequence RTN7b requires to be unique and serially incrementing.
+                        //
+                        // Unreachable today only by coincidence - AckRequired implies CanSend, and
+                        // CanQueue is false in CONNECTED - so the invariant is stated rather than
+                        // left to three unrelated facts. ably-js keeps it deliberately, via
+                        // MessageQueue's sendAttempted flag.
+                        if (sendResult.IsFailure &&
+                            cmd.ProtocolMessage.AckRequired == false &&
+                            State.Connection.CurrentStateObject.CanQueue &&
+                            Client.Options.QueueMessages)
                         {
                             Logger.Debug("Failed to send message. Queuing it.");
                             State.PendingMessages.Add(new MessageAndCallback(
@@ -746,10 +759,29 @@ namespace IO.Ably.Realtime.Workflow
         {
             var info = new ConnectionInfo(cmd.Message);
 
-            // recover is used when set via clientOptions#recover initially, resume will be used for all subsequent requests.
-            var isConnectionResumeOrRecoverAttempt = State.Connection.Key.IsNotEmpty() || Client.Options.Recover.IsNotEmpty();
-
-            var failedResumeOrRecover = State.Connection.Id != info.ConnectionId && cmd.Message.Error != null; // RTN15c7, RTN16d
+            // Whether this Connected continues the message serial sequence we are already part of.
+            // One that does not must restart at zero per RTN15c7, renumbering anything still
+            // awaiting an ACK. Three ways to continue:
+            //
+            //  - an RTN24 update, which arrives on the connection we already hold;
+            //  - a successful resume (RTN15c6), judged on the connectionId alone. RTN15c6's "and no
+            //    error property" describes what Ably sends, while the reset belongs to RTN15c7,
+            //    which is keyed on "a new connectionId". ably-js discriminates the same way, on
+            //    connIdChanged;
+            //  - a successful recover, which deliberately adopts a previous connection's counter.
+            //    RTN16f initialises it from the recovery key, which carries no connectionId, so
+            //    success is judged by the absence of an error.
+            //
+            // Broader than testing for an error on the message, which a connection cleared per
+            // RTN15g would fail: it reconnects fresh, and Ably answers with a new connectionId and
+            // no error - exactly the case that most needs a new sequence.
+            //
+            // Must be evaluated before Update below, which overwrites the id being compared, and
+            // before Options.Recover is cleared for RTN16k.
+            var isRecoverAttempt = Client.Options.Recover.IsNotEmpty();
+            var connectionContinues = cmd.IsUpdate ||
+                                      (isRecoverAttempt && cmd.Message.Error == null) ||
+                                      (State.Connection.Id.IsNotEmpty() && State.Connection.Id == info.ConnectionId);
 
             State.Connection.Update(info, cmd.IsUpdate); // RTN16d, RTN15e, RTN23a
 
@@ -768,25 +800,17 @@ namespace IO.Ably.Realtime.Workflow
 
             Client.Options.Recover = null; // RTN16k, explicitly setting null so it won't be used for subsequent connection requests
 
-            // RTN15c7
-            if (isConnectionResumeOrRecoverAttempt && failedResumeOrRecover)
+            // RTN15c7, RTN15g3, RTN11d - a connection that is not a continuation of the one we held
+            // restarts the message serial sequence at zero.
+            if (connectionContinues == false)
             {
                 State.Connection.MessageSerial = 0;
             }
 
-            // RTN15g3, RTN15c6, RTN15c7, RTN16l - for resume/recovered or when connection ttl passed, re-attach channels
-            if (State.Connection.HasConnectionStateTtlPassed(Now) || isConnectionResumeOrRecoverAttempt)
-            {
-                foreach (var channel in Channels)
-                {
-                    if (channel.State == ChannelState.Attaching || channel.State == ChannelState.Attached || channel.State == ChannelState.Suspended)
-                    {
-                        ((RealtimeChannel)channel).Attach(null, null, null, true); // state changes as per RTL2g
-                    }
-                }
-            }
-
-            SendPendingMessagesOnConnected(failedResumeOrRecover); // RTN19a
+            // The RTL3d reattach lives in RealtimeChannel.ConnectionStateChanged, not here: that
+            // handler runs inside NotifyUpdate's internal handlers, so the channel transitions land
+            // before CONNECTED reaches external listeners, as RTL3d1 requires.
+            SendPendingMessagesOnConnected(connectionContinues, cmd.IsUpdate); // RTN19a
         }
 
         private void HandlePingTimer(PingTimerCommand cmd)
@@ -1124,25 +1148,53 @@ namespace IO.Ably.Realtime.Workflow
             }
         }
 
-        private void SendPendingMessagesOnConnected(bool failedResumeOrRecover)
+        private void SendPendingMessagesOnConnected(bool connectionContinues, bool isUpdate)
         {
-            // RTN19a1
-            if (failedResumeOrRecover)
+            // RTN19 is scoped to "when a transport is disconnected for any reason", which puts an
+            // RTN24 update outside it: nothing was disconnected, and the transport that will ACK the
+            // in-flight messages is the one they went out on. Resending would put a duplicate of each
+            // on the wire for Ably to discard by msgSerial, and requeueing would renumber messages
+            // the server is still expecting under their original serials. ably-js does not re-drain
+            // on a CONNECTED received while already connected either.
+            //
+            // The RTL6c2 queue below is still flushed. It should be empty while connected, and
+            // skipping it would strand anything that did land there.
+            if (isUpdate == false)
             {
-                foreach (var messageAndCallback in State.WaitingForAck)
+                if (connectionContinues)
                 {
-                    State.PendingMessages.Add(new MessageAndCallback(
-                        messageAndCallback.Message,
-                        messageAndCallback.Callback,
-                        messageAndCallback.Logger));
+                    // RTN19a2 - the same connection is still expecting the serials these messages were
+                    // originally given, so resend them unchanged and leave them awaiting their ACK.
+                    foreach (var message in State.WaitingForAck.Select(x => x.Message))
+                    {
+                        ConnectionManager.SendToTransport(message);
+                    }
                 }
-            }
-            else
-            {
-                // RTN19a2 - successful resume, msgSerial doesn't change
-                foreach (var message in State.WaitingForAck.Select(x => x.Message))
+                else
                 {
-                    ConnectionManager.SendToTransport(message);
+                    // RTN19a1, RTN19a2 - a different connection means a fresh serial sequence, so
+                    // requeue rather than resend. The loop below hands each message to SendMessage,
+                    // which assigns a serial from the counter that HandleConnectedCommand has just
+                    // reset and re-registers it for its ACK.
+                    //
+                    // Resending these unchanged would leave the server's sequence sitting at the old
+                    // high water mark while ours restarted at zero, and Ably silently discards a
+                    // message whose serial is below what it has already seen - no ACK, no NACK, so the
+                    // publish callback would never be called at all.
+                    //
+                    // WaitingForAck is cleared because SendMessage re-registers each message as it
+                    // goes; stale entries would hold serials of the old sequence that the next ACK also
+                    // matches, running their callbacks twice.
+                    //
+                    // Inserted at the front, not appended: PendingMessages is the RTL6c2 queue and
+                    // already holds anything published while disconnected, which happened *after* these.
+                    // Appending would give the newer messages the lower serials and reverse publish
+                    // order. ably-js prepends for the same reason.
+                    State.PendingMessages.InsertRange(
+                        0,
+                        State.WaitingForAck.Select(x => new MessageAndCallback(x.Message, x.Callback, x.Logger)));
+
+                    State.WaitingForAck.Clear();
                 }
             }
 
@@ -1163,15 +1215,30 @@ namespace IO.Ably.Realtime.Workflow
             State.PendingMessages.Clear();
         }
 
+        /// <summary>
+        /// RTN7e - when the connection enters SUSPENDED, CLOSED or FAILED, everything that has not
+        /// been acknowledged has failed and must be reported as such.
+        /// </summary>
         private void ClearAckQueueAndFailMessages(ErrorInfo error)
         {
+            var messageError = error ?? ErrorInfo.ReasonUnknown;
+
             foreach (var item in State.WaitingForAck.Where(x => x.Callback != null))
             {
-                var messageError = error ?? ErrorInfo.ReasonUnknown;
                 item.SafeExecute(false, messageError);
             }
 
             State.WaitingForAck.Clear();
+
+            // RTN7e covers RTL6c2 as well as RTL6c1: a message submitted via either "should be
+            // considered failed ... and removed from any RTN19a retry queue". PendingMessages is the
+            // RTL6c2 queue.
+            foreach (var item in State.PendingMessages.Where(x => x.Callback != null))
+            {
+                item.SafeExecute(false, messageError);
+            }
+
+            State.PendingMessages.Clear();
         }
 
         public void QueueAck(ProtocolMessage message, Action<bool, ErrorInfo> callback)
