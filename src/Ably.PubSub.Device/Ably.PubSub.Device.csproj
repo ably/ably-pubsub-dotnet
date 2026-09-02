@@ -1,0 +1,59 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The core's TFMs minus net462 (PDR-091b plan decision 5b): there is no net462 Device
+         head, and .NET Framework is not a supported device target. -->
+    <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
+    <CodeAnalysisRuleSet>..\IO.Ably.ruleset</CodeAnalysisRuleSet>
+    <Configurations>Debug;Release;package</Configurations>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Ably.PubSub.Device</AssemblyName>
+    <RootNamespace>IO.Ably.PubSub.Device</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildRuntimeType)'=='Mono'">
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <!-- Signed in every configuration, not just the package one: a consumer of the signed core
+       must never have to mix signed and unsigned Ably assemblies. -->
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\IO.Ably.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='package|AnyCPU'">
+    <OutputPath>bin\package</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
+    <!-- Shared source, compiled into both door assemblies rather than published. -->
+    <Compile Include="..\Ably.PubSub.Side\Side.cs" Link="Side.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="..\stylecop.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.1.118">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ably.PubSub.Core\Ably.PubSub.Core.csproj" />
+  </ItemGroup>
+
+</Project>
