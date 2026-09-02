@@ -34,7 +34,19 @@ namespace IO.Ably
         }
 
         internal const string AblyAgentHeader = "Ably-Agent";
-        private static readonly string AblySdkIdentifier = $"ably-dotnet/{Defaults.LibraryVersion}"; // RSC7d1
+
+        // RSC7d1. The family identifier for this SDK.
+        //
+        // It flips from `ably-dotnet` to `ably-pubsub-dotnet` at the Pub/Sub package split
+        // (PDR-091b), and the flip is the point: the identifier alone then partitions legacy
+        // traffic (`ably-dotnet/*`, still emitted by the 1.x maintenance branch, which keeps
+        // the old identifier) from new-package traffic (`ably-pubsub-dotnet/*`), without
+        // needing to correlate versions. Registered in ably-common
+        // (https://github.com/ably/ably-common/pull/361) as a versioned `sdk` entry.
+        //
+        // The per-side flags (`ably-pubsub-device` / `ably-pubsub-server`) are stamped by the
+        // door packages, not here — see src/Ably.PubSub.Side/Side.cs.
+        private static readonly string AblySdkIdentifier = $"ably-pubsub-dotnet/{Defaults.LibraryVersion}";
 
         private static readonly Lazy<string> _dotnetRuntimeIdentifier =
             new Lazy<string>(() => GetDotnetRuntimeIdentifier());
