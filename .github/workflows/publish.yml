@@ -1,0 +1,273 @@
+# Publishes Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server to
+# nuget.org in lockstep at one version, and creates the GitHub release with the
+# .unitypackage attached.
+#
+# Dispatch only, and safe to sit on a branch it cannot release: the pre-flight
+# refuses any checkout whose nuget/ directory is not exactly the 2.0 lockstep set,
+# so dispatching this against a 1.x ref (which has nuget/io.ably.nuspec) aborts
+# before anything is built. That is what lets the workflow live on the default
+# branch - `gh workflow run` only reads workflow files from the default branch -
+# while the 2.0 work is still on an integration branch:
+#
+#   gh workflow run publish.yml --ref integration/v2 -f version=2.0.0 -f dry_run=true
+#
+# Run it with dry_run=true first. That does everything except the push, including
+# the packed-package assertions, and prints exactly what would be pushed.
+#
+# Ordering and idempotency. The doors pin the core as [<version>], so a door must
+# never be visible on nuget.org before the exact core version it pins: the push
+# order is core -> device -> server, and the doors wait until the core version is
+# listed. Before each push the registry is queried and an already-published
+# version is skipped, so a run that fails partway (network, validation, a revoked
+# credential) is completed by re-running it with the same version rather than by
+# hand. `--skip-duplicate` is the belt to that braces.
+#
+# Authentication is nuget.org Trusted Publishing: GitHub's OIDC token is exchanged
+# by NuGet/login for an API key valid for one hour, requested immediately before
+# the push. There is no long-lived key in this repository's secrets. It requires,
+# on nuget.org, a Trusted Publishing policy owned by the account that owns these
+# package ids, bound to this repository owner, this repository, and the workflow
+# file name `publish.yml` - see CONTRIBUTING.md. `secrets.NUGET_USER` is the
+# nuget.org *username* (profile name, not an email address); it is not a
+# credential, it is a secret only to keep the account name out of public logs.
+#
+# To fall back to a long-lived API key instead (for example while a policy is
+# being set up): delete the "NuGet login" step, drop `id-token: write` from this
+# job's permissions, add a `NUGET_API_KEY` repository secret and replace
+# `${{ steps.login.outputs.NUGET_API_KEY }}` below with
+# `${{ secrets.NUGET_API_KEY }}`. Nothing else changes.
+
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 2.0.0. Must equal src/CommonAssemblyInfo.cs and unity/Assets/Ably/version.txt on the dispatched ref'
+        required: true
+        type: string
+      dry_run:
+        description: 'Build, pack and assert everything, but do not push and do not create the release'
+        required: false
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  publish:
+    # windows-2022 because the core and server packages carry a lib/net46 asset
+    # built by an old-style MSBuild head. The Unity package is produced in this
+    # same job, from this same build, so the .unitypackage and the .nupkg files
+    # can never come from different builds of the same version.
+    runs-on: windows-2022
+    permissions:
+      contents: read
+      id-token: write # for NuGet Trusted Publishing (OIDC)
+    env:
+      DOTNET_NOLOGO: true
+      RELEASE_VERSION: ${{ inputs.version }}
+      DRY_RUN: ${{ inputs.dry_run }}
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            3.1.426
+            6.0.428
+            7.0.410
+
+      - name: Download cake tool
+        run: dotnet tool restore
+
+      # First thing that runs, and the only step that can stop a release cheaply.
+      # It asserts that the dispatched version equals both committed version files,
+      # that nuget/ holds exactly the three lockstep packages with the expected
+      # ids, and that every door pins Ably.PubSub.Core as [$version$].
+      - name: Release pre-flight
+        run: ./build.cmd -- --target=Release.Preflight --version=${{ inputs.version }}
+
+      # Pre-flight -> build every head -> assert every nuspec files entry resolves
+      # -> pack -> assert the packed .nupkg files, including the packed pin.
+      - name: Build and pack all three packages
+        run: ./build.cmd -- --target=Package --version=${{ inputs.version }} --packageOutput=release-packages
+
+      - name: Create the Unity package
+        run: ./build.cmd -- --target=UnityPackage --version=${{ inputs.version }}
+
+      - name: Assert the packed packages
+        run: ./build.cmd -- --target=Release.VerifyPackages --version=${{ inputs.version }} --packageOutput=release-packages
+
+      # Requested here, immediately before the push, because the key it returns
+      # lives for one hour and each OIDC token buys exactly one key.
+      - name: NuGet login (OIDC -> short-lived API key)
+        id: login
+        if: ${{ !inputs.dry_run }}
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish core, then the doors
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_VERSION
+          $dryRun = $env:DRY_RUN -eq 'true'
+          $source = 'https://api.nuget.org/v3/index.json'
+
+          # nuget.org's flat container lists every published version of a package
+          # id, including unlisted ones, and 404s for an id that has never been
+          # published. It is the cheapest published-or-not question there is.
+          function Get-PublishedVersions([string] $id) {
+            $url = "https://api.nuget.org/v3-flatcontainer/$($id.ToLowerInvariant())/index.json"
+            try {
+              return (Invoke-RestMethod -Uri $url -Method Get).versions
+            } catch {
+              if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 404) {
+                return @()   # the package id has never been published
+              }
+              throw
+            }
+          }
+
+          function Test-Published([string] $id, [string] $v) {
+            return (Get-PublishedVersions $id) -contains $v
+          }
+
+          function Push-Package([string] $id) {
+            $package = "release-packages/$id.$version.nupkg"
+            if (-not (Test-Path $package)) { throw "$package was not produced" }
+
+            if (Test-Published $id $version) {
+              # This is what makes a failed run completable by re-running it.
+              Write-Host "SKIP  $id $version is already on nuget.org"
+              return
+            }
+
+            if ($dryRun) {
+              Write-Host "DRY RUN  would push $package to $source"
+              return
+            }
+
+            if (-not $env:NUGET_API_KEY) { throw "No NuGet API key; the trusted-publishing login step did not run" }
+
+            Write-Host "PUSH  $package"
+            dotnet nuget push $package --source $source --api-key $env:NUGET_API_KEY --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { throw "dotnet nuget push failed for $id" }
+          }
+
+          # Core first. Both doors declare a dependency on exactly this version, so
+          # a door reaching the registry before it would be unresolvable for as long
+          # as the gap lasted.
+          Push-Package 'Ably.PubSub.Core'
+
+          if (-not $dryRun) {
+            # nuget.org validates and indexes asynchronously; a push that returned
+            # 202 is not yet resolvable. Wait for the core to be listed before the
+            # doors that pin it go out.
+            $listed = $false
+            for ($i = 1; $i -le 40; $i++) {
+              if (Test-Published 'Ably.PubSub.Core' $version) { $listed = $true; break }
+              Write-Host "Waiting for Ably.PubSub.Core $version to appear on nuget.org ($i/40)..."
+              Start-Sleep -Seconds 15
+            }
+            if (-not $listed) {
+              throw ("Ably.PubSub.Core $version did not appear on nuget.org within 10 minutes. Nothing else " +
+                     "has been pushed. Check the package's validation status on nuget.org, then re-run this " +
+                     "workflow with the same version: the core push will be skipped and the doors will go out.")
+            }
+          }
+
+          Push-Package 'Ably.PubSub.Device'
+          Push-Package 'Ably.PubSub.Server'
+
+          if ($dryRun) {
+            Write-Host ''
+            Write-Host "Dry run complete. Nothing was pushed. Re-dispatch with dry_run=false to release $version."
+          } else {
+            Write-Host ''
+            Write-Host "Published Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server at $version."
+          }
+
+          # Printed on every run, successful or not, because it is needed exactly
+          # when nobody wants to be reading a workflow file.
+          Write-Host ''
+          Write-Host '--- If this release has to be abandoned ---'
+          Write-Host 'NuGet cannot delete a published version, and the version number can never be reused.'
+          Write-Host 'Unlist it instead, which hides it from search and from version resolution while leaving'
+          Write-Host 'it restorable for anyone who already pinned it:'
+          Write-Host ''
+          Write-Host "  dotnet nuget delete Ably.PubSub.Server $version --source https://api.nuget.org/v3/index.json --api-key <key> --non-interactive"
+          Write-Host "  dotnet nuget delete Ably.PubSub.Device $version --source https://api.nuget.org/v3/index.json --api-key <key> --non-interactive"
+          Write-Host "  dotnet nuget delete Ably.PubSub.Core   $version --source https://api.nuget.org/v3/index.json --api-key <key> --non-interactive"
+          Write-Host ''
+          Write-Host '(dotnet nuget delete unlists on nuget.org; it does not delete. Or use the Listing tab on'
+          Write-Host 'each package page.) Unlist the doors before the core, the reverse of the publish order, so'
+          Write-Host 'no door is ever resolvable without the core version it pins. Then release a new version.'
+
+      - name: Archive the release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-artifacts-${{ inputs.version }}
+          path: |
+            release-packages/*.nupkg
+            *.unitypackage
+          if-no-files-found: error
+
+  # Separate job purely so that contents: write is scoped to the one thing that
+  # needs it. Skipped on a dry run, and skipped if the publish job did not finish.
+  github-release:
+    needs: publish
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Download the release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-artifacts-${{ inputs.version }}
+          path: artifacts
+
+      - name: Create the GitHub release and attach the artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_REF: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          v="${RELEASE_VERSION}"
+
+          files=$(find artifacts -type f \( -name '*.nupkg' -o -name '*.unitypackage' \) | sort)
+          if [ -z "${files}" ]; then
+            echo "No artifacts to attach"
+            exit 1
+          fi
+          echo "Attaching:"
+          echo "${files}"
+
+          # Idempotent in the same way the pushes are: re-running a run that failed
+          # after the release was created must not fail on the release existing.
+          if gh release view "${v}" >/dev/null 2>&1; then
+            echo "Release ${v} already exists; uploading assets with --clobber"
+            # shellcheck disable=SC2086
+            gh release upload "${v}" ${files} --clobber
+          else
+            # shellcheck disable=SC2086
+            gh release create "${v}" ${files} \
+              --target "${RELEASE_REF}" \
+              --title "${v}" \
+              --notes "Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server ${v} are published on nuget.org. See CHANGELOG.md for what changed."
+          fi
