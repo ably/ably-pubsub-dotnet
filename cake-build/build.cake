@@ -8,6 +8,7 @@
 #load "tasks/build.cake"
 #load "tasks/test.cake"
 #load "tasks/package.cake"
+#load "tasks/release.cake"
 
 ///////////////////////////////////////////////////////////////////////////////
 // ARGUMENTS
@@ -18,6 +19,7 @@ var configuration = Argument("configuration", "Release");
 var version = Argument("version", "");
 var defineConstants = Argument("define", "");
 var framework = Argument("framework", "");
+var packageOutput = Argument("packageOutput", "");
 
 ///////////////////////////////////////////////////////////////////////////////
 // SETUP / TEARDOWN

@@ -29,6 +29,9 @@ Task("_Package_Build_All")
 
 Task("_Package_Create_NuGet")
     .IsDependentOn("_Package_Build_All")
+    // Runs between the build and the pack: nuget silently omits a files entry it
+    // cannot resolve, so this is the last moment an empty package can be caught.
+    .IsDependentOn("_Release_Verify_Files")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
@@ -51,8 +54,10 @@ Task("_Package_Create_NuGet")
         {
             { "Configuration", "Release" }
         },
-        OutputDirectory = paths.Root
+        OutputDirectory = ReleasePackageOutputDirectory()
     };
+
+    CreateDirectory(nugetSettings.OutputDirectory);
 
     // Use local nuget.exe if available
     var nugetPath = paths.Root.CombineWithFilePath("tools/nuget.exe");
@@ -136,7 +141,11 @@ Task("_Package_Unity")
 
 Task("Package")
     .Description("Create the NuGet packages (Ably.PubSub.Core, Ably.PubSub.Device, Ably.PubSub.Server)")
-    .IsDependentOn("_Package_Create_NuGet");
+    // Dependencies run in declaration order: pack, then assert the produced
+    // .nupkg files. Together with _Release_Preflight (before the build) and
+    // _Release_Verify_Files (before the pack), the pack is bracketed by checks.
+    .IsDependentOn("_Package_Create_NuGet")
+    .IsDependentOn("_Release_Verify_Packages");
 
 Task("UnityPackage")
     .Description("Create Unity package")

@@ -21,6 +21,10 @@ Task("_Restore_Main")
 });
 
 Task("_Version")
+    // The pre-flight runs first and unconditionally: it is the only chance to
+    // compare the --version input against the committed version files, because
+    // this task then overwrites CommonAssemblyInfo.cs with that same input.
+    .IsDependentOn("_Release_Preflight")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
