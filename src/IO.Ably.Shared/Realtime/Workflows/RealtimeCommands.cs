@@ -154,14 +154,11 @@ namespace IO.Ably.Realtime.Workflow
 
     internal class SetConnectingStateCommand : RealtimeCommand
     {
-        private SetConnectingStateCommand(bool clearConnectionKey, bool retryAuth, bool? connectivityConfirmed)
+        private SetConnectingStateCommand(bool retryAuth, bool? connectivityConfirmed)
         {
-            ClearConnectionKey = clearConnectionKey;
             RetryAuth = retryAuth;
             ConnectivityConfirmed = connectivityConfirmed;
         }
-
-        public bool ClearConnectionKey { get; }
 
         public bool RetryAuth { get; }
 
@@ -172,8 +169,8 @@ namespace IO.Ably.Realtime.Workflow
         /// </summary>
         public bool? ConnectivityConfirmed { get; }
 
-        public static SetConnectingStateCommand Create(bool clearConnectionKey = false, bool retryAuth = false, bool? connectivityConfirmed = null) =>
-            new SetConnectingStateCommand(clearConnectionKey, retryAuth, connectivityConfirmed);
+        public static SetConnectingStateCommand Create(bool retryAuth = false, bool? connectivityConfirmed = null) =>
+            new SetConnectingStateCommand(retryAuth, connectivityConfirmed);
 
         protected override string ExplainData()
         {
@@ -204,13 +201,12 @@ namespace IO.Ably.Realtime.Workflow
 
     internal class SetDisconnectedStateCommand : RealtimeCommand
     {
-        private SetDisconnectedStateCommand(ErrorInfo error, bool retryInstantly, bool skipAttach, Exception exception, bool clearConnectionKey)
+        private SetDisconnectedStateCommand(ErrorInfo error, bool retryInstantly, bool skipAttach, Exception exception)
         {
             Error = error;
             RetryInstantly = retryInstantly;
             SkipAttach = skipAttach;
             Exception = exception;
-            ClearConnectionKey = clearConnectionKey;
         }
 
         public ErrorInfo Error { get; }
@@ -221,45 +217,36 @@ namespace IO.Ably.Realtime.Workflow
 
         public Exception Exception { get; }
 
-        public bool ClearConnectionKey { get; }
-
         protected override string ExplainData()
         {
             return $"RetryInstantly: {RetryInstantly}" +
                    "SkipAttach: " + SkipAttach +
                    ((Error != null) ? " Error: " + Error : string.Empty) +
-                    ((Exception != null) ? " Exception: " + Exception.Message : string.Empty) +
-                " ClearConnectionKey: " + ClearConnectionKey;
+                    ((Exception != null) ? " Exception: " + Exception.Message : string.Empty);
         }
 
         public static SetDisconnectedStateCommand Create(
             ErrorInfo error,
             bool retryInstantly = false,
             bool skipAttach = false,
-            Exception exception = null,
-            bool clearConnectionKey = false)
-            => new SetDisconnectedStateCommand(error, retryInstantly, skipAttach, exception, clearConnectionKey);
+            Exception exception = null)
+            => new SetDisconnectedStateCommand(error, retryInstantly, skipAttach, exception);
     }
 
     internal class SetSuspendedStateCommand : RealtimeCommand
     {
-        private SetSuspendedStateCommand(ErrorInfo error, bool clearConnectionKey)
+        private SetSuspendedStateCommand(ErrorInfo error)
         {
             Error = error;
-            ClearConnectionKey = clearConnectionKey;
         }
 
         public ErrorInfo Error { get; }
 
-        public bool ClearConnectionKey { get; }
-
-        public static SetSuspendedStateCommand Create(ErrorInfo error, bool clearConnectionKey = false) => new SetSuspendedStateCommand(error, clearConnectionKey);
+        public static SetSuspendedStateCommand Create(ErrorInfo error) => new SetSuspendedStateCommand(error);
 
         protected override string ExplainData()
         {
-            var message = (Error != null) ? " Error: " + Error : string.Empty;
-            message += " ClearConnectionKey:" + ClearConnectionKey;
-            return message;
+            return (Error != null) ? " Error: " + Error : string.Empty;
         }
     }
 
@@ -452,21 +439,18 @@ namespace IO.Ably.Realtime.Workflow
 
         public AblyException Exception { get; }
 
-        public bool ClearConnectionKey { get; }
-
-        private HandleConnectingErrorCommand(ErrorInfo error, AblyException ex, bool clearConnectionKey)
+        private HandleConnectingErrorCommand(ErrorInfo error, AblyException ex)
         {
             Error = error;
             Exception = ex;
-            ClearConnectionKey = clearConnectionKey;
         }
 
-        public static HandleConnectingErrorCommand Create(ErrorInfo error = null, AblyException ex = null, bool clearConnectionKey = false) =>
-            new HandleConnectingErrorCommand(error, ex, clearConnectionKey);
+        public static HandleConnectingErrorCommand Create(ErrorInfo error = null, AblyException ex = null) =>
+            new HandleConnectingErrorCommand(error, ex);
 
         protected override string ExplainData()
         {
-            return $"Error: {Error}. Exception: {Exception?.Message}. ClearConnectionKey: {ClearConnectionKey}";
+            return $"Error: {Error}. Exception: {Exception?.Message}";
         }
     }
 

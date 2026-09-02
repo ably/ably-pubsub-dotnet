@@ -28,12 +28,6 @@ namespace IO.Ably.Realtime
         private readonly PushChannel _pushChannel;
         private int _retryCount = 0;
 
-        /// <summary>
-        /// True when the channel moves to the @ATTACHED@ state, and False
-        /// when the channel moves to the @DETACHING@ or @FAILED@ states.
-        /// </summary>
-        internal bool AttachResume { get; set; }
-
         private int _decodeRecoveryInProgress;
 
         // We use interlocked exchange because it is a thread safe way to read a variable
@@ -160,33 +154,22 @@ namespace IO.Ably.Realtime
                     }
 
                     /*
-                     * (RTL3d, RTN19b, RTN15c6, RTN15c7, RTN15g3) On entering CONNECTED, every
-                     * channel that was attached or pending needs its ATTACH - or its DETACH - sent
-                     * again, because the previous transport will never answer.
+                     * On entering CONNECTED, every channel that was attached or pending needs its
+                     * ATTACH - or its DETACH - sent again; the previous transport will never answer.
                      *
                      * The two branches have different owners. RTL3d names ATTACHING, ATTACHED and
-                     * SUSPENDED and asks for an RTL4c attach. DETACHING is not in that list and is
-                     * not a state transition at all - it is RTN19b, "if there are any pending
-                     * channels i.e. in the ATTACHING or DETACHING state, the respective ATTACH or
-                     * DETACH message should be resent". ably-js splits it the same way, with
-                     * checkPendingState handling both pending operations and notifyState the
-                     * reattach.
+                     * SUSPENDED, and asks for an RTL4c attach. DETACHING is RTN19b instead, which
+                     * requires the respective ATTACH or DETACH of any pending channel to be resent.
+                     * ably-js splits it the same way, between checkPendingState and notifyState.
                      *
                      * RTL3d1 requires all of this to be applied before CONNECTED reaches external
-                     * listeners, and is why it lives here rather than in HandleConnectedCommand:
-                     * Connection.NotifyUpdate runs the internal handlers, which is what calls this,
-                     * before handing the emit to NotifyExternalClients.
+                     * listeners, which is why it lives here: Connection.NotifyUpdate runs the
+                     * internal handlers, this among them, before the emit.
                      *
-                     * Unconditional, deliberately. This used to be gated on the connectionId having
-                     * changed, which silently skipped the RTN15g3 reattach: RTN15g empties
-                     * Connection.Id *before* the CONNECTING transition, so by the time CONNECTED
-                     * arrived the id being compared against had already gone and the channel
-                     * concluded nothing had changed. The channel stayed locally ATTACHED on a brand
-                     * new connection with no server-side attachment - permanently silent.
-                     *
-                     * Whether the connection was resumed belongs inside the ATTACH, in channelSerial
-                     * and the ATTACH_RESUME flag, rather than in a decision about whether to send
-                     * one at all. ably-js reattaches unconditionally for the same reason.
+                     * Unconditional, deliberately. Whether the connection was resumed belongs
+                     * inside the ATTACH, in the channelSerial RTL4c1 carries, rather than in a
+                     * decision about whether to send one at all. ably-js reattaches unconditionally
+                     * for the same reason.
                      */
                     switch (State)
                     {
@@ -369,11 +352,6 @@ namespace IO.Ably.Realtime
                 if (Options.Modes.Any())
                 {
                     message.SetModesAsFlags(Options.Modes);
-                }
-
-                if (AttachResume)
-                {
-                    message.SetFlag(ProtocolMessage.Flag.AttachResume);
                 }
 
                 return message;
@@ -748,11 +726,9 @@ namespace IO.Ably.Realtime
                     break;
                 case ChannelState.Detaching:
                     AttachedAwaiter.Fail(new ErrorInfo("Channel transitioned to detaching", ErrorCodes.InternalError));
-                    AttachResume = false;
                     break;
                 case ChannelState.Attached:
                     _retryCount = 0;
-                    AttachResume = true;
                     break;
                 case ChannelState.Detached:
                     /* RTL13a check for unexpected detach */
@@ -792,7 +768,6 @@ namespace IO.Ably.Realtime
                     break;
                 case ChannelState.Failed:
                     _retryCount = 0;
-                    AttachResume = false;
                     AttachedAwaiter.Fail(error);
                     DetachedAwaiter.Fail(error);
                     Presence.ChannelDetachedOrFailed(error);

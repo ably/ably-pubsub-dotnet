@@ -1004,14 +1004,19 @@ namespace IO.Ably.Tests.Realtime
             stateChanges[2].Reason.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
         }
 
+        // UTS: realtime/proxy/RTN14h/resume-after-ttl-expiry-0
         [Theory]
         [ProtocolData]
-        [Trait("spec", "RTN15g")]
-        [Trait("spec", "RTN15g1")]
-        [Trait("spec", "RTN15g2")]
-        [Trait("spec", "RTN15g3")]
-        public async Task WhenDisconnectedPastTTL_ShouldNotResume_ShouldClearConnectionStateAndAttemptNewConnection(Protocol protocol)
+        [Trait("spec", "RTN14h")]
+        [Trait("spec", "RTN8d")]
+        [Trait("spec", "RTN9d")]
+        [Trait("spec", "RTN15c6")]
+        public async Task WhenDisconnectedPastTTL_ShouldStillResume_AndReattachChannels(Protocol protocol)
         {
+            // RTN14h, which replaces RTN15g as of specification 6.1.0 - the client always attempts
+            // the resume and lets the server decide whether continuity survives. Against a live
+            // endpoint the reconnect comes back with the connectionId we were holding, which is only
+            // possible because the resume param went out (RTN15b1).
             var client = await GetRealtimeClient(protocol, (options, _) =>
             {
                 options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(1000);
@@ -1020,19 +1025,11 @@ namespace IO.Ably.Tests.Realtime
 
             await client.WaitForState(ConnectionState.Connected);
 
-            // No ttl override: winding ConfirmedAliveAt back below is enough to force the stale
-            // path against the real 120s ttl plus the server's 15s maxIdleInterval. Shortening the
-            // ttl as well made this test fail, because the RTN14e clamp in
-            // ConnectionDisconnectedState.StartTimer then clamps the retry backoff down to the
-            // remaining ttl - about a second - so the reconnect happened far sooner than the
-            // DisconnectedRetryTimeout this test asserts against. A 1s ttl would also trip
-            // ShouldSuspend on the retry and land in SUSPENDED instead of CONNECTED.
             string initialConnectionId = client.Connection.Id;
+            string initialConnectionKey = client.Connection.Key;
 
-            var aliveAt1 = client.Connection.ConfirmedAliveAt;
-            var aliveAt2 = aliveAt1;
-
-            // RTN15g3 ATTACHED, ATTACHING, or SUSPENDED must be automatically reattached
+            // RTL3d - channels that were ATTACHED, ATTACHING or SUSPENDED are reattached on
+            // entering CONNECTED regardless of whether the resume succeeded.
             var channels = new List<RealtimeChannel>
             {
                 client.Channels.Get("attached".AddRandomSuffix()) as RealtimeChannel,
@@ -1048,34 +1045,21 @@ namespace IO.Ably.Tests.Realtime
             channels[1].State.Should().Be(ChannelState.Initialized); // set attaching later
             channels[2].State.Should().Be(ChannelState.Suspended);
 
-            DateTime disconnectedAt = DateTime.MinValue;
-            DateTime reconnectedAt = DateTime.MinValue;
             string newConnectionId = string.Empty;
 
             await WaitFor(60000, done =>
             {
-                client.Connection.Once(ConnectionEvent.Disconnected, change2 =>
+                client.Connection.Once(ConnectionEvent.Disconnected, _ =>
                 {
-                    disconnectedAt = DateTime.UtcNow;
-
-                    // RTN15g2 - the staleness window is connectionStateTtl plus the real
-                    // maxIdleInterval the server sent, which is 15s against a live endpoint. A
-                    // shortened ttl alone is therefore not enough to push us outside it before the
-                    // retry fires, so wind the last known activity back instead. Deliberately done
-                    // here rather than while still Connected: from Connected this would trip the
-                    // RTN23a idle monitor and race the disconnect this test is arranging.
-                    client.State.Connection.SetConfirmedAlive(DateTimeOffset.UtcNow.AddMinutes(-30));
+                    // RTN8d, RTN9d - DISCONNECTED is not a terminal state, so both survive.
+                    client.Connection.Id.Should().Be(initialConnectionId);
+                    client.Connection.Key.Should().Be(initialConnectionKey);
 
                     channels[1].Attach();
-                    client.Connection.Once(ConnectionEvent.Connecting, change3 =>
+                    client.Connection.Once(ConnectionEvent.Connected, _ =>
                     {
-                        reconnectedAt = DateTime.UtcNow;
-                        client.Connection.Once(ConnectionEvent.Connected, change4 =>
-                        {
-                            newConnectionId = client.Connection.Id;
-                            aliveAt2 = client.Connection.ConfirmedAliveAt;
-                            done();
-                        });
+                        newConnectionId = client.Connection.Id;
+                        done();
                     });
                 });
 
@@ -1083,14 +1067,10 @@ namespace IO.Ably.Tests.Realtime
                 client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
             });
 
-            var reconnectedInTime = reconnectedAt - disconnectedAt;
-
-            var (lowerBound, _) = ReconnectionStrategyTest.Bounds(1, 5000);
-            reconnectedInTime.TotalMilliseconds.Should().BeGreaterThan(lowerBound);
-
+            // RTN15c6 - the server still held the connection, so the resume succeeded and the
+            // connectionId comes back unchanged.
             initialConnectionId.Should().NotBeNullOrEmpty();
-            initialConnectionId.Should().NotBe(newConnectionId);
-            aliveAt1.Value.Should().BeBefore(aliveAt2.Value);
+            newConnectionId.Should().Be(initialConnectionId);
 
             await channels[0].WaitForAttachedState();
             await channels[1].WaitForAttachedState();

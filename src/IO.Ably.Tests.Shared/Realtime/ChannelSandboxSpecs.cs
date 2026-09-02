@@ -118,62 +118,6 @@ namespace IO.Ably.Tests.Realtime
 
         [Theory]
         [ProtocolData]
-        [Trait("spec", "RTL4j")]
-        public async Task WhenChannelIsAlreadyAttached_AndReAttachIsForcedByChangingChannelOptions_ShouldPassAttachResumeFlagInAttachMessage(Protocol protocol)
-        {
-            var sentMessages = new List<ProtocolMessage>();
-            var client = await GetRealtimeClient(protocol, (options, _) =>
-            {
-                var optionsTransportFactory = new TestTransportFactory
-                {
-                    OnMessageSent = sentMessages.Add,
-                };
-                options.TransportFactory = optionsTransportFactory;
-            });
-
-            var channel = client.Channels.Get("Test");
-            await channel.AttachAsync();
-
-            var result = await channel.SetOptionsAsync(new ChannelOptions().WithModes(ChannelMode.Publish));
-
-            result.IsSuccess.Should().BeTrue();
-            var attachMessages = sentMessages.Where(x => x.Action == ProtocolMessage.MessageAction.Attach).ToList();
-            attachMessages.Should().HaveCount(2);
-            attachMessages.First().Flags.Should().BeNull();
-            attachMessages.Last().HasFlag(ProtocolMessage.Flag.AttachResume).Should().BeTrue();
-        }
-
-        [Theory]
-        [ProtocolData]
-        [Trait("spec", "RTL4j2")]
-        public async Task TestAttachResume_And_RewindParam(Protocol protocol)
-        {
-            var client = await GetRealtimeClient(protocol);
-            var client1 = await GetRealtimeClient(protocol, (opts, _) => opts.AutoConnect = false);
-            var client2 = await GetRealtimeClient(protocol, (opts, _) => opts.AutoConnect = false);
-
-            var channel = client.Channels.Get("Test");
-            await channel.PublishAsync("test", "test");
-
-            var channelWithAttachResume = client1.Channels.Get("Test", new ChannelOptions().WithRewind(1)) as RealtimeChannel;
-            channelWithAttachResume.AttachResume = true;
-            var channel1Messages = new List<Message>();
-            channelWithAttachResume.Subscribe(channel1Messages.Add);
-            await channelWithAttachResume.WaitForAttachedState();
-            var channelWithoutAttachResume = client2.Channels.Get("Test", new ChannelOptions().WithRewind(1));
-
-            var channel2Messages = new List<Message>();
-            channelWithoutAttachResume.Subscribe(channel2Messages.Add);
-            await channelWithoutAttachResume.WaitForAttachedState();
-
-            await Task.Delay(2000);
-
-            channel2Messages.Should().HaveCount(1);
-            channel1Messages.Should().BeEmpty();
-        }
-
-        [Theory]
-        [ProtocolData]
         [Trait("spec", "RTL4k1")]
         public async Task ChannelParamsIncludedInTheAttachedMessage_ShouldBeExposedAsReadonlyOnChannel(Protocol protocol)
         {

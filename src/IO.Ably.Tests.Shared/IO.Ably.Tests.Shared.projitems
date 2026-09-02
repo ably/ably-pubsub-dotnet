@@ -89,7 +89,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelsSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionAttemptsInfoSpecs.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionStateFreshnessSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionSandboxOperatingSystemEventsForNetworkSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionSandBoxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionSandboxTransportSideEffectsSpecs.cs" />

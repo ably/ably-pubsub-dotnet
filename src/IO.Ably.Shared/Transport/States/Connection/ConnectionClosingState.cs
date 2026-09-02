@@ -74,8 +74,12 @@ namespace IO.Ably.Transport.States.Connection
 
         public override RealtimeCommand Connect()
         {
+            // No key to clear for RTN11b's clean connection: entering CLOSING already ran
+            // ClearKeyAndId for RTN8d and RTN9d, and the single reader processed that before it can
+            // reach this. The following CONNECTED therefore finds no id to match and restarts the
+            // serial sequence under RTN15c7.
             _timer.Abort();
-            return SetConnectingStateCommand.Create(clearConnectionKey: true).TriggeredBy("ClosingState.Connect()");
+            return SetConnectingStateCommand.Create().TriggeredBy("ClosingState.Connect()");
         }
     }
 }

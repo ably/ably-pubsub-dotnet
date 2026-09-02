@@ -109,27 +109,95 @@ namespace IO.Ably.Tests.NETFramework.Realtime
 
         public class ConnectingCommandSpecs : AblyRealtimeSpecs
         {
+            // UTS: realtime/unit/RTN14h/resume-after-ttl-0
             [Fact]
-            public async Task WithInboundErrorMessageWhenItCanUseFallBack_ShouldClearsConnectionKey()
+            [Trait("spec", "RTN14h")]
+            [Trait("spec", "RTN15b1")]
+            public async Task AfterSuspendedAndAFailedAttempt_EveryReconnectionShouldCarryResume()
             {
-                // Arrange
-                var client = GetRealtimeClient(options =>
+                // RTN14h: "Reconnection attempts in this state should continue to attempt to
+                // resume, regardless of how long it has been since the client was last connected."
+                var client = await GetConnectedClient();
+                var key = client.State.Connection.Key;
+                var id = client.State.Connection.Id;
+                key.Should().NotBeNullOrEmpty();
+
+                client.ExecuteCommand(SetSuspendedStateCommand.Create(ErrorInfo.ReasonSuspended));
+                await client.ProcessCommands();
+
+                // RTN8d, RTN9d - retained, because SUSPENDED is not one of the terminal states.
+                client.State.Connection.Key.Should().Be(key);
+                client.State.Connection.Id.Should().Be(id);
+
+                client.ExecuteCommand(SetConnectingStateCommand.Create());
+                await client.ProcessCommands();
+                LastCreatedTransport.Parameters.GetParams()
+                    .Should().Contain(new KeyValuePair<string, string>("resume", key)); // RTN15b1
+            }
+
+            [Fact]
+            [Trait("spec", "RTN14h")]
+            [Trait("spec", "RTN15b1")]
+            public async Task AfterAFailedAttempt_TheNextReconnectionShouldStillCarryResume()
+            {
+                // RTN14h's "continue to attempt to resume" applies from the second attempt onwards,
+                // not just after a suspend.
+                //
+                // Deliberately never passes through SUSPENDED, and asserts as much: once AttemptsInfo
+                // has recorded a suspend, ShouldSuspend returns true and the DISCONNECTED handler
+                // diverts straight back to SUSPENDED without reaching the path under test.
+                var client = await GetConnectedClient(opts =>
+                    opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+                var key = client.State.Connection.Key;
+                key.Should().NotBeNullOrEmpty();
+
+                client.ExecuteCommand(HandleConnectingErrorCommand.Create(
+                    new ErrorInfo("boom", 50000, System.Net.HttpStatusCode.InternalServerError)));
+                await client.ProcessCommands();
+
+                client.Connection.State.Should().NotBe(ConnectionState.Suspended);
+                client.State.Connection.Key.Should().Be(key);
+
+                // A 500 earns the RTN15h3 instant retry, so the next transport is already built by
+                // the time the commands settle, and must carry the resume.
+                LastCreatedTransport.Parameters.GetParams()
+                    .Should().Contain(new KeyValuePair<string, string>("resume", key));
+            }
+
+            [Fact]
+            [Trait("spec", "RTN14h")]
+            public async Task WithInboundErrorMessageWhenItCanUseFallBack_ShouldKeepConnectionKey()
+            {
+                // RTN14h - a retryable inbound ERROR must not cost the key, because the reconnection
+                // attempt has to continue to attempt to resume. The client is driven through
+                // CONNECTED first so there is a real key at stake.
+                var client = await GetConnectedClient(options =>
                 {
                     options.RealtimeRequestTimeout = TimeSpan.FromSeconds(60);
                     options.DisconnectedRetryTimeout = TimeSpan.FromSeconds(60);
                 });
 
-                await client.WaitForState(ConnectionState.Connecting);
+                var key = client.State.Connection.Key;
+                key.Should().NotBeNullOrEmpty();
+
+                // Back to CONNECTING, where a retryable inbound ERROR is a failed attempt rather
+                // than RTN15j's fatal connection error.
+                client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
+                await client.ProcessCommands();
+                client.ExecuteCommand(SetConnectingStateCommand.Create());
+                await client.ProcessCommands();
+
+                client.State.Connection.Key.Should().Be(key);
 
                 var messageWithError = new ProtocolMessage(ProtocolMessage.MessageAction.Error)
                 {
                     Error = new ErrorInfo("test", 123, System.Net.HttpStatusCode.InternalServerError),
                 };
 
-                // Act
                 await client.ProcessMessage(messageWithError);
 
-                client.State.Connection.Key.Should().BeEmpty();
+                client.State.Connection.Key.Should().Be(key);
             }
 
             [Fact]
@@ -1055,31 +1123,68 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             }
 
             [Theory]
+            [InlineData(ConnectionState.Closing)]
+            [InlineData(ConnectionState.Closed)]
+            [InlineData(ConnectionState.Failed)]
+            [Trait("spec", "RTN8d")]
+            [Trait("spec", "RTN9d")]
+            public async Task WhenATerminalStateIsEmitted_TheKeyAndIdShouldAlreadyBeNull(
+                ConnectionState state)
+            {
+                // RTN8d and RTN9d: both are null in CLOSED, CLOSING and FAILED. SetState is what
+                // emits - inline, when no SynchronizationContext is installed - so the clear has to
+                // precede it.
+                //
+                // Read from inside the listener deliberately: asserting after the commands settle
+                // passes either way. Same shape as the RTL3d1 ordering requirement one clause over.
+                var client = await GetConnectedClient();
+                client.State.Connection.Key.Should().NotBeEmpty();
+
+                string keyAtEmit = null;
+                string idAtEmit = null;
+                client.Connection.On(state.ToConnectionEvent(), _ =>
+                {
+                    keyAtEmit = client.Connection.Key;
+                    idAtEmit = client.Connection.Id;
+                });
+
+                client.ExecuteCommand(state switch
+                {
+                    ConnectionState.Closing => SetClosingStateCommand.Create(),
+                    ConnectionState.Closed => SetClosedStateCommand.Create(),
+                    _ => SetFailedStateCommand.Create(new ErrorInfo("gone", 1)),
+                });
+                await client.ProcessCommands();
+
+                keyAtEmit.Should().BeNullOrEmpty();
+                idAtEmit.Should().BeNullOrEmpty();
+            }
+
+            [Theory]
             [InlineData(ConnectionState.Failed)]
             [InlineData(ConnectionState.Closed)]
             [InlineData(ConnectionState.Suspended)]
             [Trait("spec", "RTN7e")]
             [Trait("spec", "RTN8d")]
             [Trait("spec", "RTN9d")]
-            public async Task WhenTheTransitionThrows_ShouldStillClearTheKeyAndDestroyTheTransport(
+            [Trait("spec", "RTN14h")]
+            public async Task WhenTheTransitionThrows_ShouldStillCompleteTheTeardown(
                 ConnectionState state)
             {
-                // RTN8d and RTN9d: connectionId and connectionKey are null in CLOSED, CLOSING and
-                // FAILED. The connection has entered the state by the time SetState rethrows, so
-                // leaving the clear outside the finally meant a throwing transition reporting the
-                // terminal state while still holding a resumable key, and left a live transport
-                // whose listener kept refreshing the activity timestamp behind an RTN23a monitor
-                // gated on Connected. RTN7e's failure of the ack queue was skipped the same way,
-                // stranding those messages with no callback at all.
+                // The teardown must complete even when SetState rethrows: otherwise a live transport
+                // survives with its listener attached, behind an RTN23a monitor gated on Connected,
+                // and RTN7e's failure of the ack queue is skipped.
                 //
-                // All three sites carry the same finally, so all three are driven here.
+                // All three states are driven because the key and id differ between them: RTN8d and
+                // RTN9d name only CLOSED, CLOSING and FAILED, while SUSPENDED retains them for
+                // RTN14h's next resume.
                 var client = await GetConnectedClient();
                 client.State.WaitingForAck.Add(new MessageAndCallback(new ProtocolMessage(), null));
 
-                // Connection.NotifyUpdate invokes internal handlers unguarded, which puts the throw
-                // where the bug needed it: after the connection has entered the state, and before
-                // the teardown. A plain Exception rather than an AblyException, so the workflow's
-                // own catch does not convert the outcome into FAILED and hide the state under test.
+                // Connection.NotifyUpdate invokes internal handlers unguarded, so throwing from one
+                // lands after the connection has entered the state and before the teardown. A plain
+                // Exception, not an AblyException, so the workflow's catch does not divert to FAILED
+                // and hide the state under test.
                 client.Connection.InternalStateChanged += (_, change) =>
                 {
                     if (change.Current == state)
@@ -1098,9 +1203,18 @@ namespace IO.Ably.Tests.NETFramework.Realtime
 
                 client.Connection.State.Should().Be(state);
                 client.State.WaitingForAck.Should().BeEmpty();
-                client.State.Connection.Key.Should().BeEmpty();
-                client.State.Connection.Id.Should().BeEmpty();
                 client.ConnectionManager.Transport.Should().BeNull();
+
+                if (state == ConnectionState.Suspended)
+                {
+                    client.State.Connection.Key.Should().NotBeEmpty();
+                    client.State.Connection.Id.Should().NotBeEmpty();
+                }
+                else
+                {
+                    client.State.Connection.Key.Should().BeEmpty();
+                    client.State.Connection.Id.Should().BeEmpty();
+                }
             }
 
             [Fact]
@@ -1255,12 +1369,11 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             }
 
             [Fact]
-            [Trait("spec", "RTN15g3")]
+            [Trait("spec", "RTN15c7")]
             public async Task OnAFreshConnectionWithoutAnError_ShouldRestartTheSerialSequence()
             {
-                // The RTN15g case, and the one that was broken: connection state was cleared, so
-                // Ably answers with a new connectionId and no error. Both of the guards this used
-                // to depend on were false here, which is precisely when a restart is needed.
+                // A resume the server refuses is answered with a new connectionId and, often, no
+                // error at all - which is precisely when the sequence must restart.
                 var client = await GetClientWithOneUnackedMessage();
 
                 await Reconnect(client, connectionId: "different");
@@ -1430,28 +1543,24 @@ namespace IO.Ably.Tests.NETFramework.Realtime
         public class ConnectedUpdateSpecs : AblyRealtimeSpecs
         {
             [Fact]
-            [Trait("spec", "RTN15g3")]
+            [Trait("spec", "RTN15c7")]
             [Trait("spec", "RTL3d")]
-            public async Task AfterAnRtn15gClear_ShouldReattachAnAttachedChannel()
+            public async Task AfterAFailedResume_ShouldReattachAnAttachedChannel()
             {
-                // Gating the reattach on a changed connectionId cannot work here: RTN15g empties
-                // Connection.Id before the CONNECTING transition, so there is nothing left to
-                // compare against by the time CONNECTED arrives, and the channel would stay locally
-                // ATTACHED on a brand new connection with no server-side attachment.
+                // RTN15c7 - a resume the server refused, answered with a connectionId we were not
+                // holding. RTL3d reattaches regardless.
                 var client = await GetConnectedClient();
                 var channel = (RealtimeChannel)client.Channels.Get("test");
                 channel.SetChannelState(ChannelState.Attached);
                 await client.ProcessCommands();
 
-                // Force the RTN15g path: last activity long enough ago that the state is stale.
-                client.State.Connection.SetConfirmedAlive(DateTimeOffset.UtcNow.AddMinutes(-30));
                 client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
                 await client.ProcessCommands();
                 client.ExecuteCommand(SetConnectingStateCommand.Create());
                 await client.ProcessCommands();
 
-                // RTN15g should have discarded the connection state.
-                client.State.Connection.Key.Should().BeEmpty();
+                // RTN14h - the reconnection attempt still carries the resume.
+                client.State.Connection.Key.Should().NotBeEmpty();
                 LastCreatedTransport.SentMessages.Clear();
 
                 client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)

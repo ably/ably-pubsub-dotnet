@@ -80,43 +80,6 @@ namespace IO.Ably.Realtime.Workflow
                 return new ConnectionStateChange(connectionEvent, oldState, newState, state.RetryIn, ErrorReason);
             }
 
-            public bool HasConnectionStateTtlPassed(Func<DateTimeOffset> now)
-            {
-                if (ConfirmedAliveAt.HasValue == false)
-                {
-                    // Nothing has ever been received on this client, so there is no connection
-                    // state to consider stale.
-                    return false;
-                }
-
-                // RTN15g2 - the window is connectionStateTtl plus maxIdleInterval, measured from
-                // the last known sign of activity from Ably rather than from when we left the
-                // Connected state. A device that slept may only have left Connected moments ago
-                // having last actually heard from Ably hours earlier.
-                // Clamped at zero rather than coalesced, because nothing between the wire and here
-                // validates the sign: TimeSpanJsonConverter will hand back a negative TimeSpan for a
-                // negative number and Update assigns it as-is. A negative value would make the
-                // subtraction below throw OverflowException, which is precisely the failure this
-                // method was rewritten to remove - the throw escapes HandleSetStateCommand's
-                // AblyException-only catch, gets logged and dropped by the command loop, and leaves
-                // the client wedged in DISCONNECTED with no transport and no retry. The RTN23a
-                // monitor already treats a non-positive interval as no promise at all.
-                var maxIdleInterval = MaxIdleInterval > TimeSpan.Zero ? MaxIdleInterval.Value : TimeSpan.Zero;
-
-                if (ConnectionStateTtl >= TimeSpan.MaxValue - maxIdleInterval)
-                {
-                    // The window cannot be represented, so it can never elapse.
-                    return false;
-                }
-
-                // Deliberately a subtraction rather than ConfirmedAliveAt + window. Adding to a
-                // DateTimeOffset throws ArgumentOutOfRangeException once the result runs past
-                // DateTimeOffset.MaxValue, and that exception escaped into the command loop where
-                // it was logged and dropped - silently abandoning whichever state transition was
-                // in progress. Comparing two durations cannot fail that way.
-                return now() - ConfirmedAliveAt.Value > ConnectionStateTtl + maxIdleInterval;
-            }
-
             public void Update(ConnectionInfo info, bool isUpdate)
             {
                 // Guarded differently on purpose. connectionId is a top-level field and always
