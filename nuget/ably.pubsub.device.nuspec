@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+    <metadata>
+        <id>Ably.PubSub.Device</id>
+        <version>$version$</version>
+        <title>Ably.PubSub.Device</title>
+        <authors>Martin Georgiev, Sachin Shinde, Yavor Ivanov, Jack Rutherford, Tom Kirby-Green</authors>
+        <owners>Ably Real-time Ltd</owners>
+        <license type="expression">Apache-2.0</license>
+        <projectUrl>https://github.com/ably/ably-dotnet</projectUrl>
+        <icon>icon.png</icon>
+        <readme>README.md</readme>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>The supported entry point for Ably Pub/Sub in an end-user device application - a mobile or desktop app, a Unity game, a set-top box or any other client the end user holds. Create clients through PubSubDevice.CreateClient(...) in the IO.Ably.PubSub.Device namespace; it accepts an API key, an Ably token, a ClientOptions or an Action&lt;ClientOptions&gt;, and returns the ordinary AblyRealtime so the whole of the IO.Ably API remains available, including device-side connectionless operations such as message history, presence reads and token requests. Creating a client any other way - including directly from the Ably.PubSub.Core implementation package this depends on - does not classify it as device-side, which Ably's platform behaviour and billing depend on. Install Ably.PubSub.Server instead in a server-side application. See https://www.ably.com for more info.</description>
+        <releaseNotes>https://github.com/ably/ably-dotnet/releases</releaseNotes>
+        <copyright>©2026 Ably Real-time Ltd</copyright>
+        <tags>ably realtime messaging websocket pubsub presence device mobile dotnet csharp maui unity netstandard</tags>
+        <repository type="git" url="https://github.com/ably/ably-dotnet.git" branch="main" />
+        <language />
+        <!-- The exact pin is the NuGet analogue of ably-js's exact peerDependencies: the door and
+             the core are released in lockstep, and consumers must never resolve two core
+             versions. TODO(verify on the release dry run): confirm nuget.exe substitutes
+             $version$ inside a dependency version attribute; the packed pin must equal the
+             package version. Stack PR 3 adds a pre-flight that asserts it. -->
+        <dependencies>
+          <group targetFramework="netstandard2.0">
+            <dependency id="Ably.PubSub.Core" version="[$version$]" />
+          </group>
+          <group targetFramework="net6.0">
+            <dependency id="Ably.PubSub.Core" version="[$version$]" />
+          </group>
+          <group targetFramework="net7.0">
+            <dependency id="Ably.PubSub.Core" version="[$version$]" />
+          </group>
+        </dependencies>
+    </metadata>
+    <files>
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\netstandard2.0\Ably.PubSub.Device.dll" target="lib\netstandard2.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\netstandard2.0\Ably.PubSub.Device.pdb" target="lib\netstandard2.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\netstandard2.0\Ably.PubSub.Device.xml" target="lib\netstandard2.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\net6.0\Ably.PubSub.Device.dll" target="lib\net6.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\net6.0\Ably.PubSub.Device.pdb" target="lib\net6.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\net6.0\Ably.PubSub.Device.xml" target="lib\net6.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\net7.0\Ably.PubSub.Device.dll" target="lib\net7.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\net7.0\Ably.PubSub.Device.pdb" target="lib\net7.0" />
+        <file src="..\src\Ably.PubSub.Device\bin\$configuration$\net7.0\Ably.PubSub.Device.xml" target="lib\net7.0" />
+        <file src="..\README.md" target="README.md" />
+        <file src="..\images\logo.png" target="icon.png" />
+    </files>
+</package>
