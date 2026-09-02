@@ -48,6 +48,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ably.PubSub.Core\Ably.PubSub.Core.csproj" />
+    <!-- The door specs live in this head rather than Ably.PubSub.Tests.Shared because
+         Ably.PubSub.Device has no net462 asset (plan decision 5b), so the shared project
+         cannot reference it from the .NET Framework test head. -->
+    <ProjectReference Include="..\Ably.PubSub.Device\Ably.PubSub.Device.csproj" />
+    <ProjectReference Include="..\Ably.PubSub.Server\Ably.PubSub.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>  	
