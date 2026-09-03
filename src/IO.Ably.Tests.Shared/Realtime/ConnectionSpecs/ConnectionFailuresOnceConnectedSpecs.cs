@@ -215,6 +215,44 @@ namespace IO.Ably.Tests.Realtime
             LastCreatedTransport.Should().NotBeSameAs(firstTransport);
         }
 
+        // UTS: realtime/unit/RTN15b/successful-resume-0
+        [Fact]
+        [Trait("spec", "RTN15b")]
+        [Trait("spec", "RTN15c6")]
+        public async Task WhenTheTransportDropsAndTheResumeSucceeds_ShouldKeepTheConnectionId()
+        {
+            // RTN15b - the reconnect carries the connectionKey in the resume query param. RTN15c6 -
+            // the server signals a successful resume by answering with the same connectionId, and
+            // may hand back a refreshed connectionKey with it.
+            var client = await SetupConnectedClient();
+
+            var connectionId = client.Connection.Id;
+            var connectionKey = client.Connection.Key;
+            connectionId.Should().NotBeNullOrEmpty();
+            connectionKey.Should().NotBeNullOrEmpty();
+
+            // An unexpected transport drop, so the next attempt is a resume rather than a fresh
+            // connection.
+            LastCreatedTransport.Listener.OnTransportEvent(LastCreatedTransport.Id, TransportState.Closed);
+            await client.WaitForState(ConnectionState.Connecting);
+            await client.ProcessCommands();
+
+            LastCreatedTransport.Parameters.GetParams()
+                .Should().ContainKey("resume")
+                .WhoseValue.Should().Be(connectionKey);
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+            {
+                ConnectionId = connectionId,
+                ConnectionDetails = new ConnectionDetails { ConnectionKey = "connectionKey-updated" },
+            });
+            await client.WaitForState(ConnectionState.Connected);
+            await client.ProcessCommands();
+
+            client.Connection.Id.Should().Be(connectionId);
+            client.Connection.Key.Should().Be("connectionKey-updated");
+        }
+
         [Fact]
         [Trait("spec", "RTN15a")]
         public async Task AckMessagesAreSentWhenConnectionIsDroppedAndNotResumed()
