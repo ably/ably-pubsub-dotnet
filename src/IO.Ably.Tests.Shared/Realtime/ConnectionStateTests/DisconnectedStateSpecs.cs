@@ -119,7 +119,6 @@ namespace IO.Ably.Tests
             _state.RetryIn.Should().Be(_timer.LastDelay);
         }
 
-        // UTS: realtime/unit/RTB1/disconnected-retry-delay-0
         [Fact]
         [Trait("spec", "RTN14d")]
         [Trait("spec", "RTB1")]

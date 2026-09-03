@@ -1004,7 +1004,6 @@ namespace IO.Ably.Tests.Realtime
             stateChanges[2].Reason.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
         }
 
-        // UTS: realtime/proxy/RTN14h/resume-after-ttl-expiry-0
         [Theory]
         [ProtocolData]
         [Trait("spec", "RTN14h")]

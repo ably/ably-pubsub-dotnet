@@ -131,8 +131,25 @@ namespace IO.Ably.Tests.NETFramework.Realtime
 
                 client.ExecuteCommand(SetConnectingStateCommand.Create());
                 await client.ProcessCommands();
-                LastCreatedTransport.Parameters.GetParams()
-                    .Should().Contain(new KeyValuePair<string, string>("resume", key)); // RTN15b1
+
+                // A second and third attempt, because the clause is "reconnection attempts" plural -
+                // one attempt carrying a resume does not show that every later one does.
+                for (var i = 0; i < 2; i++)
+                {
+                    client.ExecuteCommand(HandleConnectingErrorCommand.Create(
+                        new ErrorInfo("boom", 50000, System.Net.HttpStatusCode.InternalServerError)));
+                    await client.ProcessCommands();
+                    client.ExecuteCommand(SetConnectingStateCommand.Create());
+                    await client.ProcessCommands();
+                }
+
+                var reconnects = CreatedTransports.Skip(1).ToList();
+                reconnects.Should().HaveCountGreaterOrEqualTo(3);
+                foreach (var transport in reconnects)
+                {
+                    transport.Parameters.GetParams()
+                        .Should().Contain(new KeyValuePair<string, string>("resume", key)); // RTN15b1
+                }
             }
 
             [Fact]
@@ -777,6 +794,12 @@ namespace IO.Ably.Tests.NETFramework.Realtime
 
                 errors.Should().ContainSingle();
                 errors[0].Message.Should().Be("the actual reason");
+                errors[0].Code.Should().Be(12345);
+
+                // The point of the clause: the error handed to the publisher is the reason the
+                // connection itself is reporting, not a separately minted one.
+                client.Connection.ErrorReason.Should().NotBeNull();
+                client.Connection.ErrorReason.Code.Should().Be(errors[0].Code);
             }
 
             [Fact]
@@ -1120,6 +1143,13 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 detach.IsSuccess.Should().BeTrue();
                 channel.State.Should().Be(ChannelState.Detached);
                 client.State.PendingMessages.Should().BeEmpty();
+
+                // "No DETACH message was sent (transport is unavailable)" - checked on the wire,
+                // not only on the outbound queue.
+                LastCreatedTransport.SentMessages
+                    .Select(x => x.Original)
+                    .Where(x => x != null)
+                    .Should().NotContain(x => x.Action == ProtocolMessage.MessageAction.Detach);
             }
 
             [Theory]
@@ -1388,11 +1418,31 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             public async Task OnAFailedResume_ShouldRestartTheSerialSequence()
             {
                 var client = await GetClientWithOneUnackedMessage();
+                var originalId = client.State.Connection.Id;
 
-                await Reconnect(client, connectionId: "different", error: new ErrorInfo("resume failed", 80008));
+                // Through DISCONNECTED first, as a refused resume actually arrives. Reconnecting
+                // straight from CONNECTED trips UpdateState's same-state early return, which drops
+                // the error before it reaches Connection.ErrorReason.
+                client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
+                await client.WaitForState(ConnectionState.Disconnected);
+                await client.ProcessCommands();
+
+                await Reconnect(
+                    client,
+                    connectionId: "different",
+                    error: new ErrorInfo("resume failed", 80008),
+                    connectionKey: "connectionKey-2");
 
                 SentSerials(client).Should().Equal(0L);
                 client.State.Connection.MessageSerial.Should().Be(1);
+
+                // The rest of what a refused resume looks like: a new id and key, the reason on the
+                // connection, and CONNECTED all the same.
+                client.State.Connection.Id.Should().Be("different").And.NotBe(originalId);
+                client.State.Connection.Key.Should().Be("connectionKey-2");
+                client.Connection.ErrorReason.Should().NotBeNull();
+                client.Connection.ErrorReason.Code.Should().Be(80008);
+                client.Connection.State.Should().Be(ConnectionState.Connected);
             }
 
             [Fact]
@@ -1458,9 +1508,14 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 await Reconnect(client, connectionId: "recovered");
 
                 client.State.Connection.MessageSerial.Should().Be(45);
+
+                // And it is the serial actually put on the wire, which is what RTN16f is for.
+                client.ExecuteCommand(SendMessageCommand.Create(
+                    new ProtocolMessage(ProtocolMessage.MessageAction.Message, "test")));
+                await client.ProcessCommands();
+                SentSerials(client).Should().Equal(45L);
             }
 
-            // UTS: realtime/unit/RTN16f/recover-initializes-msgserial-0
             [Fact]
             [Trait("spec", "RTN16f")]
             [Trait("spec", "RTN15c7")]
@@ -1506,13 +1561,13 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             }
 
             private static async Task Reconnect(
-                AblyRealtime client, string connectionId, bool isUpdate = false, ErrorInfo error = null)
+                AblyRealtime client, string connectionId, bool isUpdate = false, ErrorInfo error = null, string connectionKey = "connectionKey")
             {
                 await client.Workflow.ProcessCommand(SetConnectedStateCommand.Create(
                     new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
                     {
                         ConnectionId = connectionId,
-                        ConnectionDetails = new ConnectionDetails { ConnectionKey = "connectionKey" },
+                        ConnectionDetails = new ConnectionDetails { ConnectionKey = connectionKey },
                         Error = error,
                     },
                     isUpdate));
@@ -1644,7 +1699,6 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                     .Should().ContainSingle().Which.Should().BeOfType<SetDisconnectedStateCommand>();
             }
 
-            // UTS: realtime/unit/RTN23a/idle-timeout-reconnect-1
             [Fact]
             public async Task WhenIdleForLongerThanAllowed_ShouldDisconnect()
             {
@@ -1662,6 +1716,52 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 // RTN15a - the idle disconnect asks to reconnect at once rather than waiting out
                 // the disconnected retry timeout.
                 disconnect.RetryInstantly.Should().BeTrue();
+            }
+
+            // UTS: realtime/unit/RTN23a/idle-timeout-reconnect-1
+            [Fact]
+            [Trait("spec", "RTN23a")]
+            [Trait("spec", "RTN15a")]
+            public async Task WhenTheIdleTimeoutFires_ShouldDisconnectAndReconnect()
+            {
+                // The UTS case asserts the whole cycle, not just the decision to disconnect:
+                // connecting, connected, disconnected, connecting, connected, with a second
+                // connection attempt and a new connectionId. The test above pins what the monitor
+                // decides; this one pins what the client does with it.
+                var client = await GetConnectedClient(PromisedMaxIdleInterval);
+
+                var states = new List<ConnectionState>();
+                client.Connection.On(args => states.Add(args.Current));
+
+                CreatedTransports.Should().HaveCount(1);
+
+                _now.Reset(_now.Value.Add(AllowedIdleTime.Add(TimeSpan.FromSeconds(1))));
+                foreach (var command in await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                {
+                    client.ExecuteCommand(command);
+                }
+
+                await client.WaitForState(ConnectionState.Connecting);
+                await client.ProcessCommands();
+
+                // RTN15a's immediate reconnect built a second transport.
+                CreatedTransports.Should().HaveCount(2);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+                {
+                    ConnectionId = "connection-id-2",
+                    ConnectionDetails = new ConnectionDetails
+                    {
+                        ConnectionKey = "key-2",
+                        MaxIdleInterval = PromisedMaxIdleInterval,
+                    },
+                });
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                states.Should().ContainInOrder(
+                    ConnectionState.Disconnected, ConnectionState.Connecting, ConnectionState.Connected);
+                client.Connection.Id.Should().Be("connection-id-2");
             }
 
             [Fact]
@@ -1738,6 +1838,20 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 var commands = await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value));
 
                 commands.Should().BeEmpty();
+
+                // Still a single attempt at this point, per the case.
+                CreatedTransports.Should().HaveCount(1);
+
+                // And once the window really does elapse with no activity, the cycle runs.
+                _now.Reset(_now.Value.Add(AllowedIdleTime.Add(TimeSpan.FromSeconds(1))));
+                foreach (var command in await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                {
+                    client.ExecuteCommand(command);
+                }
+
+                await client.WaitForState(ConnectionState.Connecting);
+                await client.ProcessCommands();
+                CreatedTransports.Should().HaveCount(2);
             }
 
             [Fact]

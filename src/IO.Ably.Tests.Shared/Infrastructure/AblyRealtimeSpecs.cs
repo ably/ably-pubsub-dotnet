@@ -96,6 +96,8 @@ namespace IO.Ably.Tests
 
         protected FakeTransport LastCreatedTransport => FakeTransportFactory.LastCreatedTransport;
 
+        protected List<FakeTransport> CreatedTransports => FakeTransportFactory.CreatedTransports;
+
         internal AblyRealtime GetClientWithFakeTransport(Action<ClientOptions> optionsAction = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
         {
             var options = new ClientOptions(ValidKey) { TransportFactory = FakeTransportFactory };

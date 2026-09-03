@@ -323,6 +323,9 @@ namespace IO.Ably.Tests.Realtime
             var client = await GetConnectedClient(opts =>
                 opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
 
+            var originalId = client.Connection.Id;
+            var connectionKey = client.Connection.Key;
+
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
             {
                 Error = new ErrorInfo("Something else went wrong", 50000),
@@ -333,6 +336,22 @@ namespace IO.Ably.Tests.Realtime
             // Immediately, not in ten minutes.
             client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
             client.Connection.State.Should().Be(ConnectionState.Connecting);
+
+            // RTN15h3 asks for a reconnect *with a resume attempt*, so follow it through: the new
+            // attempt carries the key, and a CONNECTED bearing the same id keeps the connection.
+            LastCreatedTransport.Parameters.GetParams()
+                .Should().ContainKey("resume")
+                .WhoseValue.Should().Be(connectionKey);
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+            {
+                ConnectionId = originalId,
+                ConnectionDetails = new ConnectionDetails { ConnectionKey = connectionKey },
+            });
+            await client.WaitForState(ConnectionState.Connected);
+            await client.ProcessCommands();
+
+            client.Connection.Id.Should().Be(originalId);
         }
 
         [Fact]
