@@ -276,7 +276,10 @@ namespace IO.Ably.Realtime
             var channelSerials = new Dictionary<string, string>();
             foreach (var realtimeChannel in this)
             {
-                if (realtimeChannel.State == ChannelState.Attached)
+                // Gated on the serial, not on the channel state. RTL15b2 keeps the serial through
+                // SUSPENDED and RTN16i needs it in the recovery key, so a state test would drop it
+                // in exactly the state RTN16g3 hands a key out for. ably-js gates on the serial too.
+                if (realtimeChannel.Properties.ChannelSerial.IsNotEmpty())
                 {
                     channelSerials[realtimeChannel.Name] = realtimeChannel.Properties.ChannelSerial;
                 }

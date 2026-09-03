@@ -34,7 +34,7 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
         }
 
         [Fact]
-        [Trait("spec", "RTN16g2")]
+        [Trait("spec", "RTN16g3")]
         public async Task CreateRecoveryKey_ShouldReturnNullRecoveryKeyForNullConnectionKeyOrWhenStateIsClosed()
         {
             var client = GetClientWithFakeTransport();
@@ -47,6 +47,43 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
             client.Close();
             await client.WaitForState(ConnectionState.Closed);
             client.Connection.CreateRecoveryKey().Should().BeNullOrEmpty();
+        }
+
+        [Fact]
+        [Trait("spec", "RTN16g3")]
+        [Trait("spec", "RTN14h")]
+        public async Task CreateRecoveryKey_ShouldReturnAKeyWhileSuspended()
+        {
+            // RTN16g3 lists CLOSED, CLOSING and FAILED, and deliberately not SUSPENDED: RTN8d and
+            // RTN9d keep the key there because RTN14h always attempts a resume, so the connection
+            // is still recoverable and the key can be handed to another client.
+            var client = GetClientWithFakeTransport();
+            client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+            await client.WaitForState(ConnectionState.Connected);
+
+            // An attached channel carrying a channelSerial, because RTN16i makes those the point of
+            // the key. Without one the assertion below holds even if they are dropped.
+            var channel = (RealtimeChannel)client.Channels.Get("test");
+            channel.Attach();
+            await client.ProcessCommands();
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+            {
+                Channel = "test",
+                ChannelSerial = "serial-abc",
+            });
+            await client.ProcessCommands();
+
+            var connectedKey = client.Connection.CreateRecoveryKey();
+            connectedKey.Should().Contain("serial-abc");
+
+            client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(ErrorInfo.ReasonSuspended));
+            await client.WaitForState(ConnectionState.Suspended);
+            await client.ProcessCommands();
+
+            // RTL15b2 keeps the serial through SUSPENDED, so the key is unchanged - connectionKey,
+            // msgSerial and channelSerials all still present.
+            channel.State.Should().Be(ChannelState.Suspended);
+            client.Connection.CreateRecoveryKey().Should().Be(connectedKey);
         }
 
         [Fact]
