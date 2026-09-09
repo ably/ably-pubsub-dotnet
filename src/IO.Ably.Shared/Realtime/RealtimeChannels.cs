@@ -241,8 +241,9 @@ namespace IO.Ably.Realtime
                 case ConnectionState.Closed:
                 case ConnectionState.Failed:
                     /* (RTN11d) From CLOSED or FAILED, every channel goes to INITIALIZED with its
-                     * errorReason unset (RTL24). CLOSING is included because RTN11b routes connect()
-                     * in that state through RTN11d.
+                     * errorReason unset (RTL24). CLOSING is included because RTN11b asks for the
+                     * channel half there - "reinitialize channels per RTN11d" - and for that half
+                     * only. The connection half stays CLOSED/FAILED, per RTN11d's own trigger.
                      *
                      * Passing no error is what unsets it: SetChannelState hands it to OnError, which
                      * assigns either way, and does so before the same-state early return.

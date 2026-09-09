@@ -1980,6 +1980,49 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                     .Should().BeEmpty();
             }
 
+            [Fact]
+            [Trait("spec", "RTN23b")]
+            public async Task WhenTheCallerChangesTransportParams_ShouldFollowTheChange()
+            {
+                // ClientOptions.TransportParams is a mutable dictionary the client keeps a reference
+                // to, and TransportParams.Create reads it again for every transport - so the guard
+                // has to track it rather than answer once. A cached answer arms the monitor against
+                // heartbeats the current transport never asked for, or stands it down while they
+                // are being sent.
+                var client = GetClientWithFakeTransport(opts =>
+                {
+                    opts.NowFunc = _now.ValueFn;
+                    opts.RealtimeRequestTimeout = RequestTimeout;
+                    opts.HeartbeatMonitorDelay = (int)TimeSpan.FromMinutes(10).TotalMilliseconds;
+                    opts.TransportParams = new Dictionary<string, object> { { "heartbeats", "false" } };
+                });
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+                {
+                    ConnectionId = "1",
+                    ConnectionDetails = new ConnectionDetails
+                    {
+                        ConnectionKey = "connectionKey",
+                        MaxIdleInterval = PromisedMaxIdleInterval,
+                    },
+                });
+
+                await client.WaitForState(ConnectionState.Connected);
+
+                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
+                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                    .Should().BeEmpty("stood down while the caller's heartbeats=false stands");
+
+                // Driven stood-down first on purpose. The other direction cannot detect a stale
+                // answer: a disconnect latches _heartbeatMonitorDisconnectRequested, so the second
+                // tick returns nothing whether the guard was consulted again or not.
+                client.Options.TransportParams["heartbeats"] = "true";
+
+                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
+                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                    .Should().ContainSingle("the current transport does ask for protocol heartbeats");
+            }
+
             [Theory]
             [InlineData("heartbeats", true)]
             [InlineData("heartbeats", "true")]

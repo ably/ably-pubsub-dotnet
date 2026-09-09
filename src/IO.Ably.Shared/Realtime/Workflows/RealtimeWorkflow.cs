@@ -35,9 +35,6 @@ namespace IO.Ably.Realtime.Workflow
         private volatile bool _processingCommand;
         private bool _heartbeatMonitorDisconnectRequested;
 
-        // Null until first asked. See ProtocolHeartbeatsNotRequestedByCaller.
-        private bool? _protocolHeartbeatsNotRequested;
-
         private bool _warnedIdleCheckInactive;
         private bool _disposedValue;
 
@@ -111,10 +108,32 @@ namespace IO.Ably.Realtime.Workflow
             _ = Task.Run(
                 async () =>
                 {
-                    while (true)
+                    var monitorToken = _heartbeatMonitorCancellationTokenSource.Token;
+
+                    try
                     {
-                        QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("AblyRealtime.HeartbeatMonitor()"));
-                        await Task.Delay(Client.Options.HeartbeatMonitorDelay, _heartbeatMonitorCancellationTokenSource.Token);
+                        while (true)
+                        {
+                            QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("AblyRealtime.HeartbeatMonitor()"));
+                            await Task.Delay(Client.Options.HeartbeatMonitorDelay, monitorToken);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Disposal. Not worth a line.
+                    }
+                    catch (Exception ex)
+                    {
+                        // Nothing observes this task, so without the catch anything thrown here
+                        // faults it silently and RTN23a detection is gone for the life of the client
+                        // with no trace of why. HeartbeatMonitorDelay is validated on the way in, so
+                        // reaching this means something unforeseen - which is precisely the case that
+                        // needs to be visible rather than inferred from a connection that never
+                        // notices it is dead.
+                        Logger.Error(
+                            "The RTN23a heartbeat monitor has stopped. Idle connection detection is " +
+                            "off for the rest of this client's life.",
+                            ex);
                     }
                 },
                 _heartbeatMonitorCancellationTokenSource.Token);
@@ -367,6 +386,17 @@ namespace IO.Ably.Realtime.Workflow
                     // RTN11d - connect() out of CLOSED or FAILED starts afresh. The channel half,
                     // back to INITIALIZED with errorReason unset, is done per channel by the command
                     // queued below; Id and Key are already emptied on entering CLOSED or FAILED.
+                    //
+                    // Deliberately not CLOSING. RTN11d's trigger is CLOSED or FAILED, and RTN11b
+                    // asks only that channels be reinitialised from CLOSING - the operations table
+                    // maps that column to RTN11b, not RTN11d. So the channel command below covers
+                    // CLOSING and this connection level reset does not.
+                    //
+                    // ably-js reaches the same place for CLOSING by a different route rather than
+                    // by the same split: its reset lives in clearConnection, called on entering a
+                    // terminal state, and closing is not one - so no msgSerial reset either. It is
+                    // no guide to the rest of RTN11d though, since it clears errorReason only on
+                    // reaching CONNECTED and never returns channels to INITIALIZED at all.
                     if (State.Connection.State == ConnectionState.Closed ||
                         State.Connection.State == ConnectionState.Failed)
                     {
@@ -644,18 +674,11 @@ namespace IO.Ably.Realtime.Workflow
         /// <returns>true when protocol heartbeats have not been requested.</returns>
         private bool ProtocolHeartbeatsNotRequestedByCaller()
         {
-            // Answered once - TransportParams is fixed at client construction.
-            if (_protocolHeartbeatsNotRequested.HasValue)
-            {
-                return _protocolHeartbeatsNotRequested.Value;
-            }
-
-            _protocolHeartbeatsNotRequested = ComputeProtocolHeartbeatsNotRequested();
-            return _protocolHeartbeatsNotRequested.Value;
-        }
-
-        private bool ComputeProtocolHeartbeatsNotRequested()
-        {
+            // Recomputed per tick rather than cached. ClientOptions.TransportParams is a mutable
+            // dictionary the client keeps a reference to, and TransportParams.Create reads it afresh
+            // for every transport - so a cached answer can describe a param the current transport
+            // never sent, arming the monitor against heartbeats nobody asked for or standing it down
+            // while they are being sent. The cost is a scan of a dictionary that is normally empty.
             var transportParams = Client.Options.TransportParams;
             if (transportParams == null)
             {

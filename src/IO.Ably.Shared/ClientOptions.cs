@@ -296,17 +296,18 @@ namespace IO.Ably
         public TimeSpan ChannelRetryTimeout { get; set; } = Defaults.ChannelRetryTimeout;
 
         private TimeSpan _realtimeRequestTimeout = Defaults.RealtimeRequestTimeout;
+        private int _heartbeatMonitorDelay = 1000;
 
         /// <summary>
         /// How long the library waits for Ably to answer before treating a realtime request as
         /// having failed. Applies while establishing a connection, while awaiting a response to a
         /// Heartbeat, Connect, Attach, Detach or Close, and as part of the RTN23a idle timeout.
-        /// Default: 10s. Must be a positive interval, and values beyond a minute or so are rarely
-        /// useful. Disabling the timeout is not supported - the timeouts this value drives are all
-        /// required to fire - so both Timeout.InfiniteTimeSpan and TimeSpan.MaxValue are rejected.
+        /// Default: 10s. Must be at least one millisecond, and values beyond a minute or so are
+        /// rarely useful. Disabling the timeout is not supported - the timeouts this value drives are
+        /// all required to fire - so both Timeout.InfiniteTimeSpan and TimeSpan.MaxValue are rejected.
         /// TO3l11 - https://sdk.ably.com/builds/ably/specification/main/features/#TO3l11.
         /// </summary>
-        /// <exception cref="ArgumentOutOfRangeException">when set to zero, a negative value, or an
+        /// <exception cref="ArgumentOutOfRangeException">when set below one millisecond, or to an
         /// interval too large for the underlying timers to fire.</exception>
         public TimeSpan RealtimeRequestTimeout
         {
@@ -314,23 +315,25 @@ namespace IO.Ably
 
             set
             {
-                // A non-positive value fails quietly rather than loudly: zero turns the RTN14c
-                // connect timeout into a hot reconnect loop, and a negative one stops the timer
-                // firing at all. Timeout.InfiniteTimeSpan is -1ms, so the lower bound catches it -
-                // which matters, because both Task.Delay and System.Threading.Timer accept it as
-                // genuine infinity and it would disable RTN14c, RTN12b, RTL4f, RTL5f and RSA4c.
+                // The lower bound is one millisecond, not zero. CountdownTimer hands the delay to
+                // System.Threading.Timer as (int)TotalMilliseconds, so anything under a millisecond
+                // truncates to a zero delay timer - the same hot loop a literal zero produces, and
+                // just as quiet. A negative value stops the timer firing at all, and
+                // Timeout.InfiniteTimeSpan is -1ms, which matters because both Task.Delay and
+                // System.Threading.Timer accept it as genuine infinity and it would disable RTN14c,
+                // RTN12b, RTL4f, RTL5f and RSA4c outright.
                 //
                 // The upper bound is the tightest limit across the sinks this value reaches on every
                 // framework shipped: Task.Delay allows uint.MaxValue - 1 ms on .NET 6+ but only
                 // Int32.MaxValue on .NET Framework, Mono and Xamarin, and CountdownTimer casts to
                 // int for System.Threading.Timer. So Int32.MaxValue ms - a bound on the arithmetic,
                 // not a supported configuration, which is why the message names the useful range.
-                if (value <= TimeSpan.Zero || value.TotalMilliseconds > int.MaxValue)
+                if (value < TimeSpan.FromMilliseconds(1) || value.TotalMilliseconds > int.MaxValue)
                 {
                     throw new ArgumentOutOfRangeException(
                         nameof(RealtimeRequestTimeout),
                         value,
-                        "RealtimeRequestTimeout must be a positive interval. The default is 10s; " +
+                        "RealtimeRequestTimeout must be at least one millisecond. The default is 10s; " +
                         "values beyond a minute or so are rarely useful. Disabling the timeout is " +
                         "not supported - the connect, close, attach, detach and auth timeouts it " +
                         "drives are all required to fire.");
@@ -435,7 +438,32 @@ namespace IO.Ably
         /// connection has been lost.
         /// Defaults: 1000.
         /// </summary>
-        public int HeartbeatMonitorDelay { get; set; } = 1000;
+        public int HeartbeatMonitorDelay
+        {
+            get => _heartbeatMonitorDelay;
+
+            set
+            {
+                // This is the granularity of RTN23a idle detection, and the monitor driving it is a
+                // fire-and-forget loop, so a value it cannot wait on takes detection out for the life
+                // of the client. Zero is a hot loop, queueing a command per scheduler tick. Minus one
+                // is Timeout.Infinite, which Task.Delay accepts as genuine infinity, so the monitor
+                // ticks once and is then silent for good - nothing thrown, nothing logged. Below
+                // minus one it throws inside the loop instead. None of the three can be what a caller
+                // meant, so this rejects rather than clamping and quietly overriding them.
+                if (value < 1)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(HeartbeatMonitorDelay),
+                        value,
+                        "HeartbeatMonitorDelay must be at least one millisecond. The default is 1000. " +
+                        "It is how often RTN23a idle detection is evaluated, so a large value delays " +
+                        "noticing a dead connection, and turning it off is not supported.");
+                }
+
+                _heartbeatMonitorDelay = value;
+            }
+        }
 
         /// <summary>
         /// If enabled, every REST request to Ably includes a `request_id` query string parameter.

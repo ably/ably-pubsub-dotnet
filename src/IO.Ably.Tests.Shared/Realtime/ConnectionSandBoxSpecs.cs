@@ -1009,26 +1009,36 @@ namespace IO.Ably.Tests.Realtime
         [Trait("spec", "RTN14h")]
         [Trait("spec", "RTN8d")]
         [Trait("spec", "RTN9d")]
-        [Trait("spec", "RTN15c6")]
+        [Trait("spec", "RTL3d")]
         public async Task WhenDisconnectedPastTTL_ShouldStillResume_AndReattachChannels(Protocol protocol)
         {
-            // RTN14h, which replaces RTN15g as of specification 6.1.0 - the client always attempts
-            // the resume and lets the server decide whether continuity survives. Against a live
-            // endpoint the reconnect comes back with the connectionId we were holding, which is only
-            // possible because the resume param went out (RTN15b1).
+            // RTN14h, which replaces RTN15g as of specification 6.1.0 - the client keeps its
+            // connection state however long it has been disconnected, and still attempts a resume.
+            //
+            // The ttl has to actually elapse for this to be about RTN14h rather than about a brief
+            // reconnect, and a live endpoint reconnects too quickly for that on its own. So the
+            // attempts are held in CONNECTING until the ttl has passed and the client suspends -
+            // SUSPENDED being the state RTN14h names - and only then allowed to complete.
+            var holdInConnecting = false;
+            var transportFactory = new TestTransportFactory(
+                transport => transport.KeepInConnectingState = holdInConnecting);
+
             var client = await GetRealtimeClient(protocol, (options, _) =>
             {
+                options.TransportFactory = transportFactory;
                 options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(1000);
-                options.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(5000);
+                options.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(500);
+                options.SuspendedRetryTimeout = TimeSpan.FromMilliseconds(500);
             });
 
             await client.WaitForState(ConnectionState.Connected);
 
-            string initialConnectionId = client.Connection.Id;
-            string initialConnectionKey = client.Connection.Key;
+            var initialConnectionId = client.Connection.Id;
+            var initialConnectionKey = client.Connection.Key;
+            initialConnectionKey.Should().NotBeNullOrEmpty();
 
             // RTL3d - channels that were ATTACHED, ATTACHING or SUSPENDED are reattached on
-            // entering CONNECTED regardless of whether the resume succeeded.
+            // entering CONNECTED.
             var channels = new List<RealtimeChannel>
             {
                 client.Channels.Get("attached".AddRandomSuffix()) as RealtimeChannel,
@@ -1044,33 +1054,39 @@ namespace IO.Ably.Tests.Realtime
             channels[1].State.Should().Be(ChannelState.Initialized); // set attaching later
             channels[2].State.Should().Be(ChannelState.Suspended);
 
-            string newConnectionId = string.Empty;
+            // A ttl short enough to elapse while the attempts below are being held open.
+            client.State.Connection.ConnectionStateTtl = TimeSpan.FromMilliseconds(2000);
 
-            await WaitFor(60000, done =>
-            {
-                client.Connection.Once(ConnectionEvent.Disconnected, _ =>
-                {
-                    // RTN8d, RTN9d - DISCONNECTED is not a terminal state, so both survive.
-                    client.Connection.Id.Should().Be(initialConnectionId);
-                    client.Connection.Key.Should().Be(initialConnectionKey);
+            holdInConnecting = true;
+            client.GetTestTransport().Close(); // close event is suppressed by default
+            client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
 
-                    channels[1].Attach();
-                    client.Connection.Once(ConnectionEvent.Connected, _ =>
-                    {
-                        newConnectionId = client.Connection.Id;
-                        done();
-                    });
-                });
+            await client.WaitForState(ConnectionState.Disconnected);
 
-                client.GetTestTransport().Close(); // close event is suppressed by default
-                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
-            });
+            // RTN8d, RTN9d - DISCONNECTED is not a terminal state, so both survive.
+            client.Connection.Id.Should().Be(initialConnectionId);
+            client.Connection.Key.Should().Be(initialConnectionKey);
 
-            // RTN15c6 - the server still held the connection, so the resume succeeded and the
-            // connectionId comes back unchanged.
-            initialConnectionId.Should().NotBeNullOrEmpty();
-            newConnectionId.Should().Be(initialConnectionId);
+            // Attached during the outage, so it is pending when the connection comes back - RTL3d
+            // reattaches ATTACHING, ATTACHED and SUSPENDED channels and deliberately leaves
+            // INITIALIZED ones alone.
+            channels[1].Attach();
 
+            // The held attempts time out until the ttl is spent, which is what takes us here.
+            await client.WaitForState(ConnectionState.Suspended, TimeSpan.FromSeconds(30));
+
+            // The point of RTN14h: past the ttl, in the state RTN15g used to clear state in, the
+            // key is still there to resume with.
+            client.Connection.Key.Should().Be(initialConnectionKey);
+            client.Connection.Id.Should().Be(initialConnectionId);
+
+            holdInConnecting = false;
+
+            await client.WaitForState(ConnectionState.Connected, TimeSpan.FromSeconds(30));
+
+            // Whether the server still honoured the resume is its decision, not ours, so the
+            // connectionId is deliberately not asserted either way. What matters is that the
+            // client got back and RTL3d reattached everything.
             await channels[0].WaitForAttachedState();
             await channels[1].WaitForAttachedState();
             await channels[2].WaitForAttachedState();

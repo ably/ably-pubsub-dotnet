@@ -447,6 +447,35 @@ namespace IO.Ably.Tests.Realtime
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]
+        [InlineData(-2)]
+        [InlineData(int.MinValue)]
+        [Trait("spec", "RTN23a")]
+        public void WithANonPositiveHeartbeatMonitorDelay_ShouldReject(int milliseconds)
+        {
+            // The RTN23a monitor is a fire-and-forget loop, so a delay it cannot wait on disables
+            // idle detection for the life of the client. -1 is the quietest of the three: it is
+            // Timeout.Infinite, which Task.Delay accepts as genuine infinity, so the monitor ticks
+            // once and then never again with nothing thrown and nothing logged.
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.HeartbeatMonitorDelay = milliseconds);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN23a")]
+        public void WithTheSmallestUsableHeartbeatMonitorDelay_ShouldAccept()
+        {
+            var options = new ClientOptions(ValidKey);
+
+            options.HeartbeatMonitorDelay = 1;
+
+            options.HeartbeatMonitorDelay.Should().Be(1);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
         [Trait("spec", "TO3l11")]
         public void WithANonPositiveRealtimeRequestTimeout_ShouldReject(int seconds)
         {
@@ -454,6 +483,25 @@ namespace IO.Ably.Tests.Realtime
 
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => options.RealtimeRequestTimeout = TimeSpan.FromSeconds(seconds));
+        }
+
+        [Fact]
+        [Trait("spec", "TO3l11")]
+        public void WithASubMillisecondRealtimeRequestTimeout_ShouldReject()
+        {
+            // Positive but below a millisecond is the same hazard as zero, and quieter:
+            // CountdownTimer hands the delay to System.Threading.Timer as (int)TotalMilliseconds,
+            // so it truncates to a zero delay timer and turns RTN14c into a hot loop.
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(0.5));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromTicks(1));
+
+            // Exactly one millisecond is the smallest the timers can carry, so it is allowed.
+            options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(1);
+            options.RealtimeRequestTimeout.Should().Be(TimeSpan.FromMilliseconds(1));
         }
 
         [Fact]
