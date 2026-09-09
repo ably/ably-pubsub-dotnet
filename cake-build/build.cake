@@ -26,7 +26,7 @@ var framework = Argument("framework", "");
 Setup(ctx =>
 {
     Information("========================================");
-    Information("Cake Build System for ably-dotnet");
+    Information("Cake Build System for ably-pubsub-dotnet");
     Information("========================================");
     Information($"Target: {target}");
     Information($"Configuration: {configuration}");

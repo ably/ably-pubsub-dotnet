@@ -7,15 +7,15 @@
         <authors>Martin Georgiev, Yavor Ivanov, Jack Rutherford, Tom Kirby-Green, Sachin Shinde</authors>
         <owners>Ably Real-time Ltd</owners>
         <license type="expression">Apache-2.0</license>
-        <projectUrl>https://github.com/ably/ably-dotnet</projectUrl>
+        <projectUrl>https://github.com/ably/ably-pubsub-dotnet</projectUrl>
         <icon>icon.png</icon>
         <readme>README.md</readme>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Ably .NET library to enable push notifications on Android devices. This package provides Android-specific push notification functionality using Firebase Cloud Messaging for the Ably realtime messaging platform.</description>
-        <releaseNotes>https://github.com/ably/ably-dotnet/releases</releaseNotes>
+        <releaseNotes>https://github.com/ably/ably-pubsub-dotnet/releases</releaseNotes>
         <copyright>©2025 Ably Real-time Ltd</copyright>
         <tags>ably realtime messaging push notifications android xamarin firebase fcm mobile websocket pubsub</tags>
-        <repository type="git" url="https://github.com/ably/ably-dotnet.git" branch="main" />
+        <repository type="git" url="https://github.com/ably/ably-pubsub-dotnet.git" branch="main" />
         <language />
         <dependencies>
 

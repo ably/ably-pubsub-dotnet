@@ -58,7 +58,7 @@ namespace IO.Ably
         /// This returns dotnet platform as per ably-lib mappings defined in agents.json.
         /// https://github.com/ably/ably-common/blob/main/protocol/agents.json.
         /// This is required since we are migrating from 'X-Ably-Lib' header (RSC7b) to agent headers (RSC7d).
-        /// Please note that uwp platform is Deprecated and removed as a part of https://github.com/ably/ably-dotnet/pull/1101.
+        /// Please note that uwp platform is Deprecated and removed as a part of https://github.com/ably/ably-pubsub-dotnet/pull/1101.
         /// </summary>
         /// <returns> Clean Platform Identifier. </returns>
         private static string GetDotnetRuntimeIdentifier()

@@ -96,7 +96,7 @@ namespace IO.Ably
             }
         }
 
-        // TODO: Refactor how we hold the ClientId as per https://github.com/ably/ably-dotnet/issues/930
+        // TODO: Refactor how we hold the ClientId as per https://github.com/ably/ably-pubsub-dotnet/issues/930
         public string ClientId => ConnectionClientId
                                   ?? CurrentToken?.ClientId
                                   ?? CurrentTokenParams?.ClientId

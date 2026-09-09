@@ -1,6 +1,6 @@
 ![Ably Pub/Sub Dotnet Header](images/NETSDK-github.png)
 [![NuGet version](https://badge.fury.io/nu/ably.io.svg)](https://www.nuget.org/packages/ably.io)
-[![License](https://badgen.net/github/license/ably/ably-dotnet)](https://github.com/ably/ably-dotnet/blob/main/LICENSE)
+[![License](https://badgen.net/github/license/ably/ably-pubsub-dotnet)](https://github.com/ably/ably-pubsub-dotnet/blob/main/LICENSE)
 
 # Ably Pub/Sub .NET SDK
 
@@ -61,7 +61,7 @@ dotnet add package ably.io
 
 ### MAUI configuration
 
-When using Ably in a MAUI project, be aware of potential issues caused by assembly trimming, as `ably-dotnet` relies on the reflection API. 
+When using Ably in a MAUI project, be aware of potential issues caused by assembly trimming, as `ably-pubsub-dotnet` relies on the reflection API. 
 
 Add the following to your `.csproj` file to prevent trimming of the `IO.Ably` assembly:
 
@@ -121,7 +121,7 @@ clientOpts.LogHandler = new CustomLogHandler();
 
 ### Unity usage
 
-- Download latest `ably.io.*.unitypackage` from [releases section](https://github.com/ably/ably-dotnet/releases) and include it in the unity project.
+- Download latest `ably.io.*.unitypackage` from [releases section](https://github.com/ably/ably-pubsub-dotnet/releases) and include it in the unity project.
 - For more information, check [Unity README](./unity/README.md)
 
 ## Releases
@@ -138,11 +138,11 @@ Read the [CONTRIBUTING.md](./CONTRIBUTING.md) guidelines to contribute to Ably.
 
 ## Support, feedback and troubleshooting
 
-For help or technical support, visit Ably's [support page](https://ably.com/support) or [GitHub Issues](https://github.com/ably/ably-dotnet/issues) for community-reported bugs and discussions.
+For help or technical support, visit Ably's [support page](https://ably.com/support) or [GitHub Issues](https://github.com/ably/ably-pubsub-dotnet/issues) for community-reported bugs and discussions.
 
 ### Increasing transport send and receive buffers for .NET framework
 
-In high-throughput scenarios, for example, sending messages >50KB, the default WebSocket buffer in the .NET Framework can cause instability or errors. This issue is discussed in [GitHub issue #446](https://github.com/ably/ably-dotnet/issues/446).
+In high-throughput scenarios, for example, sending messages >50KB, the default WebSocket buffer in the .NET Framework can cause instability or errors. This issue is discussed in [GitHub issue #446](https://github.com/ably/ably-pubsub-dotnet/issues/446).
 
 To mitigate this, increase the WebSocket buffer size to the maximum allowed (64KB):
 
