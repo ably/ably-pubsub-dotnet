@@ -1982,13 +1982,12 @@ namespace IO.Ably.Tests.NETFramework.Realtime
 
             [Fact]
             [Trait("spec", "RTN23b")]
-            public async Task WhenTheCallerChangesTransportParams_ShouldFollowTheChange()
+            public async Task WhenTheCallerChangesTransportParams_ShouldFollowTheNextTransport()
             {
-                // ClientOptions.TransportParams is a mutable dictionary the client keeps a reference
-                // to, and TransportParams.Create reads it again for every transport - so the guard
-                // has to track it rather than answer once. A cached answer arms the monitor against
-                // heartbeats the current transport never asked for, or stands it down while they
-                // are being sent.
+                // The decision is per transport, not per client and not per tick. A caller can
+                // mutate ClientOptions.TransportParams at any time, but the transport already open
+                // went out with whatever it went out with - so a change must not retune the monitor
+                // for the current transport, only for the next one built from it.
                 var client = GetClientWithFakeTransport(opts =>
                 {
                     opts.NowFunc = _now.ValueFn;
@@ -1997,7 +1996,42 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                     opts.TransportParams = new Dictionary<string, object> { { "heartbeats", "false" } };
                 });
 
-                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+                client.FakeProtocolMessageReceived(ConnectedWithMaxIdleInterval());
+                await client.WaitForState(ConnectionState.Connected);
+
+                LastCreatedTransport.Parameters.GetParams()
+                    .Should().Contain(new KeyValuePair<string, string>("heartbeats", "false"));
+
+                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
+                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                    .Should().BeEmpty("this transport did not ask for protocol heartbeats");
+
+                client.Options.TransportParams["heartbeats"] = "true";
+
+                // Still stood down: the change cannot reach a transport that has already been built.
+                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
+                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                    .Should().BeEmpty("the open transport still went out with heartbeats=false");
+
+                // A new transport, which does carry the change.
+                client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
+                await client.WaitForState(ConnectionState.Disconnected);
+                client.ExecuteCommand(SetConnectingStateCommand.Create());
+                await client.ProcessCommands();
+
+                LastCreatedTransport.Parameters.GetParams()
+                    .Should().Contain(new KeyValuePair<string, string>("heartbeats", "true"));
+
+                client.FakeProtocolMessageReceived(ConnectedWithMaxIdleInterval());
+                await client.WaitForState(ConnectionState.Connected);
+
+                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
+                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
+                    .Should().ContainSingle("the current transport does ask for protocol heartbeats");
+            }
+
+            private static ProtocolMessage ConnectedWithMaxIdleInterval() =>
+                new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
                 {
                     ConnectionId = "1",
                     ConnectionDetails = new ConnectionDetails
@@ -2005,23 +2039,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                         ConnectionKey = "connectionKey",
                         MaxIdleInterval = PromisedMaxIdleInterval,
                     },
-                });
-
-                await client.WaitForState(ConnectionState.Connected);
-
-                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
-                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
-                    .Should().BeEmpty("stood down while the caller's heartbeats=false stands");
-
-                // Driven stood-down first on purpose. The other direction cannot detect a stale
-                // answer: a disconnect latches _heartbeatMonitorDisconnectRequested, so the second
-                // tick returns nothing whether the guard was consulted again or not.
-                client.Options.TransportParams["heartbeats"] = "true";
-
-                _now.Reset(_now.Value.Add(AllowedIdleTime).Add(TimeSpan.FromSeconds(1)));
-                (await client.Workflow.ProcessCommand(HeartbeatMonitorCommand.Create(_now.Value)))
-                    .Should().ContainSingle("the current transport does ask for protocol heartbeats");
-            }
+                };
 
             [Theory]
             [InlineData("heartbeats", true)]

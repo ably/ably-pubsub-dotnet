@@ -49,6 +49,16 @@ namespace IO.Ably.Realtime.Workflow
             public TimeSpan? MaxIdleInterval { get; internal set; }
 
             /// <summary>
+            /// Whether the current transport actually asked Ably for protocol heartbeats, read off
+            /// the query params it was built with. RTN23b guarantees them only for heartbeats=true,
+            /// and a caller's own TransportParams entry can displace ours - so without them Ably may
+            /// satisfy maxIdleInterval with websocket pings, which ClientWebSocket cannot observe
+            /// and RTN23a therefore cannot measure. Per transport, because the params are rebuilt
+            /// for each one.
+            /// </summary>
+            public bool ProtocolHeartbeatsRequested { get; internal set; }
+
+            /// <summary>
             ///     Information relating to the transition to the current state,
             ///     as an Ably ErrorInfo object. This contains an error code and
             ///     message and, in the failed state in particular, provides diagnostic

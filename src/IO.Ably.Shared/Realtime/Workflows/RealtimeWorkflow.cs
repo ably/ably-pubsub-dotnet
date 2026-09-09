@@ -298,8 +298,10 @@ namespace IO.Ably.Realtime.Workflow
             }
 
             // RTN23b - without protocol heartbeats Ably may satisfy maxIdleInterval with websocket
-            // ping frames, which this library cannot observe, leaving nothing to measure.
-            if (ProtocolHeartbeatsNotRequestedByCaller())
+            // ping frames, which this library cannot observe, leaving nothing to measure. Read off
+            // the params this transport was built with, not off ClientOptions, which the caller can
+            // change after the fact; ConnectionManager.CreateTransport records it and warns.
+            if (connection.ProtocolHeartbeatsRequested == false)
             {
                 return Enumerable.Empty<RealtimeCommand>();
             }
@@ -663,72 +665,6 @@ namespace IO.Ably.Realtime.Workflow
             }
 
             return EmptyCommand.Instance;
-        }
-
-        /// <summary>
-        /// Whether the caller's own transportParams entry has displaced ours, leaving RTN23b's
-        /// protocol heartbeats unrequested. RTN23b guarantees them only for exactly
-        /// `heartbeats=true`; anything else lets Ably use transport-level pings, which
-        /// ClientWebSocket does not surface.
-        /// </summary>
-        /// <returns>true when protocol heartbeats have not been requested.</returns>
-        private bool ProtocolHeartbeatsNotRequestedByCaller()
-        {
-            // Recomputed per tick rather than cached. ClientOptions.TransportParams is a mutable
-            // dictionary the client keeps a reference to, and TransportParams.Create reads it afresh
-            // for every transport - so a cached answer can describe a param the current transport
-            // never sent, arming the monitor against heartbeats nobody asked for or standing it down
-            // while they are being sent. The cost is a scan of a dictionary that is normally empty.
-            var transportParams = Client.Options.TransportParams;
-            if (transportParams == null)
-            {
-                return false;
-            }
-
-            // Case-insensitive because DictionaryExtensions.Merge drops our own heartbeats param on a
-            // case-insensitive key match, so "Heartbeats" reaches the wire in place of ours.
-            var callerEntry = transportParams.FirstOrDefault(x => x.Key.EqualsTo("heartbeats"));
-            if (callerEntry.Key == null)
-            {
-                return false;
-            }
-
-            // Two conditions, because Merge has already dropped ours on a case-insensitive key match:
-            //  - the value must be "true"; RTN23b guarantees protocol heartbeats only for that, and
-            //    treats false or unspecified as permission to use any transport-level mechanism.
-            //  - the key must be exactly "heartbeats"; any other spelling is a param Ably ignores,
-            //    which reads as unspecified.
-            string value;
-            try
-            {
-                value = callerEntry.Value?.ToString();
-            }
-            catch (Exception ex)
-            {
-                // Unguarded, a throwing ToString would escape every tick and be dropped by the
-                // command loop, killing RTN23a silently. TransportParams.ConvertValue guards it too.
-                Logger.Error($"Could not read transportParams['{callerEntry.Key}'] as a string.", ex);
-                value = null;
-            }
-
-            var keyIsExact = callerEntry.Key.EqualsTo("heartbeats", caseSensitive: true);
-            var valueIsTrue = value.EqualsTo("true");
-            var disabled = keyIsExact == false || valueIsTrue == false;
-
-            if (disabled)
-            {
-                // Named separately because the two halves need different fixes.
-                var reason = keyIsExact
-                    ? $"transportParams sets heartbeats to '{value}', not 'true'."
-                    : $"transportParams sets '{callerEntry.Key}'; Ably only reads 'heartbeats'.";
-
-                Logger.Warning(
-                    $"{reason} Ably may then keep this connection alive with websocket pings, which " +
-                    "this library cannot see, so idle connection detection is off and a silently " +
-                    "dropped connection will not be detected. Set heartbeats to 'true' to enable it.");
-            }
-
-            return disabled;
         }
 
         private void SetNewHostInState(string newHost)
