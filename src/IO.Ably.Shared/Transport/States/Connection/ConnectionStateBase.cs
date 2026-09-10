@@ -26,7 +26,7 @@ namespace IO.Ably.Transport.States.Connection
 
         public Exception Exception { get; set; }
 
-        public TimeSpan? RetryIn { get; protected set; }
+        public TimeSpan? RetryIn { get; internal set; }
 
         public virtual bool CanQueue => false;
 

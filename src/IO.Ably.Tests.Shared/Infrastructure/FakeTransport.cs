@@ -45,9 +45,21 @@ namespace IO.Ably.Tests
 
         public bool OnConnectChangeStateToConnected { get; set; } = true;
 
+        /// <summary>
+        /// Makes Connect throw, as a transport does when the endpoint cannot be reached at all.
+        /// Mirrors TestTransportWrapper.ThrowOnConnect, for tests that need the failure to happen
+        /// inside the command that created the transport rather than as a later event.
+        /// </summary>
+        public bool ThrowOnConnect { get; set; }
+
         public void Connect()
         {
             DefaultLogger.Debug($"Connecting using: {Parameters.GetUri()}");
+
+            if (ThrowOnConnect)
+            {
+                throw new Exception("Test transport failing on connect");
+            }
 
             ConnectCalled = true;
             if (OnConnectChangeStateToConnected)
