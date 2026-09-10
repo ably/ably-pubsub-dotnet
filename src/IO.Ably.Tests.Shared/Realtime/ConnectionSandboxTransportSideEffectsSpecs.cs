@@ -18,7 +18,7 @@ namespace IO.Ably.Tests.Realtime
         [Theory]
         [ProtocolData]
         [Trait("spec", "RTN19b")]
-        public async Task WithChannelInAttachingState_WhenTransportIsDisconnected_ShouldResendAttachMessageOnConnectionResumed(Protocol protocol)
+        public async Task WithChannelInAttachingState_WhenTransportIsDisconnected_ShouldResendAttachMessageOnConnectionResumed_Flaky(Protocol protocol)
         {
             var client = await GetRealtimeClient(protocol);
             await client.WaitForState(ConnectionState.Connected);
@@ -78,7 +78,7 @@ namespace IO.Ably.Tests.Realtime
         [ProtocolData]
         [Trait("spec", "RTN19")]
         [Trait("spec", "RTN19a1")]
-        public async Task OnConnected_ShouldResendAckWithConnectionMessageSerialIfResumeFailed(Protocol protocol)
+        public async Task OnConnected_ShouldResendAckWithConnectionMessageSerialIfResumeFailed_Flaky(Protocol protocol)
         {
             var client = await GetRealtimeClient(protocol);
             await client.WaitForState(ConnectionState.Connected);

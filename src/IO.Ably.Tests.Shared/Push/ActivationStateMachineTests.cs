@@ -636,7 +636,7 @@ namespace IO.Ably.Tests.Push
                     var response = localDevice.ToString();
 
                     return Task.FromResult(new AblyResponse()
-                        { StatusCode = HttpStatusCode.OK, TextResponse = response });
+                    { StatusCode = HttpStatusCode.OK, TextResponse = response });
                 };
                 var (nextState, nextStateFunction) =
                     await state.Transition(new ActivationStateMachine.GotPushDeviceDetails());

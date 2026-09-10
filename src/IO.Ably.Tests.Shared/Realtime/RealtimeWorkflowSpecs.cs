@@ -22,40 +22,40 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             [Trait("spec", "RTN8b")]
             public void ConnectedState_UpdatesConnectionInformation()
             {
-             // Act
-             var connectedProtocolMessage = new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
-             {
-                 ConnectionId = "1",
-                 ConnectionDetails = new ConnectionDetails
-                 {
-                     ClientId = "client1",
-                     ConnectionKey = "validKey"
-                 },
-             };
-             var client = GetRealtimeClient(options => options.AutoConnect = false);
-             client.Workflow.ProcessCommand(SetConnectedStateCommand.Create(connectedProtocolMessage, false));
+                // Act
+                var connectedProtocolMessage = new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+                {
+                    ConnectionId = "1",
+                    ConnectionDetails = new ConnectionDetails
+                    {
+                        ClientId = "client1",
+                        ConnectionKey = "validKey"
+                    },
+                };
+                var client = GetRealtimeClient(options => options.AutoConnect = false);
+                client.Workflow.ProcessCommand(SetConnectedStateCommand.Create(connectedProtocolMessage, false));
 
-             // Assert
-             var connection = client.Connection;
-             connection.Id.Should().Be("1");
-             connection.Key.Should().Be("validKey");
-             client.Auth.ClientId.Should().Be("client1");
+                // Assert
+                var connection = client.Connection;
+                connection.Id.Should().Be("1");
+                connection.Key.Should().Be("validKey");
+                client.Auth.ClientId.Should().Be("client1");
             }
 
             [Fact]
             public async Task SetFailedState_ShouldClearConnectionKeyAndId()
             {
-             var client = GetDisconnectedClient();
+                var client = GetDisconnectedClient();
 
-             client.State.Connection.Key = "Test";
-             client.State.Connection.Id = "Test";
+                client.State.Connection.Key = "Test";
+                client.State.Connection.Id = "Test";
 
-             client.ExecuteCommand(SetFailedStateCommand.Create(null));
+                client.ExecuteCommand(SetFailedStateCommand.Create(null));
 
-             await client.ProcessCommands();
+                await client.ProcessCommands();
 
-             client.State.Connection.Key.Should().BeEmpty();
-             client.State.Connection.Id.Should().BeEmpty();
+                client.State.Connection.Key.Should().BeEmpty();
+                client.State.Connection.Id.Should().BeEmpty();
             }
 
             public GeneralSpecs(ITestOutputHelper output)

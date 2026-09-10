@@ -503,7 +503,7 @@ namespace IO.Ably.Tests.Realtime
             [ProtocolData]
             [Trait("spec", "RTP17")]
             [Trait("spec", "RTP17b")]
-            public async Task Presence_ShouldHaveInternalMapForCurrentConnectionId(Protocol protocol)
+            public async Task Presence_ShouldHaveInternalMapForCurrentConnectionId_Flaky(Protocol protocol)
             {
                 /*
                  * any ENTER, PRESENT, UPDATE or LEAVE event that matches
@@ -1710,7 +1710,7 @@ namespace IO.Ably.Tests.Realtime
                 [Theory]
                 [ProtocolData]
                 [Trait("spec", "RTN7d")]
-                public async Task ChannelStateCondition_WhenQueueMessagesIsFalse_ShouldFailAckQueueMessages_WhenSendFails(Protocol protocol)
+                public async Task ChannelStateCondition_WhenQueueMessagesIsFalse_ShouldFailAckQueueMessages_WhenSendFails_Flaky(Protocol protocol)
                 {
                     var client = await GetRealtimeClient(protocol, (options, settings) =>
                     {

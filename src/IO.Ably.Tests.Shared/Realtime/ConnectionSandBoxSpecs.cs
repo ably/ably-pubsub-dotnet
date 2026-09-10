@@ -488,7 +488,7 @@ namespace IO.Ably.Tests.Realtime
         [Theory]
         [ProtocolData]
         [Trait("spec", "RTN16d")]
-        public async Task RecoverRequest_ShouldInitializeRecoveryContextAndReceiveSameConnectionIdOnRecoverSuccess(Protocol protocol)
+        public async Task RecoverRequest_ShouldInitializeRecoveryContextAndReceiveSameConnectionIdOnRecoverSuccess_Flaky(Protocol protocol)
         {
             var client1 = await GetRealtimeClient(protocol);
             await client1.WaitForState(ConnectionState.Connected);

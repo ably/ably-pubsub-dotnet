@@ -160,12 +160,12 @@ namespace IO.Ably
             return new Result(true, null);
         }
 
-       /// <summary>
-       /// Factory method to create a successful Result of T with value.
-       /// </summary>
-       /// <typeparam name="T">Type of value.</typeparam>
-       /// <param name="value">successful value held in the result.</param>
-       /// <returns>Result.</returns>
+        /// <summary>
+        /// Factory method to create a successful Result of T with value.
+        /// </summary>
+        /// <typeparam name="T">Type of value.</typeparam>
+        /// <param name="value">successful value held in the result.</param>
+        /// <returns>Result.</returns>
         public static Result<T> Ok<T>(T value)
         {
             return new Result<T>(value, true, null);

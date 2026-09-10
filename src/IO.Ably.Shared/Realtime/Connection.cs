@@ -305,15 +305,15 @@ namespace IO.Ably.Realtime
             RealtimeClient.NotifyExternalClients(
                 () =>
                 {
-                        Emit(stateChange.Event, stateChange);
-                        try
-                        {
-                            externalHandlers?.Invoke(this, stateChange);
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Error("Error notifying Connection state changed handlers", ex);
-                        }
+                    Emit(stateChange.Event, stateChange);
+                    try
+                    {
+                        externalHandlers?.Invoke(this, stateChange);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("Error notifying Connection state changed handlers", ex);
+                    }
                 });
         }
 
