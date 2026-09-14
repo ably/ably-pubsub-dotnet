@@ -95,7 +95,12 @@ jobs:
             ${{ github.workspace }}/*.nupkg
 
   package-push:
-    runs-on: macos-14
+    # Intel (x86_64) runner: the classic Xamarin.iOS/Android SDKs this job installs are
+    # x86_64 Mono packages, and the last green run of this job (macOS-13) was Intel.
+    # The standard macos-14 label is arm64, which would put the whole Xamarin build
+    # under Rosetta. If larger runners are not enabled for this org (job stays queued),
+    # fall back to 'macos-14' and accept Rosetta.
+    runs-on: macos-14-large
     env:
       DOTNET_NOLOGO: true
 
@@ -108,7 +113,11 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: '14.3'
+          # Xcode 14.3 (which classic Xamarin.iOS 16.4 targets) was only ever present on
+          # the retired macOS-13 image; the macOS-14 image ships 15.0.1-16.2, so 14.3 can
+          # no longer resolve and the job died here. 15.0.1 is the lowest version the
+          # image carries, i.e. the smallest step away from what Xamarin.iOS expects.
+          xcode-version: '15.0.1'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
@@ -128,17 +137,32 @@ jobs:
 
       - name: Install legacy Xamarin
         run: |
-          # macOS 13 runners should have Xamarin pre-installed
-          # Verify Xamarin.iOS and Xamarin.Android are available
-          ls -la "/Library/Frameworks/Mono.framework/External/xbuild/Xamarin/" || true
-          ls -la "/Library/Frameworks/Xamarin.iOS.framework/" || true
-          
-          # If not found, install via brew
+          # macOS-14+ images ship no Xamarin (Mono only), and the xamarin-ios /
+          # xamarin-android brew casks were removed after Xamarin's EOL, so both the
+          # "preinstalled" and the brew paths of the old step are dead. Install the final
+          # classic SDK releases from Microsoft's archived installers instead - the same
+          # versions the last green run had preinstalled on macOS-13 (Xamarin.iOS 16.4,
+          # Xamarin.Android 13.2).
+          set -euo pipefail
+
           if [ ! -d "/Library/Frameworks/Xamarin.iOS.framework/" ]; then
-            echo "Installing Xamarin via brew..."
-            brew install --cask xamarin-ios || true
-            brew install --cask xamarin-android || true
+            echo "Installing Xamarin.iOS 16.4.0.23 from archived pkg..."
+            curl -fL --retry 3 -o /tmp/xamarin.ios.pkg \
+              "https://download.visualstudio.microsoft.com/download/pr/ceb0ea3f-4db8-46b4-8dc3-8049d27c0107/3960868aa9b1946a6c77668c3f3334ee/xamarin.ios-16.4.0.23.pkg"
+            sudo installer -pkg /tmp/xamarin.ios.pkg -target /
           fi
+
+          if [ ! -d "/Library/Frameworks/Xamarin.Android.framework/" ]; then
+            echo "Installing Xamarin.Android 13.2.2.0 from archived pkg..."
+            curl -fL --retry 3 -o /tmp/xamarin.android.pkg \
+              "https://download.visualstudio.microsoft.com/download/pr/8cbf56b1-ef0d-466f-8cfe-fae4ba8c5080/e9e853fee3169b1c5128098942f19120/xamarin.android-13.2.2.0.pkg"
+            sudo installer -pkg /tmp/xamarin.android.pkg -target /
+          fi
+
+          echo "Verifying Xamarin targets..."
+          ls -la "/Library/Frameworks/Mono.framework/External/xbuild/Xamarin/"
+          test -d "/Library/Frameworks/Xamarin.iOS.framework/"
+          test -d "/Library/Frameworks/Xamarin.Android.framework/"
 
       - name: Download cake tool
         run: dotnet tool restore
