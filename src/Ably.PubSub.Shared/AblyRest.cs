@@ -20,7 +20,14 @@ namespace IO.Ably
         private LocalDevice _device;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRest"/> class using an api key.</summary>
+        /// Initializes a new instance of the <see cref="AblyRest"/> class using an api key.
+        /// Prefer <c>PubSubServer.CreateHttpClient</c> on the server package: a client constructed
+        /// directly here is not classified as device-side or server-side.</summary>
+        /// <remarks>
+        /// The device/server classification is an agent entry the door factories stamp onto the
+        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
+        /// client will be rejected once MAU-based pricing is live.
+        /// </remarks>
         /// <param name="apiKey">Full api key.</param>
         public AblyRest(string apiKey)
             : this(new ClientOptions(apiKey))
@@ -36,7 +43,14 @@ namespace IO.Ably
         ///  opt.ClientId = "123";
         /// });
         /// </example>
+        /// Prefer <c>PubSubServer.CreateHttpClient</c> on the server package: a client constructed
+        /// directly here is not classified as device-side or server-side.
         /// </summary>
+        /// <remarks>
+        /// The device/server classification is an agent entry the door factories stamp onto the
+        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
+        /// client will be rejected once MAU-based pricing is live.
+        /// </remarks>
         /// <param name="init">Action delegate which receives a empty options object.</param>
         public AblyRest(Action<ClientOptions> init)
         {
@@ -47,7 +61,14 @@ namespace IO.Ably
 
         /// <summary>
         /// Initialize the library with a custom set of options.
+        /// Prefer <c>PubSubServer.CreateHttpClient</c> on the server package: a client constructed
+        /// directly here is not classified as device-side or server-side.
         /// </summary>
+        /// <remarks>
+        /// The device/server classification is an agent entry the door factories stamp onto the
+        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
+        /// client will be rejected once MAU-based pricing is live.
+        /// </remarks>
         /// <param name="clientOptions">instance of clientOptions.</param>
         public AblyRest(ClientOptions clientOptions)
             : this(clientOptions, IoC.MobileDevice)

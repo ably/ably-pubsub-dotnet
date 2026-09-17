@@ -226,7 +226,7 @@ Push notifications containing both the notification and data objects will be tre
 
 ### Receiving Messages
 
-For examples of handling incoming messages and dealing with notifications, see [push_notification_handlers](example/lib/push_notifications/push_notification_handlers.dart) in the example app.
+For examples of handling incoming messages and dealing with notifications, see the push samples under the `examples/` directory.
 
 #### Notification Message / Alert Push Notification
 

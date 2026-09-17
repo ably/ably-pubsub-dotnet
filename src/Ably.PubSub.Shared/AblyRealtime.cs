@@ -28,7 +28,15 @@ namespace IO.Ably
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AblyRealtime"/> class with an ably key.
+        /// Prefer <c>PubSubDevice.CreateClient</c> or <c>PubSubServer.CreateRealtimeClient</c> on
+        /// the device/server packages: a client constructed directly here is not classified as
+        /// device-side or server-side.
         /// </summary>
+        /// <remarks>
+        /// The device/server classification is an agent entry the door factories stamp onto the
+        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
+        /// client will be rejected once MAU-based pricing is live.
+        /// </remarks>
         /// <param name="key">String key (obtained from application dashboard).</param>
         public AblyRealtime(string key)
             : this(new ClientOptions(key))
@@ -37,7 +45,15 @@ namespace IO.Ably
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AblyRealtime"/> class with the given options.
+        /// Prefer <c>PubSubDevice.CreateClient</c> or <c>PubSubServer.CreateRealtimeClient</c> on
+        /// the device/server packages: a client constructed directly here is not classified as
+        /// device-side or server-side.
         /// </summary>
+        /// <remarks>
+        /// The device/server classification is an agent entry the door factories stamp onto the
+        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
+        /// client will be rejected once MAU-based pricing is live.
+        /// </remarks>
         /// <param name="options"><see cref="ClientOptions"/>.</param>
         public AblyRealtime(ClientOptions options)
             : this(options, CreateRestFunc, IoC.MobileDevice)

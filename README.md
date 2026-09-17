@@ -1,5 +1,4 @@
 ![Ably Pub/Sub Dotnet Header](images/NETSDK-github.png)
-[![NuGet version](https://badge.fury.io/nu/ably.io.svg)](https://www.nuget.org/packages/ably.io)
 [![License](https://badgen.net/github/license/ably/ably-dotnet)](https://github.com/ably/ably-dotnet/blob/main/LICENSE)
 
 # Ably Pub/Sub .NET SDK
@@ -30,7 +29,9 @@ Find out more:
 >
 > Never reference `ably.io` and `Ably.PubSub.*` from the same project: they share the `IO.Ably` namespace, so mixing them is a compile error by design.
 >
-> The installation and usage instructions below still describe the 1.x package and are rewritten later in this stack.
+> This also applies **transitively**. NuGet dedupes only by package ID, so a graph that pulls both `ably.io` 1.x (often via a library dependency) and any `Ably.PubSub.*` package loads *both* assemblies, and every `IO.Ably.*` type then exists twice: you get compile error CS0433 where your own code names those types, and runtime type-identity failures (`InvalidCastException`-class) where a library exposes `IO.Ably` types across its API. There is no type-forwarding between the packages. Detect it with `dotnet nuget why <project> ably.io`; if a dependency genuinely forces both, isolate them with an [`extern alias`](https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/extern-alias) — note `<Aliases>` applies only to a **direct** `PackageReference`, so first promote `ably.io` to a direct reference of the affected project, then add `<Aliases>ablyLegacy</Aliases>` to it and `extern alias ablyLegacy;` in the consuming file — otherwise treat a both-packages graph as unsupported and migrate the transitive dependency off `ably.io`.
+>
+> The Installation and Usage sections below still describe the 1.x `ably.io` package; they are replaced with `Ably.PubSub.Device`/`Ably.PubSub.Server` instructions before 2.0 general availability.
 
 ---
 
@@ -55,7 +56,7 @@ Everything you need to get started with Ably:
 | Unity | 2019.x+ |
 
 > [!IMPORTANT]
-> SDK versions < 1.2.12 will be [deprecated](https://ably.com/docs/platform/deprecate/protocol-v1) from November 1, 2025.
+> SDK versions < 1.2.12 are [deprecated](https://ably.com/docs/platform/deprecate/protocol-v1) (protocol v1, retired November 1, 2025).
 
 ---
 

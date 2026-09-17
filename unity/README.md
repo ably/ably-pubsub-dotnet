@@ -11,7 +11,7 @@
 
 ### Importing Unity Package
 - You can import the package by going to Assets -> Import Package -> Custom Package in the Unity UI. For more detailed information on importing packages, visit https://docs.unity3d.com/Manual/AssetPackagesImport.html.
-- [Configure SynchronizationContext](../README.md#executing-callbacks-on-mainui-thread) to execute callbacks on Main/UI thread.
+- Configure a `SynchronizationContext` (via `ClientOptions.CustomContext`) to execute callbacks on the Main/UI thread.
 - Sample code :
 
 ```dotnet

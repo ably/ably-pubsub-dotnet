@@ -39,8 +39,11 @@
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>bin\Release\Ably.PubSub.Core.xml</DocumentationFile>
   </PropertyGroup>
-  <PropertyGroup>
+  <PropertyGroup Condition="'$(Package)'!='True'">
     <SignAssembly>false</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Package)'=='True'">
+    <SignAssembly>true</SignAssembly>
   </PropertyGroup>
   <PropertyGroup>
     <AssemblyOriginatorKeyFile>IO.Ably.snk</AssemblyOriginatorKeyFile>

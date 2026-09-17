@@ -78,6 +78,14 @@ Task("_Package_Unity")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
+    var committedPlugin = paths.Root.CombineWithFilePath("unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll");
+    if (!FileExists(committedPlugin))
+    {
+        throw new Exception(
+            $"Committed Unity plugin missing: {committedPlugin}. The .unitypackage bundles this merged " +
+            "assembly; regenerate it with ./unity-plugins-updater.sh <version> and commit it.");
+    }
+
     Information($"Creating Unity package version {version}...");
     
     var unityPackagerPath = paths.Root.Combine("unity-packager");
