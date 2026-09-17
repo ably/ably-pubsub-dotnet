@@ -27,74 +27,21 @@ Task("_Package_Build_All")
     MSBuild(paths.PackageSolution, settings);
 });
 
-Task("_Package_Merge_All")
-    .IsDependentOn("_Package_Build_All")
-    .Does(() =>
-{
-    Information("Merging dependencies (Newtonsoft.Json and DeltaCodec) into Ably assemblies...");
-    
-    var projectsToMerge = new[]
-    {
-        "IO.Ably.Android",
-        "IO.Ably.iOS",
-        "IO.Ably.NETFramework"
-    };
-    
-    foreach (var project in projectsToMerge)
-    {
-        var projectPath = paths.Src.Combine(project);
-        
-        if (!DirectoryExists(projectPath))
-        {
-            Warning($"Project directory not found: {project}, skipping...");
-            continue;
-        }
-        
-        var binPath = projectPath.Combine("bin/Release");
-        
-        if (!DirectoryExists(binPath))
-        {
-            Warning($"Bin directory not found for {project}, skipping...");
-            continue;
-        }
-        
-        Information($"Processing {project}...");
-        
-        var primaryDll = binPath.CombineWithFilePath("IO.Ably.dll");
-        var dllsToMerge = new[]
-        {
-            binPath.CombineWithFilePath("Newtonsoft.Json.dll"),
-            binPath.CombineWithFilePath("IO.Ably.DeltaCodec.dll")
-        };
-        var packagedPath = binPath.Combine("Packaged");
-        var outputDll = packagedPath.CombineWithFilePath("IO.Ably.dll");
-        
-        // Merge all dependencies into primary DLL in one go
-        ilRepackHelper.MergeDLLs(primaryDll, dllsToMerge, outputDll);
-        
-        // Copy XML documentation if it exists
-        var docsFile = binPath.CombineWithFilePath("IO.Ably.xml");
-        if (FileExists(docsFile))
-        {
-            CopyFile(docsFile, packagedPath.CombineWithFilePath("IO.Ably.xml"));
-        }
-    }
-});
-
 Task("_Package_Create_NuGet")
-    .IsDependentOn("_Package_Merge_All")
+    .IsDependentOn("_Package_Build_All")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
-    Information($"Creating NuGet package version {version}...");
-    
-    var nuspecFile = paths.Root.CombineWithFilePath("nuget/io.ably.nuspec");
-    
-    if (!FileExists(nuspecFile))
+    Information($"Creating NuGet packages version {version}...");
+
+    // The lockstep package set. Every package here is built from this repository
+    // and released at the same version. Stack PR 2 adds the door packages
+    // (ably.pubsub.device.nuspec, ably.pubsub.server.nuspec) to this list.
+    var nuspecFiles = new[]
     {
-        throw new Exception($"Nuspec file not found: {nuspecFile}");
-    }
-    
+        "nuget/ably.pubsub.core.nuspec"
+    };
+
     var nugetSettings = new NuGetPackSettings
     {
         Version = version,
@@ -104,90 +51,26 @@ Task("_Package_Create_NuGet")
         },
         OutputDirectory = paths.Root
     };
-    
+
     // Use local nuget.exe if available
     var nugetPath = paths.Root.CombineWithFilePath("tools/nuget.exe");
     if (FileExists(nugetPath))
     {
         nugetSettings.ToolPath = nugetPath;
     }
-    
-    NuGetPack(nuspecFile, nugetSettings);
-    
-    Information($"✓ Package created: ably.io.{version}.nupkg");
-});
 
-Task("_Restore_Push_Package")
-    .Does(() =>
-{
-    RestoreSolution(paths.PushPackageSolution);
-});
-
-Task("_PushPackage_Build_All")
-    .IsDependentOn("_Clean")
-    .IsDependentOn("_Version")
-    .IsDependentOn("_Restore_Push_Package")
-    .Does(() =>
-{
-    Information("Building push notification packages...");
-    
-    var settings = buildConfig.ApplyStandardSettings(
-        new MSBuildSettings(),
-        "Package"
-    );
-    
-    settings = buildConfig.ApplyPackageSettings(settings);
-    settings = settings.WithTarget("Build");
-    
-    MSBuild(paths.PushPackageSolution, settings);
-});
-
-Task("_PushPackage_Create_NuGet")
-    .IsDependentOn("_PushPackage_Build_All")
-    .WithCriteria(() => !string.IsNullOrEmpty(version))
-    .Does(() =>
-{
-    Information($"Creating push notification packages version {version}...");
-    
-    var nugetSettings = new NuGetPackSettings
+    foreach (var nuspec in nuspecFiles)
     {
-        Version = version,
-        Properties = new Dictionary<string, string>
+        var nuspecFile = paths.Root.CombineWithFilePath(nuspec);
+
+        if (!FileExists(nuspecFile))
         {
-            { "Configuration", "Release" }
-        },
-        OutputDirectory = paths.Root
-    };
-    
-    // Use local nuget.exe if available
-    var nugetPath = paths.Root.CombineWithFilePath("tools/nuget.exe");
-    if (FileExists(nugetPath))
-    {
-        nugetSettings.ToolPath = nugetPath;
-    }
-    
-    // Android package
-    var androidNuspec = paths.Root.CombineWithFilePath("nuget/io.ably.push.android.nuspec");
-    if (FileExists(androidNuspec))
-    {
-        NuGetPack(androidNuspec, nugetSettings);
-        Information($"✓ Package created: ably.io.push.android.{version}.nupkg");
-    }
-    else
-    {
-        Warning($"Android nuspec not found: {androidNuspec}");
-    }
-    
-    // iOS package
-    var iosNuspec = paths.Root.CombineWithFilePath("nuget/io.ably.push.ios.nuspec");
-    if (FileExists(iosNuspec))
-    {
-        NuGetPack(iosNuspec, nugetSettings);
-        Information($"✓ Package created: ably.io.push.ios.{version}.nupkg");
-    }
-    else
-    {
-        Warning($"iOS nuspec not found: {iosNuspec}");
+            throw new Exception($"Nuspec file not found: {nuspecFile}");
+        }
+
+        NuGetPack(nuspecFile, nugetSettings);
+
+        Information($"✓ Packed {nuspecFile.GetFilename()} at version {version}");
     }
 });
 
@@ -195,10 +78,18 @@ Task("_Package_Unity")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
+    var committedPlugin = paths.Root.CombineWithFilePath("unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll");
+    if (!FileExists(committedPlugin))
+    {
+        throw new Exception(
+            $"Committed Unity plugin missing: {committedPlugin}. The .unitypackage bundles this merged " +
+            "assembly; regenerate it with ./unity-plugins-updater.sh <version> and commit it.");
+    }
+
     Information($"Creating Unity package version {version}...");
     
     var unityPackagerPath = paths.Root.Combine("unity-packager");
-    var outputPath = paths.Root.CombineWithFilePath($"ably.io.{version}.unitypackage");
+    var outputPath = paths.Root.CombineWithFilePath($"ably.pubsub.{version}.unitypackage");
     
     // Clone unity-packager if not exists
     if (!DirectoryExists(unityPackagerPath))
@@ -242,12 +133,8 @@ Task("_Package_Unity")
 ///////////////////////////////////////////////////////////////////////////////
 
 Task("Package")
-    .Description("Create main NuGet package (ably.io)")
+    .Description("Create the NuGet packages (Ably.PubSub.Core)")
     .IsDependentOn("_Package_Create_NuGet");
-
-Task("PushPackage")
-    .Description("Create push notification packages (Android & iOS)")
-    .IsDependentOn("_PushPackage_Create_NuGet");
 
 Task("UnityPackage")
     .Description("Create Unity package")

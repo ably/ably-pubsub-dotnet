@@ -77,41 +77,14 @@ Task("_NetStandard_Build")
     DotNetBuild(paths.NetStandardSolution.FullPath, settings);
 });
 
-Task("_Restore_Xamarin")
-    .Does(() =>
-{
-    RestoreSolution(paths.XamarinSolution);
-});
-
-Task("_Xamarin_Build")
-    .Does(() =>
-{
-    Information("Building Xamarin solution...");
-    
-    if (!FileExists(paths.XamarinSolution))
-    {
-        Warning("Xamarin solution not found, skipping build");
-        return;
-    }
-    
-    var settings = buildConfig.ApplyStandardSettings(
-        new MSBuildSettings(),
-        configuration
-    );
-    
-    settings = settings.WithTarget("Build");
-    
-    MSBuild(paths.XamarinSolution, settings);
-});
-
 Task("_Build_Ably_Unity_Dll")
     .Description("Create merged Unity DLL with all dependencies")
     .Does(() =>
 {
-    Information("Merging Unity dependencies into IO.Ably.dll...");
+    Information("Merging Unity dependencies into Ably.PubSub.Core.dll...");
     
     var netStandard20BinPath = paths.Src
-        .Combine("IO.Ably.NETStandard20")
+        .Combine("Ably.PubSub.Core")
         .Combine("bin/Release/netstandard2.0");
     
     if (!DirectoryExists(netStandard20BinPath))
@@ -119,11 +92,11 @@ Task("_Build_Ably_Unity_Dll")
         throw new Exception($"NETStandard2.0 bin directory not found: {netStandard20BinPath}. Please build the project first.");
     }
     
-    var primaryDll = netStandard20BinPath.CombineWithFilePath("IO.Ably.dll");
+    var primaryDll = netStandard20BinPath.CombineWithFilePath("Ably.PubSub.Core.dll");
     
     if (!FileExists(primaryDll))
     {
-        throw new Exception($"Primary DLL not found: {primaryDll}. Please build the IO.Ably.NETStandard20 project first.");
+        throw new Exception($"Primary DLL not found: {primaryDll}. Please build the Ably.PubSub.Core project first.");
     }
     
     var newtonsoftDll = paths.Root
@@ -145,7 +118,7 @@ Task("_Build_Ably_Unity_Dll")
     };
     
     var unityOutputPath = paths.Root.Combine("unity/Assets/Ably/Plugins");
-    var outputDll = unityOutputPath.CombineWithFilePath("IO.Ably.dll");
+    var outputDll = unityOutputPath.CombineWithFilePath("Ably.PubSub.Core.dll");
     
     // Delete existing output DLL if it exists
     if (FileExists(outputDll))
@@ -178,13 +151,6 @@ Task("Build.NetStandard")
     .IsDependentOn("_Clean")
     .IsDependentOn("_Restore_Main")
     .IsDependentOn("_NetStandard_Build");
-
-// Public task: Build Xamarin projects
-Task("Build.Xamarin")
-    .Description("Build Xamarin solution (iOS & Android)")
-    .IsDependentOn("_Clean")
-    .IsDependentOn("_Restore_Xamarin")
-    .IsDependentOn("_Xamarin_Build");
 
 // Public task: Update Ably DLLs inside unity project
 Task("Update.AblyUnity")

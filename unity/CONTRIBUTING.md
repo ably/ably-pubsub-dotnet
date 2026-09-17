@@ -151,4 +151,4 @@ Unity.exe -batchmode -nographics -quit -projectPath 'C:\Users\${UserName}\UnityP
 ## Updating the Ably Unity Package
 - Currently, the latest Ably source code is imported as DLLs in Unity using [Unity Plug-ins](https://docs.unity3d.com/Manual/Plugins.html).
 - This is done as part of the [release process](../CONTRIBUTING.md/#release-process) by running `./unity-plugins-updater.sh 1.2.3` (linux/mac) / `.\unity-plugins-updater.cmd 1.2.3` (windows) at the root.
-- This script is responsible for merging all dependencies into `IO.Ably.dll` and copying it to `unity/Assets/Ably/Plugins/`.
+- This script is responsible for merging all dependencies into `Ably.PubSub.Core.dll` and copying it to `unity/Assets/Ably/Plugins/`.

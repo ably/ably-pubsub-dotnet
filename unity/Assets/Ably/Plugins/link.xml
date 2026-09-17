@@ -1,5 +1,5 @@
 <linker>
-    <assembly fullname="IO.Ably" preserve="all" />
+    <assembly fullname="Ably.PubSub.Core" preserve="all" />
     <assembly fullname="UnityEngine.CoreModule">
         <type fullname="UnityEngine.Application">
             <property name="unityVersion" />

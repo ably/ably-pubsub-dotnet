@@ -26,7 +26,7 @@ Running `.\build.cmd` (Windows) or `./build.sh` (Unix/macOS) will start the buil
 ## Build Commands
 
 ### Build NetFramework
-We have a dedicated NetFramework project targeting .NET Framework 4.6+.
+`src/Ably.PubSub.Core.NETFramework` targets .NET Framework 4.6.2.
 
 **Windows:**
 ```cmd
@@ -34,7 +34,7 @@ We have a dedicated NetFramework project targeting .NET Framework 4.6+.
 ```
 
 ### Build NetStandard
-NetStandard currently supports explicit targets for netstandard2.0, net6.0 and net7.0.
+`src/Ably.PubSub.Core` targets netstandard2.0, net6.0 and net7.0.
 
 **Windows:**
 ```cmd
@@ -44,14 +44,6 @@ NetStandard currently supports explicit targets for netstandard2.0, net6.0 and n
 **Unix/macOS:**
 ```bash
 ./build.sh --target=Build.NetStandard
-```
-
-### Build Xamarin
-We have a Xamarin solution targeting Android and iOS.
-
-**Unix/macOS:**
-```bash
-./build.sh --target=Build.Xamarin
 ```
 
 ## Test Commands
@@ -94,42 +86,34 @@ Additional `--framework` flag can be supplied to test for target framework `net6
 
 ## Create NuGet Packages
 
-Currently, we have two scripts to generate NuGet packages:
+### package.cmd
 
-### 1. package.cmd
-
-- Responsible for creating core `ably.io` NuGet package.
-- Works only on Windows due to a dependency on the .NET Framework.
+- Responsible for creating the `Ably.PubSub.Core` NuGet package.
+- Works only on Windows due to a dependency on the .NET Framework head.
 
 ```cmd
-.\package.cmd 1.2.3
+.\package.cmd 2.0.0
 ```
 
-Above command creates `ably.io.1.2.3.nupkg` package at root.
+Above command creates `Ably.PubSub.Core.2.0.0.nupkg` at root, from
+`nuget/ably.pubsub.core.nuspec`. The nuspec list lives in
+`cake-build/tasks/package.cake` (`_Package_Create_NuGet`); the device and server
+packages join it later in this stack.
 
-During release process, this package is hosted on [nuget.org/packages/ably.io](https://www.nuget.org/packages/ably.io).
+During release process, this package is hosted on
+[nuget.org/packages/Ably.PubSub.Core](https://www.nuget.org/packages/Ably.PubSub.Core).
 
-### 2. package-push.sh / package-push.cmd
+### package-unity.sh
 
-Responsible for creating push packages for Android and iOS.
+Responsible for creating the Unity package.
 
-Please take a look at [Push Notification Documentation](../PushNotifications.md) for usage.
-
-**Unix/macOS:**
 ```bash
-./package-push.sh 1.2.3
+./package-unity.sh 2.0.0
 ```
 
-**Windows:**
-```cmd
-.\package-push.cmd 1.2.3
-```
-
-Above command creates `ably.io.push.android.1.2.3.nupkg` and `ably.io.push.ios.1.2.3.nupkg` packages at root.
-
-During release process, these packages are hosted on:
-- [nuget.org/packages/ably.io.push.android](https://www.nuget.org/packages/ably.io.push.android)
-- [nuget.org/packages/ably.io.push.ios](https://www.nuget.org/packages/ably.io.push.ios)
+Above command creates `ably.pubsub.2.0.0.unitypackage` at root. The merged
+plugin assembly it packages is produced separately by
+`./unity-plugins-updater.sh 2.0.0`, which needs Mono (for ILRepack).
 
 ## Advanced Options
 

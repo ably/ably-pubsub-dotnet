@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\IO.Ably.NETStandard20\IO.Ably.NETStandard20.csproj" />
+      <ProjectReference Include="..\..\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj" />
         <PackageReference Include="StyleCop.Analyzers" Version="1.1.118">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

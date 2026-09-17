@@ -5,10 +5,9 @@
 #
 # To create a release:
 # 1. Go to Actions tab → Package ably workflow
-# 2. Click "Run workflow" and enter the version number (e.g., 1.2.3)
+# 2. Click "Run workflow" and enter the version number (e.g., 2.0.0)
 # 3. Download artifacts:
-#    - ably-package: Main NuGet packages (.nupkg)
-#    - ably-push-package: Push notification packages (.nupkg)
+#    - ably-package: NuGet packages (.nupkg)
 #    - ably-unity-package: Unity package (.unitypackage)
 # ============================================================================
 
@@ -40,45 +39,6 @@ jobs:
             6.0.428
             7.0.410
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
-        
-      - name: Install Android SDK Platform 30
-        shell: pwsh
-        run: |
-          echo "y" | & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "platforms;android-30"
-          echo "y" | & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "build-tools;30.0.3"
-
-      - name: Install legacy Xamarin
-        shell: pwsh
-        run: |
-          # Install Xamarin.Android and Xamarin.iOS components via VS installer
-          Write-Host "Installing Xamarin workload for VS 2022..."
-          Write-Host "This may take several minutes..."
-          
-          & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-            --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
-            --add Microsoft.VisualStudio.Workload.XamarinBuildTools `
-            --add Component.Xamarin `
-            --wait
-          
-          Write-Host "Xamarin installation completed"
-          
-          # Verify installation
-          Write-Host "Verifying Xamarin.iOS targets..."
-          if (-not (Test-Path "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Xamarin\iOS\Xamarin.iOS.CSharp.targets")) {
-            Write-Error "Xamarin.iOS targets not found at expected path"
-            exit 1
-          }
-          Write-Host "Verified Xamarin.iOS installation"
-
-          Write-Host "Verifying Xamarin.Android targets..."
-          if (-not (Test-Path "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Xamarin\Android\Xamarin.Android.CSharp.targets")) {
-            Write-Error "Xamarin.Android targets not found at expected path"
-            exit 1
-          }
-          Write-Host "Verified Xamarin.Android installation"
-
       - name: Download cake tool
         run: dotnet tool restore
 
@@ -91,67 +51,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ably-package
-          path: |
-            ${{ github.workspace }}/*.nupkg
-
-  package-push:
-    runs-on: macos-14
-    env:
-      DOTNET_NOLOGO: true
-
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          submodules: 'recursive'
-          persist-credentials: false
-
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
-        with:
-          xcode-version: '14.3'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
-        
-      - name: Install Android SDK Platform 30
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-30"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;30.0.3"
-
-      - name: Download dotnet framework
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: |
-            3.1.426
-            6.0.428
-            7.0.410
-
-      - name: Install legacy Xamarin
-        run: |
-          # macOS 13 runners should have Xamarin pre-installed
-          # Verify Xamarin.iOS and Xamarin.Android are available
-          ls -la "/Library/Frameworks/Mono.framework/External/xbuild/Xamarin/" || true
-          ls -la "/Library/Frameworks/Xamarin.iOS.framework/" || true
-          
-          # If not found, install via brew
-          if [ ! -d "/Library/Frameworks/Xamarin.iOS.framework/" ]; then
-            echo "Installing Xamarin via brew..."
-            brew install --cask xamarin-ios || true
-            brew install --cask xamarin-android || true
-          fi
-
-      - name: Download cake tool
-        run: dotnet tool restore
-
-      - name: Package Push (iOS & Android)
-        env:
-          VERSION: ${{ github.event.inputs.version }}
-        run: ./package-push.sh "$VERSION"
-
-      - name: Archive push packages
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ably-push-package
           path: |
             ${{ github.workspace }}/*.nupkg
 
@@ -187,7 +86,7 @@ jobs:
 
   merge-artifacts:
     runs-on: ubuntu-22.04
-    needs: [package-library, package-push, package-unity]
+    needs: [package-library, package-unity]
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -204,14 +103,6 @@ jobs:
             echo "Copied .nupkg files from ably-package"
           else
             echo "Warning: ably-package artifact not found"
-          fi
-          
-          # Copy all .nupkg files from ably-push-package
-          if [ -d "artifacts/ably-push-package" ]; then
-            find artifacts/ably-push-package -name "*.nupkg" -exec cp {} output-package/ \;
-            echo "Copied .nupkg files from ably-push-package"
-          else
-            echo "Warning: ably-push-package artifact not found"
           fi
           
           # Copy .unitypackage file

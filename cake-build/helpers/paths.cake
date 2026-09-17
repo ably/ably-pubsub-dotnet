@@ -12,9 +12,7 @@ public class BuildPaths
     public FilePath MainSolution { get; }
     public FilePath NetStandardSolution { get; }
     public FilePath NetFrameworkSolution { get; }
-    public FilePath XamarinSolution { get; }
     public FilePath PackageSolution { get; }
-    public FilePath PushPackageSolution { get; }
     public FilePath DeltaCodecProject { get; }
     
     public BuildPaths(ICakeContext context)
@@ -25,12 +23,10 @@ public class BuildPaths
         Lib = Root.Combine("lib");
         TestResults = Root.Combine("test-results");
         
-        MainSolution = Src.CombineWithFilePath("IO.Ably.sln");
-        NetStandardSolution = Src.CombineWithFilePath("IO.Ably.NetStandard.sln");
-        NetFrameworkSolution = Src.CombineWithFilePath("IO.Ably.NetFramework.sln");
-        XamarinSolution = Src.CombineWithFilePath("IO.Ably.Xamarin.sln");
-        PackageSolution = Src.CombineWithFilePath("IO.Ably.Package.sln");
-        PushPackageSolution = Src.CombineWithFilePath("IO.Ably.PackagePush.sln");
+        MainSolution = Src.CombineWithFilePath("Ably.PubSub.sln");
+        NetStandardSolution = Src.CombineWithFilePath("Ably.PubSub.NetStandard.sln");
+        NetFrameworkSolution = Src.CombineWithFilePath("Ably.PubSub.NetFramework.sln");
+        PackageSolution = Src.CombineWithFilePath("Ably.PubSub.Package.sln");
         
         DeltaCodecProject = Lib.CombineWithFilePath("delta-codec/IO.Ably.DeltaCodec/IO.Ably.DeltaCodec.csproj");
     }

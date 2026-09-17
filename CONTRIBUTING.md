@@ -22,12 +22,12 @@ If you want to incorporate `ably-dotnet` into your project from source (perhaps 
 2. Open the solution you want to reference ably-dotnet from
 3. In Solution Explorer right click the root node (it will be labelled Solution 'YourSolutionName')
 4. Select Add > Existing Project from the context menu
-5. Browse to the ably-dotnet repository and add ably-dotnet\src\IO.Ably.Shared\IO.Ably.Shared.shproj
-6. Browse to the ably-dotnet repository and add the project that corresponds to your target platform, so if you are targeting .NET Framework (AKA Classic .NET) you would add ably-dotnet\src\IO.Ably.NETFramework\IO.Ably.NETFramework.csproj, if you are targeting .NET Core 2 then chose ably-dotnet\src\IO.Ably.NetStandard20\IO.Ably.NetStandard20.csproj and so on.
+5. Browse to the ably-dotnet repository and add ably-dotnet\src\Ably.PubSub.Shared\Ably.PubSub.Shared.shproj
+6. Browse to the ably-dotnet repository and add the project that corresponds to your target platform, so if you are targeting .NET Framework (AKA Classic .NET) you would add ably-dotnet\src\Ably.PubSub.Core.NETFramework\Ably.PubSub.Core.NETFramework.csproj, and for .NET / .NET Standard you would add ably-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj.
 7. In any project that you want to use `ably-dotnet` you need to add a project reference, to do so:
     1. Find your project in Solution Explorer and expand the tree so that the Dependencies node is visible
     2. Right click Dependencies and select Add Reference
-    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to IO.Ably.NETFramework (or whatever version you are trying to use) and click OK.
+    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to Ably.PubSub.Core.NETFramework (or Ably.PubSub.Core, whichever you added) and click OK.
 
 ## Spec
 
@@ -111,9 +111,9 @@ This library uses [semantic versioning](http://semver.org/). For each release, t
 6. Push the branch and create a release PR (ensure you include an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers) and gain approvals for it, then merge that to `main`.
 7. Go to [Github Actions tab](https://github.com/ably/ably-dotnet/actions), click on [Package Ably](https://github.com/ably/ably-dotnet/actions/workflows/package.yml) workflow at the left nav-bar. On the right corner, click on `Run workflow` with the current release tag as a input to `Ably version`.
   - You can check all latest workflows under [Github Actions Tab](https://github.com/ably/ably-dotnet/actions). Download the generated artifact named `output-package` at the end of the latest successful workflow run.
-  - `output-package` artifact is a zip with 4 files => `ably.io.1.2.3.nupkg`, `ably.io.push.android.1.2.3.nupkg`,`ably.io.push.ios.1.2.3.nupkg` and `ably.io.1.2.3.unitypackage`.
+  - `output-package` artifact is a zip containing => `Ably.PubSub.Core.2.0.0.nupkg` and `ably.pubsub.2.0.0.unitypackage`.
   - If using github codespaces, you can upload downloaded `output-package` artifact by dragging into it.
-8. Extract `output-package`, open bash/powershell in the same folder and run `dotnet nuget push ably.io.*.nupkg --api-key GENERATED_API_KEY_FROM_NUGET_ACCOUNT --source https://api.nuget.org/v3/index.json` (More information on publishing nuget package can be found [here](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli#publish-with-the-net-cli-or-nuget-cli))
+8. Extract `output-package`, open bash/powershell in the same folder and run `dotnet nuget push *.nupkg --api-key GENERATED_API_KEY_FROM_NUGET_ACCOUNT --source https://api.nuget.org/v3/index.json` (More information on publishing nuget package can be found [here](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli#publish-with-the-net-cli-or-nuget-cli))
 9. Add a tag to the new `main` head commit and push to origin such as `git tag 1.2.3 && git push origin 1.2.3`
-10. Visit [https://github.com/ably/ably-dotnet/tags](https://github.com/ably/ably-dotnet/tags) and `Add release notes` for the release including links to the changelog entry, upload `ably.io.1.2.3.unitypackage` as a file to the latest release note.
+10. Visit [https://github.com/ably/ably-dotnet/tags](https://github.com/ably/ably-dotnet/tags) and `Add release notes` for the release including links to the changelog entry, upload `ably.pubsub.1.2.3.unitypackage` as a file to the latest release note.
 11. Create the entry on the [Ably Changelog](https://changelog.ably.com/) (via [headwayapp](https://headwayapp.co/)).

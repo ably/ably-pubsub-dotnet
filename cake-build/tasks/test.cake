@@ -8,7 +8,7 @@ Task("_NetFramework_Unit_Tests")
 {
     Information("Running .NET Framework unit tests...");
     
-    var testAssemblies = testExecutionHelper.FindTestAssemblies("IO.Ably.Tests.NETFramework");
+    var testAssemblies = testExecutionHelper.FindTestAssemblies("Ably.PubSub.Tests.NETFramework");
     if (!testAssemblies.Any()) return;
     
     var settings = testExecutionHelper.CreateXUnitSettings("xunit-netframework-unit", isIntegration: false);
@@ -21,7 +21,7 @@ Task("_NetFramework_Unit_Tests_WithRetry")
 {
     Information("Running .NET Framework unit tests with retry...");
     
-    var testAssemblies = testExecutionHelper.FindTestAssemblies("IO.Ably.Tests.NETFramework");
+    var testAssemblies = testExecutionHelper.FindTestAssemblies("Ably.PubSub.Tests.NETFramework");
     if (!testAssemblies.Any()) return;
     
     var resultsPath = paths.TestResults.CombineWithFilePath("xunit-netframework-unit.xml");
@@ -50,7 +50,7 @@ Task("_NetFramework_Integration_Tests")
 {
     Information("Running .NET Framework integration tests...");
     
-    var testAssemblies = testExecutionHelper.FindTestAssemblies("IO.Ably.Tests.NETFramework");
+    var testAssemblies = testExecutionHelper.FindTestAssemblies("Ably.PubSub.Tests.NETFramework");
     if (!testAssemblies.Any()) return;
     
     var settings = testExecutionHelper.CreateXUnitSettings("xunit-netframework-integration", isIntegration: true);
@@ -63,7 +63,7 @@ Task("_NetFramework_Integration_Tests_WithRetry")
 {
     Information("Running .NET Framework integration tests with retry...");
     
-    var testAssemblies = testExecutionHelper.FindTestAssemblies("IO.Ably.Tests.NETFramework");
+    var testAssemblies = testExecutionHelper.FindTestAssemblies("Ably.PubSub.Tests.NETFramework");
     if (!testAssemblies.Any()) return;
     
     var resultsPath = paths.TestResults.CombineWithFilePath("xunit-netframework-integration.xml");
@@ -96,7 +96,7 @@ Task("_NetStandard_Unit_Tests")
 {
     Information("Running .NET Standard unit tests...");
     
-    var project = paths.Src.CombineWithFilePath("IO.Ably.Tests.DotNET/IO.Ably.Tests.DotNET.csproj");
+    var project = paths.Src.CombineWithFilePath("Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj");
     var resultsPath = paths.TestResults.CombineWithFilePath("tests-netstandard-unit.trx");
     
     var filter = testExecutionHelper.CreateUnitTestFilter(IsRunningOnUnix());
@@ -111,7 +111,7 @@ Task("_NetStandard_Unit_Tests_WithRetry")
 {
     Information("Running .NET Standard unit tests with retry...");
     
-    var project = paths.Src.CombineWithFilePath("IO.Ably.Tests.DotNET/IO.Ably.Tests.DotNET.csproj");
+    var project = paths.Src.CombineWithFilePath("Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj");
     var resultsPath = paths.TestResults.CombineWithFilePath("tests-netstandard-unit.trx");
     
     var filter = testExecutionHelper.CreateUnitTestFilter(IsRunningOnUnix());
@@ -135,7 +135,7 @@ Task("_NetStandard_Integration_Tests")
 {
     Information("Running .NET Standard integration tests...");
     
-    var project = paths.Src.CombineWithFilePath("IO.Ably.Tests.DotNET/IO.Ably.Tests.DotNET.csproj");
+    var project = paths.Src.CombineWithFilePath("Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj");
     var resultsPath = paths.TestResults.CombineWithFilePath("tests-netstandard-integration.trx");
     
     var filter = testExecutionHelper.CreateIntegrationTestFilter();
@@ -150,7 +150,7 @@ Task("_NetStandard_Integration_Tests_WithRetry")
 {
     Information("Running .NET Standard integration tests with retry...");
     
-    var project = paths.Src.CombineWithFilePath("IO.Ably.Tests.DotNET/IO.Ably.Tests.DotNET.csproj");
+    var project = paths.Src.CombineWithFilePath("Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj");
     var resultsPath = paths.TestResults.CombineWithFilePath("tests-netstandard-integration.trx");
     
     var filter = testExecutionHelper.CreateIntegrationTestFilter();

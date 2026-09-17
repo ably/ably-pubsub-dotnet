@@ -1,6 +1,6 @@
 if [ $# -eq 0 ]
 then
-  echo "Provide latest version number like unity-plugins-updater.sh 1.2.8"
+  echo "Provide latest version number like unity-plugins-updater.sh 2.0.0"
 else
 	dotnet tool restore
 	dotnet cake cake-build/build.cake -- --target=Build.NetStandard --define=UNITY_PACKAGE

@@ -15,7 +15,7 @@
     "overrideReferences": false,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "IO.Ably.dll"
+        "Ably.PubSub.Core.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
