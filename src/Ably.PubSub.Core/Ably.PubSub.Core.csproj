@@ -16,6 +16,10 @@
   <PropertyGroup Condition="'$(Package)'=='True'">
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\IO.Ably.snk</AssemblyOriginatorKeyFile>
+    <!-- DeltaCodec is built unsigned from the submodule for the SDK TFMs; suppression is scoped
+         to signed Package builds only - the plain-Release CS8002 guard stays fully live.
+         Proper cure is signing the submodule build (follow-up). -->
+    <NoWarn>$(NoWarn);CS8002</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='package|AnyCPU'">
@@ -64,5 +68,14 @@
   <PropertyGroup Condition=" $(DefineConstants.Contains('UNITY_PACKAGE')) ">
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
 
 </Project>

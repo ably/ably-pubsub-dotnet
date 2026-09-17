@@ -7,15 +7,15 @@
         <authors>Martin Georgiev, Sachin Shinde, Yavor Ivanov, Jack Rutherford, Tom Kirby-Green</authors>
         <owners>Ably Real-time Ltd</owners>
         <license type="expression">Apache-2.0</license>
-        <projectUrl>https://github.com/ably/ably-dotnet</projectUrl>
+        <projectUrl>https://github.com/ably/ably-pubsub-dotnet</projectUrl>
         <icon>icon.png</icon>
         <readme>README.md</readme>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Internal implementation package for Ably's own Ably.PubSub.Device and Ably.PubSub.Server packages. It is not intended for direct use. Install Ably.PubSub.Server in a server-side application, or Ably.PubSub.Device in an end-user device application, and create clients through those packages' factory methods. This package carries the shared Ably Pub/Sub implementation (pub-sub messaging, presence, message history, push administration) and is resolved transitively; referencing it directly means the clients you create are not classified as device-side or server-side, which Ably's platform behaviour and billing depend on. See https://www.ably.com for more info.</description>
-        <releaseNotes>https://github.com/ably/ably-dotnet/releases</releaseNotes>
+        <releaseNotes>https://github.com/ably/ably-pubsub-dotnet/releases</releaseNotes>
         <copyright>©2026 Ably Real-time Ltd</copyright>
         <tags>ably realtime messaging websocket pubsub presence dotnet csharp maui netstandard unity</tags>
-        <repository type="git" url="https://github.com/ably/ably-dotnet.git" branch="main" />
+        <repository type="git" url="https://github.com/ably/ably-pubsub-dotnet.git" branch="main" />
         <language />
         <dependencies>
           <group targetFramework="net46">
