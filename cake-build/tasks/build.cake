@@ -81,7 +81,7 @@ Task("_Build_Ably_Unity_Dll")
     .Description("Create merged Unity DLL with all dependencies")
     .Does(() =>
 {
-    Information("Merging Unity dependencies into Ably.PubSub.Core.dll...");
+    Information("Merging Unity dependencies and the Ably.PubSub.Device door into Ably.PubSub.Device.dll...");
     
     var netStandard20BinPath = paths.Src
         .Combine("Ably.PubSub.Core")
@@ -108,8 +108,19 @@ Task("_Build_Ably_Unity_Dll")
         throw new Exception($"Newtonsoft.Json.dll not found at: {newtonsoftDll}");
     }
     
+    var deviceDoorDll = paths.Src
+        .Combine("Ably.PubSub.Device")
+        .Combine("bin/Release/netstandard2.0")
+        .CombineWithFilePath("Ably.PubSub.Device.dll");
+
+    if (!FileExists(deviceDoorDll))
+    {
+        throw new Exception($"Device door DLL not found: {deviceDoorDll}. Please build the Ably.PubSub.Device project first.");
+    }
+
     var dllsToMerge = new[]
     {
+        deviceDoorDll,
         netStandard20BinPath.CombineWithFilePath("IO.Ably.DeltaCodec.dll"),
         netStandard20BinPath.CombineWithFilePath("System.Runtime.CompilerServices.Unsafe.dll"),
         netStandard20BinPath.CombineWithFilePath("System.Threading.Channels.dll"),
@@ -118,7 +129,10 @@ Task("_Build_Ably_Unity_Dll")
     };
     
     var unityOutputPath = paths.Root.Combine("unity/Assets/Ably/Plugins");
-    var outputDll = unityOutputPath.CombineWithFilePath("Ably.PubSub.Core.dll");
+    // The merged Unity plugin is named after the public device door package; the
+    // primary input stays Ably.PubSub.Core.dll (its public API survives the merge)
+    // and the real Ably.PubSub.Device.dll is one of the merged, exclude-protected inputs.
+    var outputDll = unityOutputPath.CombineWithFilePath("Ably.PubSub.Device.dll");
     
     // Delete existing output DLL if it exists
     if (FileExists(outputDll))
@@ -127,8 +141,9 @@ Task("_Build_Ably_Unity_Dll")
         Information($"Deleted existing DLL: {outputDll}");
     }
     
-    // Merge all dependencies into primary DLL in one go
-    ilRepackHelper.MergeDLLs(primaryDll, dllsToMerge, outputDll);
+    // Merge all dependencies into primary DLL in one go, keeping the device door namespace public
+    var internalizeExclude = paths.Root.Combine("cake-build").CombineWithFilePath("unity-internalize-exclude.txt");
+    ilRepackHelper.MergeDLLs(primaryDll, dllsToMerge, outputDll, internalizeExclude);
     
     Information($"✓ Unity DLL created at: {outputDll}");
 });

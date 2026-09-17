@@ -38,6 +38,7 @@ namespace IO.Ably
         /// client will be rejected once MAU-based pricing is live.
         /// </remarks>
         /// <param name="key">String key (obtained from application dashboard).</param>
+        [Obsolete("Construct via PubSubDevice.CreateClient or PubSubServer.CreateRealtimeClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
         public AblyRealtime(string key)
             : this(new ClientOptions(key))
         {
@@ -55,6 +56,7 @@ namespace IO.Ably
         /// client will be rejected once MAU-based pricing is live.
         /// </remarks>
         /// <param name="options"><see cref="ClientOptions"/>.</param>
+        [Obsolete("Construct via PubSubDevice.CreateClient or PubSubServer.CreateRealtimeClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
         public AblyRealtime(ClientOptions options)
             : this(options, CreateRestFunc, IoC.MobileDevice)
         {

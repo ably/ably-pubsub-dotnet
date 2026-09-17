@@ -35,11 +35,13 @@ Task("_Package_Create_NuGet")
     Information($"Creating NuGet packages version {version}...");
 
     // The lockstep package set. Every package here is built from this repository
-    // and released at the same version. Stack PR 2 adds the door packages
-    // (ably.pubsub.device.nuspec, ably.pubsub.server.nuspec) to this list.
+    // and released at the same version, and both door packages pin the core exactly.
+    // Packed core-first so the order matches the publish order stack PR 3 adds.
     var nuspecFiles = new[]
     {
-        "nuget/ably.pubsub.core.nuspec"
+        "nuget/ably.pubsub.core.nuspec",
+        "nuget/ably.pubsub.device.nuspec",
+        "nuget/ably.pubsub.server.nuspec"
     };
 
     var nugetSettings = new NuGetPackSettings
@@ -133,7 +135,7 @@ Task("_Package_Unity")
 ///////////////////////////////////////////////////////////////////////////////
 
 Task("Package")
-    .Description("Create the NuGet packages (Ably.PubSub.Core)")
+    .Description("Create the NuGet packages (Ably.PubSub.Core, Ably.PubSub.Device, Ably.PubSub.Server)")
     .IsDependentOn("_Package_Create_NuGet");
 
 Task("UnityPackage")

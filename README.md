@@ -19,9 +19,34 @@ Find out more:
 >
 > | Package | Use it for |
 > |---------|------------|
-> | `Ably.PubSub.Device` | End-user device applications (desktop, mobile, Unity, MAUI, browser-adjacent clients) — *added in the next PR in this stack* |
-> | `Ably.PubSub.Server` | Server-side and backend applications — *added in the next PR in this stack* |
+> | `Ably.PubSub.Device` | End-user device applications (desktop, mobile, Unity, MAUI, browser-adjacent clients) |
+> | `Ably.PubSub.Server` | Server-side and backend applications (ASP.NET, Azure hosts, workers, console apps) |
 > | `Ably.PubSub.Core` | Internal implementation shared by the two packages above. Not intended for direct use; you receive it transitively |
+>
+> Install the package for the side your code runs on, and create clients through that package's factory methods — **they are the supported entry points**. `Ably.PubSub.Core` is internal: a client constructed directly from `AblyRealtime` or `AblyRest` is not classified as device-side or server-side, which Ably's platform behaviour and billing depend on.
+>
+> ```sh
+> dotnet add package Ably.PubSub.Server
+> ```
+>
+> ```csharp
+> using IO.Ably.PubSub.Server;
+>
+> var realtime = PubSubServer.CreateRealtimeClient("<API_KEY>");
+> var http = PubSubServer.CreateHttpClient("<API_KEY>");
+> ```
+>
+> ```sh
+> dotnet add package Ably.PubSub.Device
+> ```
+>
+> ```csharp
+> using IO.Ably.PubSub.Device;
+>
+> var realtime = PubSubDevice.CreateClient("<API_KEY>");
+> ```
+>
+> Each factory also takes a `ClientOptions` or an `Action<ClientOptions>`. The returned clients are the ordinary `AblyRealtime` and `AblyRest`, so the whole of the `IO.Ably` API remains available — including device-side connectionless operations such as message history, presence reads and token requests, which is why the device package has one door and no separate HTTP factory.
 >
 > The compiled assembly is now `Ably.PubSub.Core.dll`. The code namespace is unchanged: `using IO.Ably;` and every public type name stay as they are for now.
 >
@@ -30,8 +55,6 @@ Find out more:
 > Never reference `ably.io` and `Ably.PubSub.*` from the same project: they share the `IO.Ably` namespace, so mixing them is a compile error by design.
 >
 > This also applies **transitively**. NuGet dedupes only by package ID, so a graph that pulls both `ably.io` 1.x (often via a library dependency) and any `Ably.PubSub.*` package loads *both* assemblies, and every `IO.Ably.*` type then exists twice: you get compile error CS0433 where your own code names those types, and runtime type-identity failures (`InvalidCastException`-class) where a library exposes `IO.Ably` types across its API. There is no type-forwarding between the packages. Detect it with `dotnet nuget why <project> ably.io`; if a dependency genuinely forces both, isolate them with an [`extern alias`](https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/extern-alias) — note `<Aliases>` applies only to a **direct** `PackageReference`, so first promote `ably.io` to a direct reference of the affected project, then add `<Aliases>ablyLegacy</Aliases>` to it and `extern alias ablyLegacy;` in the consuming file — otherwise treat a both-packages graph as unsupported and migrate the transitive dependency off `ably.io`.
->
-> The Installation and Usage sections below still describe the 1.x `ably.io` package; they are replaced with `Ably.PubSub.Device`/`Ably.PubSub.Server` instructions before 2.0 general availability.
 
 ---
 
@@ -62,18 +85,18 @@ Everything you need to get started with Ably:
 
 ## Installation
 
-The SDK is available as a [nuget package](https://www.nuget.org/packages/ably.io/). To get started with your project, install the package from the Package Manager Console or the .NET CLI.
+Install the package for the side your application runs on. Server-side and backend applications use `Ably.PubSub.Server`; end-user device applications (desktop, mobile, Unity, MAUI) use `Ably.PubSub.Device`. Both bring in `Ably.PubSub.Core` transitively — never install `Ably.PubSub.Core` directly.
 
-Package Manager Console:
+Server-side (.NET CLI):
 
 ```shell
-PM> Install-Package ably.io
+dotnet add package Ably.PubSub.Server
 ```
 
-.NET CLI in your project directory:
+Device-side (.NET CLI):
 
 ```shell
-dotnet add package ably.io
+dotnet add package Ably.PubSub.Device
 ```
 
 ### MAUI configuration
@@ -95,8 +118,11 @@ Add the following to your `.csproj` file to prevent trimming of the Ably assembl
 The following code connects to Ably's realtime messaging service, subscribes to a channel to receive messages, and publishes a test message to that same channel:
 
 ```csharp
-// Initialize Ably Realtime client
-var realtime = new AblyRealtime("your-ably-api-key");
+// Initialize an Ably Realtime client through the server-side door
+using IO.Ably.PubSub.Server;
+
+var realtime = PubSubServer.CreateRealtimeClient("your-ably-api-key");
+// Device-side applications use: PubSubDevice.CreateClient("your-ably-api-key");
 
 // Wait for connection to be established
 realtime.Connection.On(ConnectionEvent.Connected, args =>
@@ -175,5 +201,5 @@ var websocketOptions = new MsWebSocketOptions
 
 options.TransportFactory = new MsWebSocketTransport.TransportFactory(websocketOptions);
 
-var realtime = new AblyRealtime(options);
+var realtime = PubSubServer.CreateRealtimeClient(options);
 ```

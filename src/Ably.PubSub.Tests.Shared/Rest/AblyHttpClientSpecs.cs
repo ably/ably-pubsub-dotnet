@@ -98,7 +98,7 @@ namespace IO.Ably.Tests
 
             var keys = new List<string>()
             {
-                "ably-dotnet/",
+                "ably-pubsub-dotnet/",
                 Agent.DotnetRuntimeIdentifier,
                 Agent.OsIdentifier
             };
@@ -140,7 +140,7 @@ namespace IO.Ably.Tests
 
             var keys = new List<string>()
             {
-                "ably-dotnet/",
+                "ably-pubsub-dotnet/",
                 Agent.DotnetRuntimeIdentifier,
                 Agent.OsIdentifier,
                 "agent1",

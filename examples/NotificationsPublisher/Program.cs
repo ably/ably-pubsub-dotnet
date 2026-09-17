@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using IO.Ably;
+using IO.Ably.PubSub.Server;
 using IO.Ably.Types;
 using Newtonsoft.Json.Linq;
 using Terminal.Gui;
@@ -284,7 +285,7 @@ namespace NotificationsPublisher
                     LogLevel = LogLevel.Warning,
                     AutoConnect = false
                 };
-                Ably = new AblyRealtime(options);
+                Ably = PubSubServer.CreateRealtimeClient(options);
             }
 
             var key = GetCurrentKey();

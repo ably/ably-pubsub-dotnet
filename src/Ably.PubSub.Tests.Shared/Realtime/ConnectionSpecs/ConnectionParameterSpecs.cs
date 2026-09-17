@@ -129,7 +129,7 @@ namespace IO.Ably.Tests.Realtime
             var agentValues = LastCreatedTransport.Parameters.GetParams()[Agent.AblyAgentHeader].Split(' ');
             var keys = new List<string>()
             {
-                "ably-dotnet/",
+                "ably-pubsub-dotnet/",
                 Agent.DotnetRuntimeIdentifier,
                 Agent.OsIdentifier
             };
@@ -160,7 +160,7 @@ namespace IO.Ably.Tests.Realtime
             var agentValues = LastCreatedTransport.Parameters.GetParams()[Agent.AblyAgentHeader].Split(' ');
             var keys = new List<string>()
             {
-                "ably-dotnet/",
+                "ably-pubsub-dotnet/",
                 Agent.DotnetRuntimeIdentifier,
                 Agent.OsIdentifier,
                 "agent1",
