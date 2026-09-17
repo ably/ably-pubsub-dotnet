@@ -29,16 +29,24 @@ Task("_Version")
     .Does(() =>
 {
     Information($"Setting version to {version}");
-    
+
+    // AssemblyVersion and AssemblyFileVersion accept only a numeric
+    // MAJOR.MINOR.PATCH[.REVISION]; a SemVer2 prerelease label such as
+    // "2.0.0-beta.1" in either is compile error CS7034. Only
+    // AssemblyInformationalVersion may carry the full label, so a prerelease is
+    // stamped as numeric identity + full informational version. For a stable
+    // version (no '-') numericVersion == version and nothing changes.
+    var numericVersion = version.Split('-')[0];
+
     var assemblyInfoPath = paths.Src.CombineWithFilePath("CommonAssemblyInfo.cs");
-    
+
     CreateAssemblyInfo(assemblyInfoPath, new AssemblyInfoSettings
     {
         Company = "Ably",
         Product = "Ably .NET Library",
         Copyright = $"Copyright © Ably {DateTime.Now.Year}",
-        Version = version,
-        FileVersion = version,
+        Version = numericVersion,
+        FileVersion = numericVersion,
         InformationalVersion = version
     });
 });

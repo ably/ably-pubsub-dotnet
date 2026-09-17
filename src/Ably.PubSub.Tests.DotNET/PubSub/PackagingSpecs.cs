@@ -156,16 +156,23 @@ namespace IO.Ably.Tests.PubSub
             var unityVersion = File.ReadAllText(
                 Path.Combine(RepositoryRoot(), "unity", "Assets", "Ably", "version.txt")).Trim();
 
-            var versions = new[] { "AssemblyVersion", "AssemblyFileVersion", "AssemblyInformationalVersion" }
-                .Select(attribute => Regex.Match(assemblyInfo, attribute + @"\(""([^""]*)""\)"))
-                .ToArray();
+            // Mirrors _Version and ReleaseAssertVersionFilesAgree: AssemblyVersion and
+            // AssemblyFileVersion carry the numeric identity only (a SemVer2 label in
+            // either is CS7034); AssemblyInformationalVersion carries the full string,
+            // prerelease label included.
+            var numericVersion = unityVersion.Split('-')[0];
 
-            versions.Should().OnlyContain(m => m.Success, "src/CommonAssemblyInfo.cs declares all three attributes");
-
-            foreach (var match in versions)
+            foreach (var (attribute, expected) in new[]
             {
+                ("AssemblyVersion", numericVersion),
+                ("AssemblyFileVersion", numericVersion),
+                ("AssemblyInformationalVersion", unityVersion),
+            })
+            {
+                var match = Regex.Match(assemblyInfo, attribute + @"\(""([^""]*)""\)");
+                match.Success.Should().BeTrue($"src/CommonAssemblyInfo.cs declares [assembly: {attribute}]");
                 match.Groups[1].Value.Should().Be(
-                    unityVersion,
+                    expected,
                     "src/CommonAssemblyInfo.cs and unity/Assets/Ably/version.txt are bumped together; the "
                     + ".unitypackage ships from the same run as the NuGet packages");
             }

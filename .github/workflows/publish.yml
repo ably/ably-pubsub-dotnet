@@ -54,6 +54,13 @@ on:
 
 permissions: {}
 
+# Two dispatches of the same version must not run concurrently: they would race on
+# the wait-for-core-listed loop and on the `gh release ... --clobber` upload. Never
+# cancel an in-progress publish.
+concurrency:
+  group: publish-${{ github.event.inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     # windows-2022 because the core and server packages carry a lib/net46 asset
@@ -61,6 +68,11 @@ jobs:
     # same job, from this same build, so the .unitypackage and the .nupkg files
     # can never come from different builds of the same version.
     runs-on: windows-2022
+    # Required-reviewer gate. Trusted Publishing authorises this repository to
+    # publish, not any particular person, so the human approval lives here: the
+    # `release` environment (repo Settings -> Environments, with required
+    # reviewers configured) must be approved before this job starts.
+    environment: release
     permissions:
       contents: read
       id-token: write # for NuGet Trusted Publishing (OIDC)
@@ -97,6 +109,27 @@ jobs:
       # -> pack -> assert the packed .nupkg files, including the packed pin.
       - name: Build and pack all three packages
         run: ./build.cmd -- --target=Package --version=${{ inputs.version }} --packageOutput=release-packages
+
+      # Prove the release SHA can reproduce the committed Unity plugin: copy the
+      # committed DLL aside, regenerate it from this checkout, and cross-check.
+      # The committed DLL remains canonical (it is what the Unity EditMode/PlayMode
+      # pass validated); a mismatch means it is stale relative to this source.
+      - name: Regenerate and cross-check the Unity plugin
+        shell: pwsh
+        run: |
+          $plugin = 'unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll'
+          Copy-Item $plugin "$env:RUNNER_TEMP/committed-plugin.dll"
+          ./build.cmd -- --target=Build.NetStandard --define=UNITY_PACKAGE
+          ./build.cmd -- --target=Update.AblyUnity
+          $fresh = [Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $plugin))
+          $comm  = [Reflection.AssemblyName]::GetAssemblyName("$env:RUNNER_TEMP/committed-plugin.dll")
+          $freshInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $plugin)).ProductVersion
+          $commInfo  = [Diagnostics.FileVersionInfo]::GetVersionInfo("$env:RUNNER_TEMP/committed-plugin.dll").ProductVersion
+          if (($fresh.Version -ne $comm.Version) -or ($freshInfo -ne $commInfo)) {
+            throw "Committed Unity plugin is stale: committed $($comm.Version)/$commInfo vs regenerated $($fresh.Version)/$freshInfo. Re-run ./unity-plugins-updater.sh and commit."
+          }
+          # Ship the committed (Unity-tested) copy, not the fresh one.
+          Copy-Item "$env:RUNNER_TEMP/committed-plugin.dll" $plugin -Force
 
       - name: Create the Unity package
         run: ./build.cmd -- --target=UnityPackage --version=${{ inputs.version }}
@@ -250,6 +283,14 @@ jobs:
           set -euo pipefail
           v="${RELEASE_VERSION}"
 
+          # A SemVer2 prerelease version (contains a hyphen, e.g. 2.0.0-beta.1)
+          # must be flagged so a lockstep beta never shows up as the Latest
+          # GitHub release. Empty for a stable version.
+          prerelease_flag=""
+          case "${v}" in
+            *-*) prerelease_flag="--prerelease" ;;
+          esac
+
           files=$(find artifacts -type f \( -name '*.nupkg' -o -name '*.unitypackage' \) | sort)
           if [ -z "${files}" ]; then
             echo "No artifacts to attach"
@@ -266,7 +307,7 @@ jobs:
             gh release upload "${v}" ${files} --clobber
           else
             # shellcheck disable=SC2086
-            gh release create "${v}" ${files} \
+            gh release create "${v}" ${files} ${prerelease_flag} \
               --target "${RELEASE_REF}" \
               --title "${v}" \
               --notes "Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server ${v} are published on nuget.org. See CHANGELOG.md for what changed."
