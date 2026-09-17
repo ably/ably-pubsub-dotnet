@@ -19,9 +19,9 @@
         <language />
         <!-- The exact pin is the NuGet analogue of ably-js's exact peerDependencies: the door and
              the core are released in lockstep, and consumers must never resolve two core
-             versions. TODO(verify on the release dry run): confirm nuget.exe substitutes
-             $version$ inside a dependency version attribute; the packed pin must equal the
-             package version. Stack PR 3 adds a pre-flight that asserts it. -->
+             versions. nuget.exe substitutes $version$ inside the dependency version attribute, so
+             the packed pin equals the package version (asserted by the PackagingSpecs pre-flight
+             and release-dry-run in the release tooling PR). -->
         <dependencies>
           <group targetFramework="netstandard2.0">
             <dependency id="Ably.PubSub.Core" version="[$version$]" />

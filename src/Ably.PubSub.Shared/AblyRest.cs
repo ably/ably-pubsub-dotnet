@@ -29,6 +29,7 @@ namespace IO.Ably
         /// client will be rejected once MAU-based pricing is live.
         /// </remarks>
         /// <param name="apiKey">Full api key.</param>
+        [Obsolete("Construct via PubSubServer.CreateHttpClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
         public AblyRest(string apiKey)
             : this(new ClientOptions(apiKey))
         {
@@ -52,6 +53,7 @@ namespace IO.Ably
         /// client will be rejected once MAU-based pricing is live.
         /// </remarks>
         /// <param name="init">Action delegate which receives a empty options object.</param>
+        [Obsolete("Construct via PubSubServer.CreateHttpClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
         public AblyRest(Action<ClientOptions> init)
         {
             Options = new ClientOptions();
@@ -70,6 +72,7 @@ namespace IO.Ably
         /// client will be rejected once MAU-based pricing is live.
         /// </remarks>
         /// <param name="clientOptions">instance of clientOptions.</param>
+        [Obsolete("Construct via PubSubServer.CreateHttpClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
         public AblyRest(ClientOptions clientOptions)
             : this(clientOptions, IoC.MobileDevice)
         {

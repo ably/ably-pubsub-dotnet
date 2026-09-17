@@ -79,6 +79,32 @@ namespace IO.Ably.Tests.PubSub
         }
 
         [Fact]
+        public async Task CoreConstructedRestClient_SendsNeitherSideFlag()
+        {
+            var agentValues = await CaptureHttpAgentTokens(handler =>
+            {
+                var options = new ClientOptions();
+                UseFakeHttp(options, handler);
+                return new AblyRest(options);
+            });
+
+            AssertNoSideFlag(agentValues);
+        }
+
+        [Fact]
+        public async Task CoreConstructedRealtimeClient_SendsNeitherSideFlagOnTheConnection()
+        {
+            var agentValues = await CaptureRealtimeAgentTokens(factory =>
+            {
+                var options = new ClientOptions();
+                UseFakeTransport(options, factory);
+                return new AblyRealtime(options);
+            });
+
+            AssertNoSideFlag(agentValues);
+        }
+
+        [Fact]
         public async Task CallerSuppliedAgents_ArePreservedAlongsideTheFlag()
         {
             var agentValues = await CaptureHttpAgentTokens(handler =>
@@ -108,21 +134,63 @@ namespace IO.Ably.Tests.PubSub
         }
 
         [Fact]
-        public void CallersOwnAgentsDictionary_IsNotMutated()
+        public void ServerHttpClient_WithNeitherKeyNorToken_FailsExactlyLikeTheCore()
+        {
+            // Deliberately no key, token, authUrl or authCallback.
+            Action viaDoor = () => PubSubServer.CreateHttpClient(options => { });
+            Action viaCore = () => _ = new AblyRest(new ClientOptions());
+
+            // The door neither requires nor injects auth: with no credentials it fails
+            // with exactly the core's own 40106 (and had it injected any credential,
+            // it would not throw at all).
+            var doorError = viaDoor.Should().Throw<AblyException>().Which.ErrorInfo;
+            var coreError = viaCore.Should().Throw<AblyException>().Which.ErrorInfo;
+
+            doorError.Code.Should().Be(40106);
+            coreError.Code.Should().Be(40106);
+            doorError.Message.Should().Be(coreError.Message);
+        }
+
+        [Fact]
+        public void CallersOwnOptionsInstance_IsNotMutated()
         {
             var callerAgents = new Dictionary<string, string> { { "chat-dotnet", "1.0.0" } };
             var options = new ClientOptions(ValidKey) { AutoConnect = false, Agents = callerAgents };
 
             using (PubSubServer.CreateRealtimeClient(options))
             {
+                // The caller's dictionary instance is untouched.
                 callerAgents.Should().HaveCount(1);
                 callerAgents.Should().NotContainKey(ServerFlag);
                 callerAgents.Should().ContainKey("chat-dotnet");
 
-                // The options object itself is the one the client consumes, so its Agents
-                // property is the new dictionary carrying the stamp.
-                options.Agents.Should().NotBeSameAs(callerAgents);
-                options.Agents.Should().ContainKey(ServerFlag);
+                // The caller's options instance is untouched: the door stamps a copy, so the
+                // original still points at the caller's own dictionary and carries no side flag.
+                options.Agents.Should().BeSameAs(callerAgents);
+                options.Agents.Should().NotContainKey(ServerFlag);
+            }
+        }
+
+        [Fact]
+        public void ReusingOneOptionsInstanceAcrossDoors_DoesNotAccumulateOrLeakSideFlags()
+        {
+            var options = new ClientOptions(ValidKey) { AutoConnect = false, SkipInternetCheck = true };
+
+            using (var server = PubSubServer.CreateRealtimeClient(options))
+            using (var device = PubSubDevice.CreateClient(options))
+            {
+                // Each client consumes its own stamped copy, never the caller's instance.
+                server.Options.Should().NotBeSameAs(options);
+                device.Options.Should().NotBeSameAs(options);
+
+                server.Options.Agents.Should().ContainKey(ServerFlag);
+                server.Options.Agents.Should().NotContainKey(DeviceFlag);
+
+                device.Options.Agents.Should().ContainKey(DeviceFlag);
+                device.Options.Agents.Should().NotContainKey(ServerFlag);
+
+                // The caller's own options carries neither flag - no cross-contamination.
+                options.Agents.Should().BeNull();
             }
         }
 
@@ -329,6 +397,18 @@ namespace IO.Ably.Tests.PubSub
             agentValues.Should().NotContain(
                 t => t.StartsWith(ServerFlag, StringComparison.Ordinal),
                 "a device client must never declare the server side, which would earn it the MAU exemption");
+        }
+
+        private static void AssertNoSideFlag(string[] agentValues)
+        {
+            AssertServicedByThisSdk(agentValues);
+
+            agentValues.Should().NotContain(
+                t => t.StartsWith(ServerFlag, StringComparison.Ordinal),
+                "a client built directly from the core is unclassified and must never declare the server side");
+            agentValues.Should().NotContain(
+                t => t.StartsWith(DeviceFlag, StringComparison.Ordinal),
+                "a client built directly from the core is unclassified and must never declare the device side");
         }
     }
 }

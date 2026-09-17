@@ -4,10 +4,12 @@
     <TargetFrameworks>net6.0;net7.0</TargetFrameworks>
     <CodeAnalysisRuleSet>..\IO.Ably.Tests.ruleset</CodeAnalysisRuleSet>
     <LangVersion>8</LangVersion>
+    <!-- 618: the tests deliberately exercise the [Obsolete] core constructors (unclassified-client coverage). -->
+    <NoWarn>$(NoWarn);618</NoWarn>
   </PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <NoWarn>1701;1702;SA0001;NU1701</NoWarn>
+    <NoWarn>1701;1702;SA0001;NU1701;618</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

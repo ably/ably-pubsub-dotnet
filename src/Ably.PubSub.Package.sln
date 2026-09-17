@@ -158,8 +158,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Ably.PubSub.Shared\Ably.PubSub.Shared.projitems*{2d265650-b1ec-4f8d-b043-a2e3dcc23fd8}*SharedItemsImports = 4
-		Ably.PubSub.Shared\Ably.PubSub.Shared.projitems*{3180aa9d-9800-4eb2-87f0-ada47e2fff3d}*SharedItemsImports = 4
 		Ably.PubSub.Shared\Ably.PubSub.Shared.projitems*{3553e1b2-8f1f-4e83-9524-08e702c14fcf}*SharedItemsImports = 13
+		Ably.PubSub.Shared\Ably.PubSub.Shared.projitems*{48ea337f-ae7b-4001-bd8c-da1668fc6cbd}*SharedItemsImports = 5
 		Ably.PubSub.Shared.MsgPack\Ably.PubSub.Shared.MsgPack.projitems*{eebf3249-3ca3-4078-a188-f8b916c3f4c2}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

@@ -40,17 +40,17 @@ namespace IO.Ably.PubSub.Internal
         internal const string ServerAgentIdentifier = "ably-pubsub-server";
 
         /// <summary>
-        /// Returns the caller's options carrying the agent entry that declares this package's
-        /// side.
+        /// Returns a copy of the caller's options carrying the agent entry that declares this
+        /// package's side.
         /// <para>
-        /// Only <see cref="ClientOptions.Agents"/> is replaced, and it is replaced with a new
-        /// dictionary rather than mutated, so the caller's own dictionary instance is left
-        /// untouched and can be reused for another client. The options object itself is the one
-        /// returned and therefore the one the core client consumes — there is no
-        /// <c>ClientOptions.Clone()</c> in the core to copy onto, and adding one would put a
-        /// core change on the critical path of the split; every option other than
-        /// <c>Agents</c> is therefore shared with the object the caller passed in, which is the
-        /// same treatment the core's own constructors give it.
+        /// The core stores the options object it is given <b>by reference</b>, so stamping the
+        /// side onto the caller's own instance would leak the flag into any other client built
+        /// from the same options — both doors reused on one options object, or a plain
+        /// <c>new AblyRealtime(options)</c>. To prevent that, the options are copied via
+        /// <see cref="ClientOptions.Clone()"/> and the side is stamped onto the copy; the caller's
+        /// instance and its <c>Agents</c> dictionary are left untouched. The copy lives in the core
+        /// (not here) because <c>RestHost</c>/<c>RealtimeHost</c>/<c>FallbackHosts</c> are
+        /// write-only from outside the class and cannot be carried across by a copy located here.
         /// </para>
         /// <para>
         /// The caller's <c>Agents</c> entries are preserved alongside the side stamp, so an SDK
@@ -72,7 +72,7 @@ namespace IO.Ably.PubSub.Internal
         /// </summary>
         /// <param name="options"> The options the caller passed to the door. </param>
         /// <param name="identifier"> The side-declaring agent identifier to stamp. </param>
-        /// <returns> The same options instance, with a new <c>Agents</c> dictionary. </returns>
+        /// <returns> A copy of the options, with the side stamped into its <c>Agents</c> dictionary. </returns>
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="options"/> is null. </exception>
         internal static ClientOptions WithSideAgent(ClientOptions options, string identifier)
         {
@@ -81,17 +81,21 @@ namespace IO.Ably.PubSub.Internal
                 throw new ArgumentNullException(nameof(options));
             }
 
-            var agents = options.Agents == null
-                ? new Dictionary<string, string>()
-                : new Dictionary<string, string>(options.Agents);
+            // Copy before stamping: the core keeps the options object by reference, so mutating the
+            // caller's instance would let this side flag leak into another client built from the
+            // same options. Clone() already gives Agents its own dictionary.
+            var copy = options.Clone();
+
+            if (copy.Agents == null)
+            {
+                copy.Agents = new Dictionary<string, string>();
+            }
 
             // Applied last, so the side wins a collision on its own key. Null value => bare
             // token, per the versionless-flag reasoning above.
-            agents[identifier] = null;
+            copy.Agents[identifier] = null;
 
-            options.Agents = agents;
-
-            return options;
+            return copy;
         }
 
         /// <summary>

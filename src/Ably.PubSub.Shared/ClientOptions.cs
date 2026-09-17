@@ -454,5 +454,93 @@ namespace IO.Ably
             : base(key)
         {
         }
+
+        /// <summary>
+        /// Creates a member-wise copy of these options. Value-typed members are copied by value;
+        /// the mutable dictionary members (<see cref="Agents"/>, <see cref="AuthOptions.AuthHeaders"/>,
+        /// <see cref="AuthOptions.AuthParams"/> and <see cref="TransportParams"/>) are copied into new
+        /// dictionaries so the copy can be mutated without affecting the original; every other
+        /// reference-typed member (delegates, <see cref="AuthOptions.TokenDetails"/>,
+        /// <see cref="LogHandler"/>, <see cref="HttpClient"/>, <see cref="TransportFactory"/>,
+        /// <see cref="CustomContext"/>, <see cref="DefaultTokenParams"/> and <see cref="ChannelDefaults"/>)
+        /// is shared by reference, matching how the core's own constructors retain them.
+        /// <para>
+        /// This is the copy the door packages (Ably.PubSub.Device / Ably.PubSub.Server) stamp their
+        /// side agent onto, so that stamping a client never mutates the caller's own options instance.
+        /// It lives here rather than in the door helper because <see cref="RestHost"/>,
+        /// <see cref="RealtimeHost"/> and <see cref="FallbackHosts"/> are write-only from outside the
+        /// class and can only be carried across from inside it.
+        /// </para>
+        /// </summary>
+        /// <returns>A copy of these options.</returns>
+        public ClientOptions Clone()
+        {
+            var copy = new ClientOptions
+            {
+                // AuthOptions members.
+                AuthCallback = AuthCallback,
+                AuthUrl = AuthUrl,
+                AuthMethod = AuthMethod,
+                Key = Key,
+                Token = Token,
+                TokenDetails = TokenDetails,
+                AuthHeaders = AuthHeaders == null ? null : new Dictionary<string, string>(AuthHeaders),
+                AuthParams = AuthParams == null ? null : new Dictionary<string, string>(AuthParams),
+                QueryTime = QueryTime,
+                UseTokenAuth = UseTokenAuth,
+
+                // ClientOptions members.
+                AutoConnect = AutoConnect,
+                ClientId = ClientId,
+                DefaultTokenParams = DefaultTokenParams,
+                QueueMessages = QueueMessages,
+                EchoMessages = EchoMessages,
+                Recover = Recover,
+                LogLevel = LogLevel,
+                LogHandler = LogHandler,
+                Port = Port,
+                Tls = Tls,
+                TlsPort = TlsPort,
+                UseBinaryProtocol = UseBinaryProtocol,
+                DisconnectedRetryTimeout = DisconnectedRetryTimeout,
+                SuspendedRetryTimeout = SuspendedRetryTimeout,
+                ChannelRetryTimeout = ChannelRetryTimeout,
+                HttpOpenTimeout = HttpOpenTimeout,
+                HttpRequestTimeout = HttpRequestTimeout,
+                FallbackRetryTimeout = FallbackRetryTimeout,
+                HttpMaxRetryCount = HttpMaxRetryCount,
+                HttpMaxRetryDuration = HttpMaxRetryDuration,
+                ChannelDefaults = ChannelDefaults,
+                Environment = Environment,
+                TransportFactory = TransportFactory,
+                IdempotentRestPublishing = IdempotentRestPublishing,
+                TransportParams = TransportParams == null ? null : new Dictionary<string, object>(TransportParams),
+                CustomContext = CustomContext,
+                AutomaticNetworkStateMonitoring = AutomaticNetworkStateMonitoring,
+                HeartbeatMonitorDelay = HeartbeatMonitorDelay,
+                AddRequestIds = AddRequestIds,
+                PushAdminFullWait = PushAdminFullWait,
+                Agents = Agents == null ? null : new Dictionary<string, string>(Agents),
+                HttpClient = HttpClient,
+
+                // Internal state the core reads.
+                Logger = Logger,
+                SkipInternetCheck = SkipInternetCheck,
+                RealtimeRequestTimeout = RealtimeRequestTimeout,
+            };
+
+            // Write-only / private-field members, only reachable from inside the class.
+            copy._restHost = _restHost;
+            copy._realtimeHost = _realtimeHost;
+            copy._fallbackHosts = _fallbackHosts;
+            copy._nowFunc = _nowFunc;
+
+#pragma warning disable 618
+            copy.FallbackHostsUseDefault = FallbackHostsUseDefault;
+            copy.CaptureCurrentSynchronizationContext = CaptureCurrentSynchronizationContext;
+#pragma warning restore 618
+
+            return copy;
+        }
     }
 }

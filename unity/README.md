@@ -18,6 +18,7 @@
 using System;
 using System.Threading;
 using IO.Ably;
+using IO.Ably.PubSub.Device;
 using IO.Ably.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
@@ -48,7 +49,7 @@ namespace Example.ChatApp
                 CustomContext = SynchronizationContext.Current
             };
 
-            _ably = new AblyRealtime(_clientOptions);
+            _ably = PubSubDevice.CreateClient(_clientOptions);
             _ably.Connection.On(args =>
             {
                 Debug.Log($"Connection State is <b>{args.Current}</b>");

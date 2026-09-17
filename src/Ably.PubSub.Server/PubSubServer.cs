@@ -43,7 +43,11 @@ namespace IO.Ably.PubSub.Server
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="options"/> is null. </exception>
         public static AblyRealtime CreateRealtimeClient(ClientOptions options)
         {
+            // The core constructor is [Obsolete] to steer consumers to the doors; this door is
+            // the sanctioned caller, constructing the client from the side-stamped copy.
+#pragma warning disable CS0618
             return new AblyRealtime(Side.WithSideAgent(options, Side.ServerAgentIdentifier));
+#pragma warning restore CS0618
         }
 
         /// <summary>
@@ -78,7 +82,11 @@ namespace IO.Ably.PubSub.Server
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="options"/> is null. </exception>
         public static AblyRest CreateHttpClient(ClientOptions options)
         {
+            // The core constructor is [Obsolete] to steer consumers to the doors; this door is
+            // the sanctioned caller, constructing the client from the side-stamped copy.
+#pragma warning disable CS0618
             return new AblyRest(Side.WithSideAgent(options, Side.ServerAgentIdentifier));
+#pragma warning restore CS0618
         }
 
         /// <summary>

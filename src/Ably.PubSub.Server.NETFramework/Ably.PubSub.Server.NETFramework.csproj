@@ -46,8 +46,10 @@
     <OutputPath>bin\package\</OutputPath>
     <DocumentationFile>bin\package\Ably.PubSub.Server.xml</DocumentationFile>
   </PropertyGroup>
-  <!-- Signed in every configuration, matching the SDK-style Server head. -->
-  <PropertyGroup>
+  <!-- Signed under package builds only, matching the SDK-style Server head: the packed net46
+       Server references the Package-signed net46 core, and the plain NetFramework build stays
+       all-unsigned. -->
+  <PropertyGroup Condition="'$(Package)'=='True'">
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\..\IO.Ably.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
