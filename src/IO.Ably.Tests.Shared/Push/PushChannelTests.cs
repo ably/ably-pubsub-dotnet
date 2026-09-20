@@ -146,7 +146,7 @@ namespace IO.Ably.Tests.Push
 
                     taskAwaiter.SetCompleted();
                     return new AblyResponse()
-                        { TextResponse = JsonConvert.SerializeObject(new PushChannelSubscription()) };
+                    { TextResponse = JsonConvert.SerializeObject(new PushChannelSubscription()) };
                 }
 
                 var client = GetRestClient(RequestHandler, mobileDevice: new FakeMobileDevice());

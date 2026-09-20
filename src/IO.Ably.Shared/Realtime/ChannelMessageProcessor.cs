@@ -177,8 +177,8 @@ namespace IO.Ably.Realtime
             var deltaFrom = firstMessage.Extras?.Delta?.From;
             if (deltaFrom != null && deltaFrom.EqualsTo(channelSuccessfulMessageIds.LastMessageId) == false)
             {
-               Logger.Warning($"Delta message decode failure. Previous message id does not equal expected message id. PreviousMessageId: {channelSuccessfulMessageIds.LastMessageId}. ExpectedMessageId: {deltaFrom}");
-               return false;
+                Logger.Warning($"Delta message decode failure. Previous message id does not equal expected message id. PreviousMessageId: {channelSuccessfulMessageIds.LastMessageId}. ExpectedMessageId: {deltaFrom}");
+                return false;
             }
 
             return true;

@@ -794,12 +794,12 @@ namespace IO.Ably.Tests
             var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeDataString(tokenJson);
 
             var client = new AblyRealtime(new ClientOptions
-                                                 {
-                                                     AuthUrl = new Uri(authUrl),
-                                                     Environment = settings.Environment,
-                                                     UseBinaryProtocol = protocol == Defaults.Protocol,
-                                                     HttpRequestTimeout = new TimeSpan(0, 0, 20)
-                                                 });
+            {
+                AuthUrl = new Uri(authUrl),
+                Environment = settings.Environment,
+                UseBinaryProtocol = protocol == Defaults.Protocol,
+                HttpRequestTimeout = new TimeSpan(0, 0, 20)
+            });
 
             await client.WaitForState();
             client.Connection.State.Should().Be(ConnectionState.Connected);
@@ -816,12 +816,12 @@ namespace IO.Ably.Tests
             var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeDataString(incorrectJson);
 
             var client = new AblyRealtime(new ClientOptions
-                                              {
-                                                  AuthUrl = new Uri(authUrl),
-                                                  Environment = settings.Environment,
-                                                  UseBinaryProtocol = protocol == Defaults.Protocol,
-                                                  HttpRequestTimeout = new TimeSpan(0, 0, 20)
-                                              });
+            {
+                AuthUrl = new Uri(authUrl),
+                Environment = settings.Environment,
+                UseBinaryProtocol = protocol == Defaults.Protocol,
+                HttpRequestTimeout = new TimeSpan(0, 0, 20)
+            });
 
             var tsc = new TaskCompletionAwaiter();
             ErrorInfo err = null;

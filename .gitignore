@@ -175,3 +175,4 @@ cake-build/addins/
 cake-build/modules/
 build-output/
 unity-packager/
+test-results/

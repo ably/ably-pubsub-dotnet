@@ -17,7 +17,8 @@ namespace IO.Ably.Tests
     {
         internal readonly AblyResponse DummyTokenResponse = new AblyResponse
         {
-            Type = ResponseType.Json, TextResponse = "{ \"access_token\": {}}"
+            Type = ResponseType.Json,
+            TextResponse = "{ \"access_token\": {}}"
         };
 
         internal override AblyResponse DefaultResponse => DummyTokenResponse;
