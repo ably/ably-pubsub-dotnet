@@ -30,9 +30,9 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Ably.PubSub.Tests.Shared", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IO.Ably.DeltaCodec", "..\lib\delta-codec\IO.Ably.DeltaCodec\IO.Ably.DeltaCodec.csproj", "{D8CAACFA-FE6E-46BC-9B23-8AA3B2055125}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ably.PubSub.Device", "Ably.PubSub.Device\Ably.PubSub.Device.csproj", "{ADD94C3B-7F88-4D5E-8C64-9FC84DC1DC0B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ably.PubSub.Device", "Ably.PubSub.Device\Ably.PubSub.Device.csproj", "{ADD94C3B-7F88-4D5E-8C64-9FC84DC1DC0B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ably.PubSub.Server", "Ably.PubSub.Server\Ably.PubSub.Server.csproj", "{882D22FB-68CB-4EA7-AE62-B79F7165854D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ably.PubSub.Server", "Ably.PubSub.Server\Ably.PubSub.Server.csproj", "{882D22FB-68CB-4EA7-AE62-B79F7165854D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,8 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- The core's TFMs minus net462 (PDR-091b plan decision 5b): there is no net462 Device
-         head, and .NET Framework is not a supported device target. -->
+    <!-- The core's TFMs minus net462 (PDR-091b plan decision 5b): there is no separate
+         .NET Framework Device head because .NET Framework device apps (WPF/WinForms 4.6.2+)
+         consume the netstandard2.0 asset directly, exactly as MAUI does. -->
     <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
     <CodeAnalysisRuleSet>..\IO.Ably.ruleset</CodeAnalysisRuleSet>
     <Configurations>Debug;Release;package</Configurations>
