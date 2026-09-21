@@ -12,7 +12,7 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 
 **Notes**
 
-- Device push-receive (push activation on Android/iOS) is not part of the 2.0 packages; a `net8.0-android`/`net8.0-ios` port on `Ably.PubSub.Device` is a post-GA follow-up. Push administration (from a backend) is unaffected. See [PushNotifications.md](PushNotifications.md).
+- Device push-receive (push activation on Android/iOS) is not part of the 2.0 packages; a `net8.0-android`/`net8.0-ios` port on `Ably.PubSub.Device` is a possible future follow-up (currently **parked** — no committed milestone). Push administration (from a backend) is unaffected. See [PushNotifications.md](PushNotifications.md).
 - The `ably.io` 1.x line continues to receive security and critical fixes from its maintenance branch for one year from this release, then reaches end of life.
 
 ## [1.2.19](https://github.com/ably/ably-pubsub-dotnet/tree/1.2.19) (2026-09-11)

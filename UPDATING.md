@@ -60,7 +60,7 @@ Once MAU-based pricing is live, a client that is not classified as device- or se
 
 ## Xamarin and older device apps
 
-Xamarin-era apps consume `Ably.PubSub.Device` through its `netstandard2.0` asset, the same way they consumed `ably.io`. **One gap:** device push-receive (push activation on Android/iOS) is not in the 2.0 packages yet — the two platform satellites were not carried over. If your app only publishes/subscribes, reads message history or presence, or requests tokens, it is unaffected. If it registers to *receive* push notifications on the device, stay on `ably.io` 1.x until the device push-receive port lands on `Ably.PubSub.Device`. Push administration (sending pushes and managing devices from a backend) is unaffected and available through `Ably.PubSub.Server`.
+Xamarin-era apps consume `Ably.PubSub.Device` through its `netstandard2.0` asset, the same way they consumed `ably.io`. **One gap:** device push-receive (push activation on Android/iOS) is not in the 2.0 packages yet — the two platform satellites were not carried over. If your app only publishes/subscribes, reads message history or presence, or requests tokens, it is unaffected. If it registers to *receive* push notifications on the device, stay on `ably.io` 1.x; a device push-receive port on `Ably.PubSub.Device` is a possible future follow-up, currently **parked** with no committed milestone. Push administration (sending pushes and managing devices from a backend) is unaffected and available through `Ably.PubSub.Server`.
 
 ## Unity
 

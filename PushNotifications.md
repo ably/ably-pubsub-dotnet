@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > **This document describes the 1.x push-receive packages, which are not part of the 2.0 package set.**
 >
-> `ably.io.push.android` and `ably.io.push.ios` are Xamarin-era projects. They depend on `ably.io` 1.x, stay supported from the 1.x maintenance branch, and have been removed from this branch along with the `DotnetPush` and `AndroidSample` examples. A modern `Ably.PubSub.Push.Android` / `Ably.PubSub.Push.iOS` port on `net8.0-android` / `net8.0-ios`, built on `Ably.PubSub.Device`, is a post-GA 2.x follow-up; until it lands, a device application cannot combine the 2.0 SDK with Ably push receive.
+> `ably.io.push.android` and `ably.io.push.ios` are Xamarin-era projects. They depend on `ably.io` 1.x, stay supported from the 1.x maintenance branch, and have been removed from this branch along with the `DotnetPush` and `AndroidSample` examples. A modern `Ably.PubSub.Push.Android` / `Ably.PubSub.Push.iOS` port on `net8.0-android` / `net8.0-ios`, built on `Ably.PubSub.Device`, is a possible future follow-up (currently **parked** — no committed milestone); until it lands, a device application cannot combine the 2.0 SDK with Ably push receive.
 >
 > Push **administration** (`client.Push.Admin`) is unaffected: it lives in `Ably.PubSub.Core` and remains available.
 
