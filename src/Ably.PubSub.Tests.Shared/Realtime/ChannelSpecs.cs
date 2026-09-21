@@ -388,6 +388,65 @@ namespace IO.Ably.Tests.Realtime
                 completed.Should().BeTrue("channel should have become Suspended again");
             }
 
+            [Fact]
+            [Trait("spec", "RTL3d1")]
+            [Trait("spec", "RTL3d")]
+            public async Task WhenConnectedIsEmittedExternally_TheRTL3dTransitionsShouldAlreadyBeApplied()
+            {
+                // RTL3d1: "The RTL3d channel state transitions must be applied before the CONNECTED
+                // connection state change is emitted to external listeners." Nothing implements it
+                // directly - it holds because Connection.NotifyUpdate runs the internal handlers,
+                // where RealtimeChannels fans the change out to every channel, before the emit.
+                //
+                // An ATTACHED channel on a successful resume is the case that needs it, and the one
+                // a conditional reattach would miss. With no SynchronizationContext - the default,
+                // and what every server-side host has - NotifyExternalClients invokes inline, so
+                // anything done after SetState is visible to the application too late.
+                var client = await GetConnectedClient(opts =>
+                    opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+                var channel = (RealtimeChannel)client.Channels.Get("test".AddRandomSuffix());
+                channel.SetChannelState(ChannelState.Attached);
+                await client.ProcessCommands();
+
+                client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
+                await client.WaitForState(ConnectionState.Disconnected);
+                await client.ProcessCommands();
+
+                ChannelState? seenByExternalListener = null;
+                client.Connection.On(ConnectionEvent.Connected, _ => seenByExternalListener = channel.State);
+
+                // The same connectionId the client already holds, so this is an RTN15c6 resume.
+                client.Workflow.QueueCommand(SetConnectedStateCommand.Create(ConnectedProtocolMessage, false));
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                seenByExternalListener.Should().Be(ChannelState.Attaching);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL3c")]
+            public async Task WhenConnectionIsSuspended_ADetachingChannelShouldNotBeStranded()
+            {
+                // RTL3c names only ATTACHING and ATTACHED, so DETACHING is ably-js parity rather than
+                // a spec requirement - propogateConnectionInterruption maps suspended over
+                // ['attaching','attached','detaching','suspended']. It matters because the handler
+                // fails the DetachedAwaiter first, leaving the channel with no DETACHED coming.
+                var (client, channel) = await GetClientAndChannel();
+
+                ((RealtimeChannel)channel).SetChannelState(ChannelState.Detaching);
+                await client.ProcessCommands();
+
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(new ErrorInfo("why it suspended", 12345)));
+                await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Suspended);
+
+                // And the connection's own reason, not a constant - ably-js passes change.reason.
+                channel.ErrorReason.Message.Should().Be("why it suspended");
+            }
+
             [Theory]
             [InlineData(ChannelState.Attached)]
             [InlineData(ChannelState.Attaching)]
@@ -399,10 +458,12 @@ namespace IO.Ably.Tests.Realtime
 
                 ((RealtimeChannel)channel).SetChannelState(state);
 
-                client.Close();
-
+                // Driven straight to SUSPENDED, with no Close() first: CLOSING detaches channels per
+                // RTN11b/RTL3b, so closing would race the suspend for the outcome, and RTL3c is
+                // about entering SUSPENDED anyway.
                 client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(null));
                 await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
 
                 // Assert
                 channel.State.Should().Be(ChannelState.Suspended);
@@ -1617,6 +1678,149 @@ namespace IO.Ably.Tests.Realtime
             }
 
             public HistorySpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        /// <summary>
+        /// channelSerial is the only continuity signal a reattach carries now that RTN15g and RTL4j
+        /// are deleted at 6.1.0, so its three invariants are pinned directly: RTL15b sets it, RTL15b2
+        /// says which states clear it, and RTL4c1 puts it on the outgoing ATTACH.
+        /// </summary>
+        [Trait("spec", "RTL15b")]
+        public class ChannelSerialSpecs : ChannelSpecs
+        {
+            [Theory]
+            [InlineData(ChannelState.Suspended, true)]
+            [InlineData(ChannelState.Detached, false)]
+            [InlineData(ChannelState.Failed, false)]
+            [Trait("spec", "RTL15b2")]
+            public async Task OnAStateChange_ShouldClearTheSerialOnlyWhereRTL15b2SaysTo(ChannelState state, bool shouldRetain)
+            {
+                // RTL15b2 - "If the channel enters the DETACHED or FAILED state, it must clear its
+                // channelSerial. (Unlike previous spec versions, it must not clear it when entering
+                // the SUSPENDED state)." Keeping it through SUSPENDED is what lets the reattach after
+                // an RTL4f attach timeout, or after the connection suspends and RTL3c suspends every
+                // channel, still ask to continue where it left off.
+                var (client, channel) = await GetClientAndChannel();
+                await AttachWithChannelSerial(client, channel, "serial-1");
+
+                SetState(channel, state, state == ChannelState.Failed ? new ErrorInfo("failed") : null);
+                await client.ProcessCommands();
+
+                if (shouldRetain)
+                {
+                    channel.Properties.ChannelSerial.Should().Be("serial-1");
+                }
+                else
+                {
+                    channel.Properties.ChannelSerial.Should().BeNull();
+                }
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4c1")]
+            public async Task OnAReattach_TheAttachShouldCarryTheChannelSerial()
+            {
+                // RTL4c1 - "The ATTACH ProtocolMessage channelSerial field must be set to the RTL15b
+                // channelSerial." Reattaching out of SUSPENDED is the case that matters: the serial
+                // survived per RTL15b2, and putting it on the wire is the whole of what replaced
+                // ATTACH_RESUME.
+                var (client, channel) = await GetClientAndChannel();
+                await AttachWithChannelSerial(client, channel, "serial-1");
+
+                SetState(channel, ChannelState.Suspended);
+                await client.ProcessCommands();
+                LastCreatedTransport.SentMessages.Clear();
+
+                channel.Attach();
+                await client.ProcessCommands();
+
+                var attach = SentProtocolMessages()
+                    .Should().ContainSingle(x => x.Action == ProtocolMessage.MessageAction.Attach)
+                    .Subject;
+                attach.ChannelSerial.Should().Be("serial-1");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4c1")]
+            public async Task WithNoSerialYet_TheAttachShouldNotInventOne()
+            {
+                // RTL4c1's second sentence - "If the RTL15b channelSerial is not set, the field may be
+                // set to null or omitted." A first attach has nothing to continue from.
+                var (client, channel) = await GetClientAndChannel();
+
+                channel.Attach();
+                await client.ProcessCommands();
+
+                SentProtocolMessages()
+                    .Should().ContainSingle(x => x.Action == ProtocolMessage.MessageAction.Attach)
+                    .Subject.ChannelSerial.Should().BeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4j")]
+            public async Task AcrossTheLifecycle_NoOutgoingMessageShouldSetAttachResume()
+            {
+                // RTL4j and its sub-clauses are deleted as of 6.1.0: "SDKs need not set ATTACH_RESUME
+                // any more". The Flag constant stays per TR3f, so nothing but a sweep of what actually
+                // goes out will notice it being set again - and the reattaches below are exactly the
+                // ones the deleted clauses used to demand it on.
+                var (client, channel) = await GetClientAndChannel();
+                await AttachWithChannelSerial(client, channel, "serial-1");
+
+                // A reattach out of SUSPENDED, where the serial survives.
+                SetState(channel, ChannelState.Suspended);
+                await client.ProcessCommands();
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = "serial-2",
+                });
+                await client.ProcessCommands();
+
+                // And one out of DETACHED, where it does not.
+                SetState(channel, ChannelState.Detached);
+                await client.ProcessCommands();
+                channel.Attach();
+                await client.ProcessCommands();
+
+                channel.Publish("name", "data");
+                await client.ProcessCommands();
+
+                var sent = SentProtocolMessages().ToList();
+                sent.Should().Contain(
+                    x => x.Action == ProtocolMessage.MessageAction.Attach,
+                    "the sweep has to have seen the ATTACHes for its result to mean anything");
+                sent.Where(x => x.Flags.HasValue
+                                && ((ProtocolMessage.Flag)x.Flags.Value).HasFlag(ProtocolMessage.Flag.AttachResume))
+                    .Should().BeEmpty();
+            }
+
+            private IEnumerable<ProtocolMessage> SentProtocolMessages() =>
+                LastCreatedTransport.SentMessages.Select(x => x.Original).Where(x => x != null);
+
+            /// <summary>
+            /// Attaches the channel and hands it an ATTACHED carrying a channelSerial, which is what
+            /// RTL15b reads. Asserting the serial landed makes RTL15b itself part of every case below.
+            /// </summary>
+            private async Task AttachWithChannelSerial(AblyRealtime client, IRealtimeChannel channel, string serial)
+            {
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = serial,
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Attached);
+                channel.Properties.ChannelSerial.Should().Be(serial, "RTL15b sets it from the ATTACHED");
+            }
+
+            public ChannelSerialSpecs(ITestOutputHelper output)
                 : base(output)
             {
             }

@@ -177,7 +177,7 @@ namespace IO.Ably.Tests.AuthTests
         {
             /*
              * This is a test to demonstrate the fix for issue
-             * https://github.com/ably/ably-dotnet/issues/346
+             * https://github.com/ably/ably-pubsub-dotnet/issues/346
              * against the 1.1.6 release this test would fail
              */
 

@@ -41,6 +41,24 @@ namespace IO.Ably.Realtime.Workflow
             public TimeSpan ConnectionStateTtl { get; internal set; } = Defaults.ConnectionStateTtl;
 
             /// <summary>
+            /// The maximum period of inactivity the server promises in the server to client
+            /// direction, from the connectionDetails of the most recent Connected message.
+            /// Null when the server declines to make that promise, in which case no idle
+            /// timeout is applied (CD2h).
+            /// </summary>
+            public TimeSpan? MaxIdleInterval { get; internal set; }
+
+            /// <summary>
+            /// Whether the current transport actually asked Ably for protocol heartbeats, read off
+            /// the query params it was built with. RTN23b guarantees them only for heartbeats=true,
+            /// and a caller's own TransportParams entry can displace ours - so without them Ably may
+            /// satisfy maxIdleInterval with websocket pings, which ClientWebSocket cannot observe
+            /// and RTN23a therefore cannot measure. Per transport, because the params are rebuilt
+            /// for each one.
+            /// </summary>
+            public bool ProtocolHeartbeatsRequested { get; internal set; }
+
+            /// <summary>
             ///     Information relating to the transition to the current state,
             ///     as an Ably ErrorInfo object. This contains an error code and
             ///     message and, in the failed state in particular, provides diagnostic
@@ -72,18 +90,41 @@ namespace IO.Ably.Realtime.Workflow
                 return new ConnectionStateChange(connectionEvent, oldState, newState, state.RetryIn, ErrorReason);
             }
 
-            public bool HasConnectionStateTtlPassed(Func<DateTimeOffset> now)
+            public void Update(ConnectionInfo info, bool isUpdate)
             {
-                return ConfirmedAliveAt?.Add(ConnectionStateTtl) < now();
-            }
-
-            public void Update(ConnectionInfo info)
-            {
+                // Guarded differently on purpose. connectionId is a top-level field and always
+                // meaningful, per RTN8b. connectionKey lives inside connectionDetails, and RTN21
+                // scopes an override to "the attributes within ConnectionDetails" - so a CONNECTED
+                // carrying none overrides no key, and emptying it would leave a live connection with
+                // nothing to resume with under RTN15b. Clearing the key belongs to ClearKey and
+                // ClearKeyAndId, at the points that mean it.
                 Id = info.ConnectionId;
-                Key = info.ConnectionKey;
+
+                if (info.ConnectionKey.IsNotEmpty())
+                {
+                    Key = info.ConnectionKey;
+                }
+
                 if (info.ConnectionStateTtl.HasValue)
                 {
                     ConnectionStateTtl = info.ConnectionStateTtl.Value;
+                }
+
+                // RTN23a measures against the maxIdleInterval "sent in the connectionDetails of the
+                // most recent CONNECTED message received on that transport", so the promise belongs
+                // to the transport that carried it. Hence the two cases, which isUpdate separates:
+                //
+                //  - A CONNECTED starting a new transport must not inherit the old threshold. An
+                //    omitted field is Ably declining to promise anything, so detection stands down.
+                //    Strictly unspecified - RTN23a says the field "will be sent" and CD2h licenses
+                //    arbitrary inactivity for an explicit 0 - but failing open matches CD2h's
+                //    outcome for 0, and ably-js.
+                //  - A CONNECTED arriving while already CONNECTED is an RTN24 update on the
+                //    transport we already hold, so an omitted field is not a withdrawal and the
+                //    previous value stands. ably-js keeps it with the same guard.
+                if (isUpdate == false || info.MaxIdleInterval.HasValue)
+                {
+                    MaxIdleInterval = info.MaxIdleInterval;
                 }
             }
 

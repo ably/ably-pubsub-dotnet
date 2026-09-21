@@ -17,6 +17,10 @@ jobs:
     # Track the live SDK feature spec on main rather than pinning.
     uses: ably/features/.github/workflows/sdk-features.yml@main # zizmor: ignore[unpinned-uses]
     with:
-      repository-name: ably-dotnet
+      # Selects the `ably-sdk-builds-ably-pubsub-dotnet` IAM role (provisioned by
+      # ably/infrastructure#13005) that the reusable workflow assumes via OIDC to
+      # upload the feature-spec report. It must match the repository name exactly:
+      # a mismatch fails the credential step, which is otherwise silent.
+      repository-name: ably-pubsub-dotnet
     secrets:
       ABLY_AWS_ACCOUNT_ID_SDK: ${{ secrets.ABLY_AWS_ACCOUNT_ID_SDK }}

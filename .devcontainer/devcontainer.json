@@ -38,6 +38,6 @@
 		"PATH": "${containerEnv:PATH}:${containerWorkspaceFolder}/.dotnet/tools"
 	},
 	"mounts": [
-		"source=ably-dotnet-nuget-cache,target=${containerWorkspaceFolder}/.nuget/packages,type=volume"
+		"source=ably-pubsub-dotnet-nuget-cache,target=${containerWorkspaceFolder}/.nuget/packages,type=volume"
 	]
 }

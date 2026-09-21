@@ -8,8 +8,11 @@ namespace IO.Ably.Tests.Shared.Utils
 {
     public class ReconnectionStrategyTest
     {
+        // UTS: realtime/unit/RTB1/disconnected-retry-delay-0
         [Fact]
         [Trait("spec", "RTB1")]
+        [Trait("spec", "RTB1a")]
+        [Trait("spec", "RTB1b")]
         public void ShouldCalculateRetryTimeoutsUsingBackOffAndJitter()
         {
             var retryAttempts = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };

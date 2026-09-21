@@ -183,13 +183,10 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
 
             await client.WaitForState(ConnectionState.Connecting);
 
-            client.Connection.On((args) =>
+            ConnectionStateChange firstChange = null;
+            client.Connection.Once(ConnectionEvent.Disconnected, args =>
             {
-                args.Current.Should().Be(ConnectionState.Disconnected);
-                args.Previous.Should().Be(ConnectionState.Connecting);
-                args.Event.Should().Be(ConnectionEvent.Disconnected);
-                args.RetryIn.Should().Be(options.DisconnectedRetryTimeout);
-                args.Reason.Should().NotBeNull();
+                firstChange = args;
                 Done();
             });
 
@@ -199,6 +196,17 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
             LastCreatedTransport.Listener.OnTransportEvent(LastCreatedTransport.Id, TransportState.Closing, new Exception());
 
             WaitOne();
+
+            firstChange.Should().NotBeNull();
+            firstChange.Previous.Should().Be(ConnectionState.Connecting);
+            firstChange.Event.Should().Be(ConnectionEvent.Disconnected);
+            firstChange.Reason.Should().NotBeNull();
+
+            // RTN15a - a transport disconnected unexpectedly is treated as a non-token DISCONNECTED
+            // per RTN15h3, which reconnects immediately. So RTN14d's "time until the next connection
+            // attempt" is zero here, not the disconnectedRetryTimeout. The backoff reporting itself
+            // is covered deterministically by DisconnectedStateSpecs.
+            firstChange.RetryIn.Should().Be(TimeSpan.Zero);
         }
 
         [Fact(Skip = "Requires a SandBox Spec")]

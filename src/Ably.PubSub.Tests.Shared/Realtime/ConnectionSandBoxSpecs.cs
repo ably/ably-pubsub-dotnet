@@ -270,6 +270,12 @@ namespace IO.Ably.Tests.Realtime
             {
                 await realtime.WaitForState(state);
 
+                // Drained before the watch is armed: the retry that put us in this state may still
+                // have a CONNECTING queued behind it, and that would read as a reconnect close()
+                // failed to abort rather than one it never had the chance to.
+                await realtime.ProcessCommands();
+                realtime.Connection.State.Should().Be(state);
+
                 var reconnectAwaiter = new TaskCompletionAwaiter(5000);
                 realtime.Connection.On(args =>
                 {
@@ -284,18 +290,58 @@ namespace IO.Ably.Tests.Realtime
                 await realtime.WaitForState(ConnectionState.Closed);
                 realtime.Connection.State.Should().Be(ConnectionState.Closed);
 
+                // This covers the path rather than the abort. SetState aborts the outgoing state's
+                // timer on every transition, so RTN12d's "aborts the retry process" cannot be broken
+                // without also breaking the transition to CLOSED, which WaitForState above catches
+                // first. The abort is pinned where it can actually be observed failing, on the state
+                // objects, by DisconnectedStateSpecs and SuspendedStateSpecs.
                 var didReconnect = await reconnectAwaiter.Task;
                 didReconnect.Should().BeFalse($"should not attempt a reconnect for state {state}");
             }
 
-            // setup a new client and put into a DISCONNECTED state
+            // Set up a client that is genuinely stuck in DISCONNECTED. Forcing the state is no longer
+            // enough by itself: RTN15h3 grants a non-token DISCONNECTED arriving while CONNECTED an
+            // immediate reconnect, and against a healthy sandbox that reconnect succeeds - so the
+            // client is CONNECTED again before close() can be called, and the assertions race it.
+            // Failing every reconnect attempt is what a client stuck in DISCONNECTED actually looks
+            // like, and it is the only situation in which RTN12d's "aborts the retry process" has a
+            // retry to abort.
+            var failConnects = false;
+            var throwingTransports = new TestTransportFactory(t => t.ThrowOnConnect = failConnects);
+
             var client = await GetRealtimeClient(protocol, (opts, _) =>
             {
+                // Kept short deliberately. Stability comes from draining the queue below, not from
+                // a long timeout - and the retry has to be due inside the window the assertion
+                // watches, or a close() that failed to abort it would go unnoticed.
                 opts.DisconnectedRetryTimeout = TimeSpan.FromSeconds(2);
+                opts.TransportFactory = throwingTransports;
             });
 
             await client.WaitForState(ConnectionState.Connected);
+
+            failConnects = true;
             client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(new ErrorInfo("force disconnect")));
+
+            // The immediate retries are bounded by the number of domains to traverse, and until that
+            // budget is spent the client is legitimately still cycling through CONNECTING - which is
+            // not the state RTN12d is about. Wait for it to run out before closing.
+            var domainCount = 1 + client.State.Connection.FallbackHosts.Count;
+            var budgetDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
+            while (client.State.AttemptsInfo.InstantRetryCount < domainCount
+                   && DateTimeOffset.UtcNow < budgetDeadline)
+            {
+                await Task.Delay(50);
+            }
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(
+                domainCount,
+                "the client cannot sit still in DISCONNECTED until the immediate retries are spent");
+
+            // The budget is recorded when the retry is granted, not when its attempt finishes, so
+            // the last CONNECTING is still in flight here. Let it fail before closing.
+            await client.WaitForState(ConnectionState.Disconnected);
+            await client.ProcessCommands();
 
             await AssertsClosesAndDoesNotReconnect(client, ConnectionState.Disconnected);
 
@@ -960,28 +1006,39 @@ namespace IO.Ably.Tests.Realtime
 
         [Theory]
         [ProtocolData]
-        [Trait("spec", "RTN15g")]
-        [Trait("spec", "RTN15g1")]
-        // "RTN15g2" It can't implement that spec item because RTN23a is not even implemented
-        [Trait("spec", "RTN15g3")]
-        public async Task WhenDisconnectedPastTTL_ShouldNotResume_ShouldClearConnectionStateAndAttemptNewConnection(Protocol protocol)
+        [Trait("spec", "RTN14h")]
+        [Trait("spec", "RTN8d")]
+        [Trait("spec", "RTN9d")]
+        [Trait("spec", "RTL3d")]
+        public async Task WhenDisconnectedPastTTL_ShouldStillResume_AndReattachChannels(Protocol protocol)
         {
+            // RTN14h, which replaces RTN15g as of specification 6.1.0 - the client keeps its
+            // connection state however long it has been disconnected, and still attempts a resume.
+            //
+            // The ttl has to actually elapse for this to be about RTN14h rather than about a brief
+            // reconnect, and a live endpoint reconnects too quickly for that on its own. So the
+            // attempts are held in CONNECTING until the ttl has passed and the client suspends -
+            // SUSPENDED being the state RTN14h names - and only then allowed to complete.
+            var holdInConnecting = false;
+            var transportFactory = new TestTransportFactory(
+                transport => transport.KeepInConnectingState = holdInConnecting);
+
             var client = await GetRealtimeClient(protocol, (options, _) =>
             {
+                options.TransportFactory = transportFactory;
                 options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(1000);
-                options.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(5000);
+                options.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(500);
+                options.SuspendedRetryTimeout = TimeSpan.FromMilliseconds(500);
             });
 
             await client.WaitForState(ConnectionState.Connected);
 
-            client.State.Connection.ConnectionStateTtl = TimeSpan.FromSeconds(1);
-            string initialConnectionId = client.Connection.Id;
-            TimeSpan connectionStateTtl = client.Connection.ConnectionStateTtl;
+            var initialConnectionId = client.Connection.Id;
+            var initialConnectionKey = client.Connection.Key;
+            initialConnectionKey.Should().NotBeNullOrEmpty();
 
-            var aliveAt1 = client.Connection.ConfirmedAliveAt;
-            var aliveAt2 = aliveAt1;
-
-            // RTN15g3 ATTACHED, ATTACHING, or SUSPENDED must be automatically reattached
+            // RTL3d - channels that were ATTACHED, ATTACHING or SUSPENDED are reattached on
+            // entering CONNECTED.
             var channels = new List<RealtimeChannel>
             {
                 client.Channels.Get("attached".AddRandomSuffix()) as RealtimeChannel,
@@ -997,42 +1054,39 @@ namespace IO.Ably.Tests.Realtime
             channels[1].State.Should().Be(ChannelState.Initialized); // set attaching later
             channels[2].State.Should().Be(ChannelState.Suspended);
 
-            DateTime disconnectedAt = DateTime.MinValue;
-            DateTime reconnectedAt = DateTime.MinValue;
-            string newConnectionId = string.Empty;
+            // A ttl short enough to elapse while the attempts below are being held open.
+            client.State.Connection.ConnectionStateTtl = TimeSpan.FromMilliseconds(2000);
 
-            await WaitFor(60000, done =>
-            {
-                client.Connection.Once(ConnectionEvent.Disconnected, change2 =>
-                {
-                    disconnectedAt = DateTime.UtcNow;
-                    channels[1].Attach();
-                    client.Connection.Once(ConnectionEvent.Connecting, change3 =>
-                    {
-                        reconnectedAt = DateTime.UtcNow;
-                        client.Connection.Once(ConnectionEvent.Connected, change4 =>
-                        {
-                            newConnectionId = client.Connection.Id;
-                            aliveAt2 = client.Connection.ConfirmedAliveAt;
-                            done();
-                        });
-                    });
-                });
+            holdInConnecting = true;
+            client.GetTestTransport().Close(); // close event is suppressed by default
+            client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
 
-                client.GetTestTransport().Close(); // close event is suppressed by default
-                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
-            });
+            await client.WaitForState(ConnectionState.Disconnected);
 
-            var reconnectedInTime = reconnectedAt - disconnectedAt;
+            // RTN8d, RTN9d - DISCONNECTED is not a terminal state, so both survive.
+            client.Connection.Id.Should().Be(initialConnectionId);
+            client.Connection.Key.Should().Be(initialConnectionKey);
 
-            var (lowerBound, _) = ReconnectionStrategyTest.Bounds(1, 5000);
-            reconnectedInTime.TotalMilliseconds.Should().BeGreaterThan(lowerBound);
+            // Attached during the outage, so it is pending when the connection comes back - RTL3d
+            // reattaches ATTACHING, ATTACHED and SUSPENDED channels and deliberately leaves
+            // INITIALIZED ones alone.
+            channels[1].Attach();
 
-            initialConnectionId.Should().NotBeNullOrEmpty();
-            initialConnectionId.Should().NotBe(newConnectionId);
-            connectionStateTtl.Should().Be(TimeSpan.FromSeconds(1));
-            aliveAt1.Value.Should().BeBefore(aliveAt2.Value);
+            // The held attempts time out until the ttl is spent, which is what takes us here.
+            await client.WaitForState(ConnectionState.Suspended, TimeSpan.FromSeconds(30));
 
+            // The point of RTN14h: past the ttl, in the state RTN15g used to clear state in, the
+            // key is still there to resume with.
+            client.Connection.Key.Should().Be(initialConnectionKey);
+            client.Connection.Id.Should().Be(initialConnectionId);
+
+            holdInConnecting = false;
+
+            await client.WaitForState(ConnectionState.Connected, TimeSpan.FromSeconds(30));
+
+            // Whether the server still honoured the resume is its decision, not ours, so the
+            // connectionId is deliberately not asserted either way. What matters is that the
+            // client got back and RTL3d reattached everything.
             await channels[0].WaitForAttachedState();
             await channels[1].WaitForAttachedState();
             await channels[2].WaitForAttachedState();
