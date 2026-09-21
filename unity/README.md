@@ -37,6 +37,7 @@ namespace Example.ChatApp
         void Start()
         {
             InitializeAbly();
+            CreateAblyClient();
         }
 
         private void InitializeAbly()
@@ -49,6 +50,13 @@ namespace Example.ChatApp
                 CustomContext = SynchronizationContext.Current
             };
 
+            // PubSubDevice.CreateClient clones the options, so anything the client must
+            // capture (e.g. ClientId) has to be set on _clientOptions BEFORE the client
+            // is created in CreateAblyClient.
+        }
+
+        private void CreateAblyClient()
+        {
             _ably = PubSubDevice.CreateClient(_clientOptions);
             _ably.Connection.On(args =>
             {
