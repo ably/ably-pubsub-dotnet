@@ -12,8 +12,29 @@ namespace IO.Ably
 
         internal static string GetVersion()
         {
-            var version = typeof(Defaults).GetTypeInfo().Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>().Version;
-            return version.Split('.').Take(3).JoinStrings(".");
+            // Read the informational version, not the file version: a prerelease stamps its full
+            // SemVer (e.g. "2.0.0-beta.1") into AssemblyInformationalVersion while AssemblyFileVersion
+            // is numeric-only ("2.0.0"), so reading the file version would report a prerelease as GA
+            // on the wire. Do NOT apply the .Take(3) truncation to the informational version - it would
+            // corrupt the prerelease label.
+            var info = typeof(Defaults).GetTypeInfo().Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrEmpty(info))
+            {
+                return NormalizeInformationalVersion(info);
+            }
+
+            // Fallback: numeric file version, first three parts.
+            var fileVersion = typeof(Defaults).GetTypeInfo().Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>().Version;
+            return fileVersion.Split('.').Take(3).JoinStrings(".");
+        }
+
+        internal static string NormalizeInformationalVersion(string informationalVersion)
+        {
+            // SourceLink appends build metadata as "+<commit>"; strip it, keeping the SemVer core
+            // and any prerelease label (the part before '+').
+            var plus = informationalVersion.IndexOf('+');
+            return plus >= 0 ? informationalVersion.Substring(0, plus) : informationalVersion;
         }
 
         public const string ProtocolVersion = "2"; // CSV2
