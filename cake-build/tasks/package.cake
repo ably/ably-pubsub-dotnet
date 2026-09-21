@@ -85,7 +85,7 @@ Task("_Package_Unity")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
-    var committedPlugin = paths.Root.CombineWithFilePath("unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll");
+    var committedPlugin = paths.UnityPluginDll;
     if (!FileExists(committedPlugin))
     {
         throw new Exception(

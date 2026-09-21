@@ -37,8 +37,12 @@
         </dependencies>
     </metadata>
     <files>
-        <file src="..\src\Ably.PubSub.Core.NETFramework\bin\$configuration$\Ably.PubSub.Core.*" target="lib\net46" />
-        <file src="..\src\Ably.PubSub.Core.NETFramework\bin\$configuration$\IO.Ably.DeltaCodec.*" target="lib\net46" />
+        <!-- List the net46 files explicitly: a `Ably.PubSub.Core.*` glob would also sweep in
+             Ably.PubSub.Core.dll.config (MSBuild's copy of app.config) and the .pdb, which do
+             not belong in lib\net46. Keep the .xml for IntelliSense. -->
+        <file src="..\src\Ably.PubSub.Core.NETFramework\bin\$configuration$\Ably.PubSub.Core.dll" target="lib\net46" />
+        <file src="..\src\Ably.PubSub.Core.NETFramework\bin\$configuration$\Ably.PubSub.Core.xml" target="lib\net46" />
+        <file src="..\src\Ably.PubSub.Core.NETFramework\bin\$configuration$\IO.Ably.DeltaCodec.dll" target="lib\net46" />
         <file src="..\src\Ably.PubSub.Core\bin\$configuration$\netstandard2.0\Ably.PubSub.Core.*" target="lib\netstandard2.0" />
         <file src="..\src\Ably.PubSub.Core\bin\$configuration$\netstandard2.0\IO.Ably.DeltaCodec.*" target="lib\netstandard2.0" />
         <file src="..\src\Ably.PubSub.Core\bin\$configuration$\net6.0\Ably.PubSub.Core.*" target="lib\net6.0" />

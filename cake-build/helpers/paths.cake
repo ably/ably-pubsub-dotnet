@@ -14,6 +14,11 @@ public class BuildPaths
     public FilePath NetFrameworkSolution { get; }
     public FilePath PackageSolution { get; }
     public FilePath DeltaCodecProject { get; }
+
+    // Single source of truth for the committed merged Unity plugin, referenced by
+    // the build task (output), the packaging guard and the release pre-flight so
+    // the three sites cannot drift.
+    public FilePath UnityPluginDll { get; }
     
     public BuildPaths(ICakeContext context)
     {
@@ -29,6 +34,8 @@ public class BuildPaths
         PackageSolution = Src.CombineWithFilePath("Ably.PubSub.Package.sln");
         
         DeltaCodecProject = Lib.CombineWithFilePath("delta-codec/IO.Ably.DeltaCodec/IO.Ably.DeltaCodec.csproj");
+
+        UnityPluginDll = Root.CombineWithFilePath("unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll");
     }
 }
 

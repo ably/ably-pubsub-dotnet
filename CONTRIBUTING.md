@@ -119,6 +119,7 @@ For each release:
 4. Optionally check the release locally before pushing: `./build.sh -- --target=Release.Preflight --version=2.0.1`. Note the `--`: Cake reserves `--version` for itself, so arguments for the build script go after it. A full local pack (`./package.cmd 2.0.1`) needs Windows or Mono, because the core and server packages carry a `lib/net46` asset.
 5. Run [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator) to automate the update of the [CHANGELOG](./CHANGELOG.md). This may require some manual intervention, both in terms of how the command is run and how the change log file is modified. Your mileage may vary:
   - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate token [here](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
+  - The `## [2.0.0]` section of the CHANGELOG is hand-written. If the generator produces its own 2.0.0 entry, merge that generated entry into the existing hand-written one rather than letting the two duplicate.
   - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
   - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
   - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
@@ -144,8 +145,10 @@ requires a one-time setup on nuget.org, which someone who can administer the pac
 
 - Sign in to nuget.org → your username → **Trusted Publishing** → add a policy, owned by the account (or
   organization) that owns the `Ably.PubSub.*` package ids, with **Repository Owner** `ably`, **Repository**
-  the name of this repository, and **Workflow File** `publish.yml` (the file name only, not the path). Leave
-  **Environment** empty; this workflow uses no GitHub environment.
+  the name of this repository, and **Workflow File** `publish.yml` (the file name only, not the path). The
+  workflow runs its publish job in the **`release` GitHub environment** (that environment, configured with
+  required reviewers, is the human approval gate); the policy's **Environment** field can be set to
+  `release` to pin it, or left empty — an empty field matches any environment.
 - Set the policy's **scope** to allow publishing new packages as well as new versions, with a glob covering
   `Ably.PubSub.*`. A policy does not require the package to exist already: the "new packages" scope is how
   the first version of a brand-new id is published, which is what claims the name.

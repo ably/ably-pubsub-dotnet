@@ -111,9 +111,10 @@ public class TestExecutionHelper
         
         if (!testAssemblies.Any())
         {
-            _context.Warning($"No test assemblies found matching pattern: {searchPath}");
+            throw new Exception($"No test assemblies found matching pattern: {searchPath}. " +
+                "A green run with zero assemblies is never intended; check the build output and the pattern.");
         }
-        
+
         return testAssemblies;
     }
     

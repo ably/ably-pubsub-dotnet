@@ -163,7 +163,7 @@ public void ReleaseAssertVersionFilesAgree(string releaseVersion, List<string> e
 
 public void ReleaseAssertUnityPluginVersion(string releaseVersion, List<string> errors)
 {
-    var pluginDll = paths.Root.CombineWithFilePath("unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll");
+    var pluginDll = paths.UnityPluginDll;
     if (!FileExists(pluginDll))
     {
         errors.Add(

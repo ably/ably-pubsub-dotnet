@@ -114,6 +114,16 @@ jobs:
       # committed DLL aside, regenerate it from this checkout, and cross-check.
       # The committed DLL remains canonical (it is what the Unity EditMode/PlayMode
       # pass validated); a mismatch means it is stale relative to this source.
+      #
+      # Limit of the check: it compares assembly identity and informational version,
+      # not bytes/source (ILRepack output is nondeterministic), so a committed plugin
+      # at the right version but built from different source would pass. It catches a
+      # forgotten regeneration/bump, which is the realistic failure mode.
+      #
+      # Ordering: the pack step above must stay BEFORE this step. Build.NetStandard
+      # depends on _Clean, which wipes bin/; the pack has already copied its output
+      # into release-packages/ by now, and nothing after this step reads bin/. Do
+      # not reorder.
       - name: Regenerate and cross-check the Unity plugin
         shell: pwsh
         run: |

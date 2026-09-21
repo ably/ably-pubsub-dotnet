@@ -2,7 +2,13 @@
 <!-- The .NET Framework head of the Server door, mirroring Ably.PubSub.Core.NETFramework. It
      exists only so that ably.pubsub.server.nuspec has a lib/net46 asset to sit alongside the
      core's, since the core still ships one (PDR-091b plan decision 5). There is deliberately no
-     equivalent Device head (decision 5b). -->
+     equivalent Device head (decision 5b).
+
+     SourceLink limitation: unlike the SDK-style heads (Ably.PubSub.Core/Device/Server), this
+     legacy packages.config project cannot host the Microsoft.SourceLink.GitHub analyzer
+     (packages.config does not flow build-injected MSBuild tasks the way PackageReference does,
+     and mixing the two restore styles in one project is unsupported). The lib/net46 assets
+     therefore ship without SourceLink, the same as Ably.PubSub.Core.NETFramework's. -->
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\Microsoft.CodeQuality.Analyzers.2.9.6\build\Microsoft.CodeQuality.Analyzers.props" Condition="Exists('..\packages\Microsoft.CodeQuality.Analyzers.2.9.6\build\Microsoft.CodeQuality.Analyzers.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />

@@ -140,11 +140,12 @@ Task("_Build_Ably_Unity_Dll")
         newtonsoftDll
     };
     
-    var unityOutputPath = paths.Root.Combine("unity/Assets/Ably/Plugins");
     // The merged Unity plugin is named after the public device door package; the
     // primary input stays Ably.PubSub.Core.dll (its public API survives the merge)
     // and the real Ably.PubSub.Device.dll is one of the merged, exclude-protected inputs.
-    var outputDll = unityOutputPath.CombineWithFilePath("Ably.PubSub.Device.dll");
+    // The path is defined once, in paths.cake, so the build output, the packaging
+    // guard and the release pre-flight cannot drift.
+    var outputDll = paths.UnityPluginDll;
     
     // Delete existing output DLL if it exists
     if (FileExists(outputDll))
