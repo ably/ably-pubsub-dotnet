@@ -45,9 +45,9 @@ namespace IO.Ably.Tests.Shared
 
         [Theory]
         [InlineData("2.0.0-beta.1+abc123", "2.0.0-beta.1")] // strip SourceLink metadata, keep prerelease label
-        [InlineData("2.0.0+abc123", "2.0.0")]               // strip metadata off a GA version
-        [InlineData("2.0.0-rc.1", "2.0.0-rc.1")]            // no metadata: unchanged
-        [InlineData("2.0.0", "2.0.0")]                      // plain GA: unchanged
+        [InlineData("2.0.0+abc123", "2.0.0")] // strip metadata off a GA version
+        [InlineData("2.0.0-rc.1", "2.0.0-rc.1")] // no metadata: unchanged
+        [InlineData("2.0.0", "2.0.0")] // plain GA: unchanged
         public void NormalizeInformationalVersion_StripsBuildMetadataAndKeepsPrereleaseLabel(string input, string expected)
         {
             Defaults.NormalizeInformationalVersion(input).Should().Be(expected);
