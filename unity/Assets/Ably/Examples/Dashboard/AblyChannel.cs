@@ -7,7 +7,7 @@ namespace Assets.Ably.Examples.Chat
 {
     internal class AblyChannel
     {
-        private readonly AblyRealtime _ably;
+        private AblyRealtime _ably;
         private readonly IUiConsole _uiConsole;
 
         private Button _subscribe;
@@ -28,6 +28,13 @@ namespace Assets.Ably.Examples.Chat
         internal static AblyChannel CreateInstance(AblyRealtime ably, IUiConsole uiConsole)
         {
             return new AblyChannel(ably, uiConsole);
+        }
+
+        // The client is recreated at connect time (so the latest ClientId is captured);
+        // point this console at the current instance.
+        internal void UpdateClient(AblyRealtime ably)
+        {
+            _ably = ably;
         }
 
         internal void RegisterUiComponents()

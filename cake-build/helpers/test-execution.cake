@@ -103,7 +103,7 @@ public class TestExecutionHelper
     /// <summary>
     /// Finds test assemblies matching a pattern in a project directory
     /// </summary>
-    public FilePathCollection FindTestAssemblies(string projectRelativePath, string pattern = "IO.Ably.Tests.*.dll")
+    public FilePathCollection FindTestAssemblies(string projectRelativePath, string pattern = "Ably.PubSub.Tests.*.dll")
     {
         var projectPath = _paths.Src.Combine(projectRelativePath);
         var searchPath = projectPath.Combine("bin/Release").Combine(pattern).FullPath;

@@ -21,20 +21,32 @@ Task("_Restore_Main")
 });
 
 Task("_Version")
+    // The pre-flight runs first and unconditionally: it is the only chance to
+    // compare the --version input against the committed version files, because
+    // this task then overwrites CommonAssemblyInfo.cs with that same input.
+    .IsDependentOn("_Release_Preflight")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
     Information($"Setting version to {version}");
-    
+
+    // AssemblyVersion and AssemblyFileVersion accept only a numeric
+    // MAJOR.MINOR.PATCH[.REVISION]; a SemVer2 prerelease label such as
+    // "2.0.0-beta.1" in either is compile error CS7034. Only
+    // AssemblyInformationalVersion may carry the full label, so a prerelease is
+    // stamped as numeric identity + full informational version. For a stable
+    // version (no '-') numericVersion == version and nothing changes.
+    var numericVersion = version.Split('-')[0];
+
     var assemblyInfoPath = paths.Src.CombineWithFilePath("CommonAssemblyInfo.cs");
-    
+
     CreateAssemblyInfo(assemblyInfoPath, new AssemblyInfoSettings
     {
         Company = "Ably",
         Product = "Ably .NET Library",
         Copyright = $"Copyright © Ably {DateTime.Now.Year}",
-        Version = version,
-        FileVersion = version,
+        Version = numericVersion,
+        FileVersion = numericVersion,
         InformationalVersion = version
     });
 });
@@ -77,41 +89,14 @@ Task("_NetStandard_Build")
     DotNetBuild(paths.NetStandardSolution.FullPath, settings);
 });
 
-Task("_Restore_Xamarin")
-    .Does(() =>
-{
-    RestoreSolution(paths.XamarinSolution);
-});
-
-Task("_Xamarin_Build")
-    .Does(() =>
-{
-    Information("Building Xamarin solution...");
-    
-    if (!FileExists(paths.XamarinSolution))
-    {
-        Warning("Xamarin solution not found, skipping build");
-        return;
-    }
-    
-    var settings = buildConfig.ApplyStandardSettings(
-        new MSBuildSettings(),
-        configuration
-    );
-    
-    settings = settings.WithTarget("Build");
-    
-    MSBuild(paths.XamarinSolution, settings);
-});
-
 Task("_Build_Ably_Unity_Dll")
     .Description("Create merged Unity DLL with all dependencies")
     .Does(() =>
 {
-    Information("Merging Unity dependencies into IO.Ably.dll...");
+    Information("Merging Unity dependencies and the Ably.PubSub.Device door into Ably.PubSub.Device.dll...");
     
     var netStandard20BinPath = paths.Src
-        .Combine("IO.Ably.NETStandard20")
+        .Combine("Ably.PubSub.Core")
         .Combine("bin/Release/netstandard2.0");
     
     if (!DirectoryExists(netStandard20BinPath))
@@ -119,11 +104,11 @@ Task("_Build_Ably_Unity_Dll")
         throw new Exception($"NETStandard2.0 bin directory not found: {netStandard20BinPath}. Please build the project first.");
     }
     
-    var primaryDll = netStandard20BinPath.CombineWithFilePath("IO.Ably.dll");
+    var primaryDll = netStandard20BinPath.CombineWithFilePath("Ably.PubSub.Core.dll");
     
     if (!FileExists(primaryDll))
     {
-        throw new Exception($"Primary DLL not found: {primaryDll}. Please build the IO.Ably.NETStandard20 project first.");
+        throw new Exception($"Primary DLL not found: {primaryDll}. Please build the Ably.PubSub.Core project first.");
     }
     
     var newtonsoftDll = paths.Root
@@ -135,8 +120,19 @@ Task("_Build_Ably_Unity_Dll")
         throw new Exception($"Newtonsoft.Json.dll not found at: {newtonsoftDll}");
     }
     
+    var deviceDoorDll = paths.Src
+        .Combine("Ably.PubSub.Device")
+        .Combine("bin/Release/netstandard2.0")
+        .CombineWithFilePath("Ably.PubSub.Device.dll");
+
+    if (!FileExists(deviceDoorDll))
+    {
+        throw new Exception($"Device door DLL not found: {deviceDoorDll}. Please build the Ably.PubSub.Device project first.");
+    }
+
     var dllsToMerge = new[]
     {
+        deviceDoorDll,
         netStandard20BinPath.CombineWithFilePath("IO.Ably.DeltaCodec.dll"),
         netStandard20BinPath.CombineWithFilePath("System.Runtime.CompilerServices.Unsafe.dll"),
         netStandard20BinPath.CombineWithFilePath("System.Threading.Channels.dll"),
@@ -145,7 +141,10 @@ Task("_Build_Ably_Unity_Dll")
     };
     
     var unityOutputPath = paths.Root.Combine("unity/Assets/Ably/Plugins");
-    var outputDll = unityOutputPath.CombineWithFilePath("IO.Ably.dll");
+    // The merged Unity plugin is named after the public device door package; the
+    // primary input stays Ably.PubSub.Core.dll (its public API survives the merge)
+    // and the real Ably.PubSub.Device.dll is one of the merged, exclude-protected inputs.
+    var outputDll = unityOutputPath.CombineWithFilePath("Ably.PubSub.Device.dll");
     
     // Delete existing output DLL if it exists
     if (FileExists(outputDll))
@@ -154,8 +153,9 @@ Task("_Build_Ably_Unity_Dll")
         Information($"Deleted existing DLL: {outputDll}");
     }
     
-    // Merge all dependencies into primary DLL in one go
-    ilRepackHelper.MergeDLLs(primaryDll, dllsToMerge, outputDll);
+    // Merge all dependencies into primary DLL in one go, keeping the device door namespace public
+    var internalizeExclude = paths.Root.Combine("cake-build").CombineWithFilePath("unity-internalize-exclude.txt");
+    ilRepackHelper.MergeDLLs(primaryDll, dllsToMerge, outputDll, internalizeExclude);
     
     Information($"✓ Unity DLL created at: {outputDll}");
 });
@@ -178,13 +178,6 @@ Task("Build.NetStandard")
     .IsDependentOn("_Clean")
     .IsDependentOn("_Restore_Main")
     .IsDependentOn("_NetStandard_Build");
-
-// Public task: Build Xamarin projects
-Task("Build.Xamarin")
-    .Description("Build Xamarin solution (iOS & Android)")
-    .IsDependentOn("_Clean")
-    .IsDependentOn("_Restore_Xamarin")
-    .IsDependentOn("_Xamarin_Build");
 
 // Public task: Update Ably DLLs inside unity project
 Task("Update.AblyUnity")

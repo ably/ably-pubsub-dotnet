@@ -11,13 +11,14 @@
 
 ### Importing Unity Package
 - You can import the package by going to Assets -> Import Package -> Custom Package in the Unity UI. For more detailed information on importing packages, visit https://docs.unity3d.com/Manual/AssetPackagesImport.html.
-- [Configure SynchronizationContext](../README.md#executing-callbacks-on-mainui-thread) to execute callbacks on Main/UI thread.
+- Configure a `SynchronizationContext` (via `ClientOptions.CustomContext`) to execute callbacks on the Main/UI thread.
 - Sample code :
 
 ```dotnet
 using System;
 using System.Threading;
 using IO.Ably;
+using IO.Ably.PubSub.Device;
 using IO.Ably.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
@@ -36,6 +37,7 @@ namespace Example.ChatApp
         void Start()
         {
             InitializeAbly();
+            CreateAblyClient();
         }
 
         private void InitializeAbly()
@@ -48,7 +50,14 @@ namespace Example.ChatApp
                 CustomContext = SynchronizationContext.Current
             };
 
-            _ably = new AblyRealtime(_clientOptions);
+            // PubSubDevice.CreateClient clones the options, so anything the client must
+            // capture (e.g. ClientId) has to be set on _clientOptions BEFORE the client
+            // is created in CreateAblyClient.
+        }
+
+        private void CreateAblyClient()
+        {
+            _ably = PubSubDevice.CreateClient(_clientOptions);
             _ably.Connection.On(args =>
             {
                 Debug.Log($"Connection State is <b>{args.Current}</b>");
