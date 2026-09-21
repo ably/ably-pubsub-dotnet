@@ -4,7 +4,7 @@ Guidance for Claude Code when working in ably-pubsub-dotnet.
 
 ## What this is
 
-The Ably Pub/Sub SDK for .NET, mid-migration to the 2.0 "split" layout: an internal `Ably.PubSub.Core` engine plus `Ably.PubSub.Device` / `Ably.PubSub.Server` door packages. The code namespace remains `IO.Ably`. The 2.0 work lives on the `integration/v2` branch.
+The Ably Pub/Sub SDK for .NET. It is structured as an internal `Ably.PubSub.Core` engine, consumed transitively, plus the `Ably.PubSub.Device` and `Ably.PubSub.Server` door packages. The public code namespace is `IO.Ably`.
 
 ## Build and test — use the Cake build, not bare `dotnet`
 
@@ -24,7 +24,3 @@ The `check (net6.0..net9.0)` CI legs run `./build.sh --target=Test.NetStandard.U
 
 - **SA1025** — no multiple whitespace characters in a row. Do NOT use column-alignment spaces (e.g. lining up `[InlineData(...)]` values or trailing `//` comments). Use single spaces.
 - EditorConfig: UTF-8, LF line endings, trim trailing whitespace, final newline.
-
-## Branch discipline (current 2.0 rollout)
-
-Work lands on `integration/v2` via new commits only — no rebase, squash, or force-push (preserve history; the eventual merge to `main` is squashed). Nothing is committed to `main` directly during the rollout.
