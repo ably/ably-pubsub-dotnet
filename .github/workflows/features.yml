@@ -2,10 +2,14 @@ name: Features
 
 on:
   pull_request:
+  # Unlike the six run-tests / release-dry-run workflows, this one deliberately does
+  # NOT list 'integration/**' here: the reusable ably/features action only runs on a
+  # pull_request, a push to 'main', or a push of a tag, and hard-fails on any other
+  # branch push. Coverage on the integration branch comes from the open PR's
+  # pull_request trigger instead.
   push:
     branches:
       - main
-      - 'integration/**'
 
 permissions: {}
 
