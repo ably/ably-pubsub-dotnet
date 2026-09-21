@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using FluentAssertions;
 using IO.Ably.Realtime;
@@ -94,6 +95,23 @@ namespace IO.Ably.Tests
             // Assert
             result.Should().BeTrue();
             _context.ShouldQueueCommand<SetDisconnectedStateCommand>();
+        }
+
+        [Fact]
+        [Trait("spec", "RTN12b")]
+        [Trait("spec", "TO3l11")]
+        public void StartTimer_ShouldWaitRealtimeRequestTimeout()
+        {
+            // RTN12b names the duration: "If the CLOSED ProtocolMessage is not received within
+            // realtimeRequestTimeout, the transport will be disconnected and the connection will
+            // automatically transition to the CLOSED state". The test below covers what happens when
+            // the timer fires; this pins how long it waits.
+            _context.DefaultTimeout = TimeSpan.FromMilliseconds(1234);
+
+            var state = GetState(connectedTransport: true);
+            state.StartTimer();
+
+            _timer.LastDelay.Should().Be(TimeSpan.FromMilliseconds(1234));
         }
 
         [Fact]

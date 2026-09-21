@@ -1,5 +1,24 @@
 # Change Log
 
+## [1.2.19](https://github.com/ably/ably-pubsub-dotnet/tree/1.2.19) (2026-09-11)
+
+[Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/1.2.18...1.2.19)
+
+Implements RTN23 dead-transport detection and the connection-recovery spec points around it (detection latency drops from 120s to ~25s). No public API removed or changed, but the following are visible to callers:
+
+**Behaviour changes:**
+
+- `authCallback` is now bounded by `realtimeRequestTimeout` (default 10s) — previously unbounded. A callback that took longer and still succeeded will now fail the auth attempt. `authUrl` was already bounded, by the separate `httpRequestTimeout`, and is unaffected by this change.
+- `HeartbeatMonitorDelay` rejects values below 1ms — previously accepted, but led to unintentional side-effects.
+- `Connection.Key` and `Id` read as null during a `CLOSED`/`FAILED` state-change callback (cleared before the event is emitted), and are now retained through `SUSPENDED`.
+- `connectionId` no longer changes after a long disconnection, since the client always attempts a resume now. Use `ChannelStateChange.Resumed` to detect a fresh connection.
+- `Connection.CreateRecoveryKey()` returns a key while `SUSPENDED`, where it previously returned empty.
+- Some `ErrorInfo` messages and codes changed.
+
+**Merged pull requests:**
+
+- Implement RTN23 idle-transport detection and the recovery spec points around it by @AndyTWF in https://github.com/ably/ably-pubsub-dotnet/pull/1331
+
 ## [1.2.18](https://github.com/ably/ably-dotnet/tree/1.2.18) (2025-11-27)
 
 [Full Changelog](https://github.com/ably/ably-dotnet/compare/1.2.17...1.2.18)

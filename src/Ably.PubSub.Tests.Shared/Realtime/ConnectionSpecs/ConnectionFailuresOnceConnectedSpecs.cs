@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 using IO.Ably.Realtime;
@@ -214,6 +215,44 @@ namespace IO.Ably.Tests.Realtime
             LastCreatedTransport.Should().NotBeSameAs(firstTransport);
         }
 
+        // UTS: realtime/unit/RTN15b/successful-resume-0
+        [Fact]
+        [Trait("spec", "RTN15b")]
+        [Trait("spec", "RTN15c6")]
+        public async Task WhenTheTransportDropsAndTheResumeSucceeds_ShouldKeepTheConnectionId()
+        {
+            // RTN15b - the reconnect carries the connectionKey in the resume query param. RTN15c6 -
+            // the server signals a successful resume by answering with the same connectionId, and
+            // may hand back a refreshed connectionKey with it.
+            var client = await SetupConnectedClient();
+
+            var connectionId = client.Connection.Id;
+            var connectionKey = client.Connection.Key;
+            connectionId.Should().NotBeNullOrEmpty();
+            connectionKey.Should().NotBeNullOrEmpty();
+
+            // An unexpected transport drop, so the next attempt is a resume rather than a fresh
+            // connection.
+            LastCreatedTransport.Listener.OnTransportEvent(LastCreatedTransport.Id, TransportState.Closed);
+            await client.WaitForState(ConnectionState.Connecting);
+            await client.ProcessCommands();
+
+            LastCreatedTransport.Parameters.GetParams()
+                .Should().ContainKey("resume")
+                .WhoseValue.Should().Be(connectionKey);
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+            {
+                ConnectionId = connectionId,
+                ConnectionDetails = new ConnectionDetails { ConnectionKey = "connectionKey-updated" },
+            });
+            await client.WaitForState(ConnectionState.Connected);
+            await client.ProcessCommands();
+
+            client.Connection.Id.Should().Be(connectionId);
+            client.Connection.Key.Should().Be("connectionKey-updated");
+        }
+
         [Fact]
         [Trait("spec", "RTN15a")]
         public async Task AckMessagesAreSentWhenConnectionIsDroppedAndNotResumed()
@@ -252,6 +291,240 @@ namespace IO.Ably.Tests.Realtime
 
             LastCreatedTransport.SentMessages.Should().HaveCount(2);
             client.State.WaitingForAck.Should().HaveCount(2);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN15h2")]
+        [Trait("spec", "RTN15h3")]
+        public async Task WithTokenError_ShouldNotAlsoGrantTheNonTokenImmediateReconnect()
+        {
+            // RTN15h3's immediate reconnect is for "an error other than a token error". RTN15h2 owns
+            // token errors and reconnects of its own accord, so granting a retry here as well gives
+            // two overlapping attempts - and the second reaches FAILED where RTN15h2 requires
+            // DISCONNECTED.
+            var client = await SetupConnectedClient(ConnectedClientErrors.FailRenewal);
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = _tokenErrorInfo,
+            });
+
+            await client.ProcessCommands();
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(0);
+            client.Connection.State.Should().Be(ConnectionState.Disconnected);
+        }
+
+        // UTS: realtime/unit/RTN15h3/non-token-error-resume-0
+        [Fact]
+        [Trait("spec", "RTN15h3")]
+        public async Task WithNonTokenDisconnected_ShouldReconnectImmediately()
+        {
+            var client = await GetConnectedClient(opts =>
+                opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+            var originalId = client.Connection.Id;
+            var connectionKey = client.Connection.Key;
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo("Something else went wrong", 50000),
+            });
+
+            await client.ProcessCommands();
+
+            // Immediately, not in ten minutes.
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
+            client.Connection.State.Should().Be(ConnectionState.Connecting);
+
+            // RTN15h3 asks for a reconnect *with a resume attempt*, so follow it through: the new
+            // attempt carries the key, and a CONNECTED bearing the same id keeps the connection.
+            LastCreatedTransport.Parameters.GetParams()
+                .Should().ContainKey("resume")
+                .WhoseValue.Should().Be(connectionKey);
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
+            {
+                ConnectionId = originalId,
+                ConnectionDetails = new ConnectionDetails { ConnectionKey = connectionKey },
+            });
+            await client.WaitForState(ConnectionState.Connected);
+            await client.ProcessCommands();
+
+            client.Connection.Id.Should().Be(originalId);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN15h3")]
+        [Trait("spec", "RTN17j")]
+        public async Task WhenAConnectionSucceeds_ShouldClearTheImmediateRetryBudget()
+        {
+            // The budget that bounds RTN17j's traversal is per failure run, cleared by
+            // UpdateAttemptState's Connected case. Without that a client which spent its retries once
+            // would never get an immediate reconnect again, leaving RTN15h3 unimplemented from the
+            // second disconnect onwards.
+            var client = await GetConnectedClient(opts =>
+                opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo("Something else went wrong", 50000),
+            });
+            await client.ProcessCommands();
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
+
+            client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+            await client.WaitForState(ConnectionState.Connected);
+            await client.ProcessCommands();
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(0);
+        }
+
+        [Fact]
+        [Trait("spec", "RSA4c")]
+        public async Task WithASynchronouslyBlockingAuthCallback_ShouldStillBoundTheAttempt()
+        {
+            // RSA4c - TimeoutAfter extends an already-created Task, so the callback has to be invoked
+            // through Task.Run to be bounded at all. A callback whose body runs synchronously - the
+            // most ordinary C# shape - would otherwise block before there is anything to bound and
+            // hold the workflow's single reader thread for as long as it takes.
+            var released = new ManualResetEventSlim(false);
+            var client = GetClientWithFakeTransport(opts =>
+            {
+                opts.Key = ValidKey;
+                opts.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(200);
+                opts.AuthCallback = _ =>
+                {
+                    released.Wait(TimeSpan.FromSeconds(30));
+                    return Task.FromResult<object>(new TokenDetails("blocked"));
+                };
+            });
+
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                var error = await Assert.ThrowsAsync<AblyException>(() => client.Auth.AuthorizeAsync());
+                sw.Stop();
+
+                // The specific failure, not merely any failure - a bare IsFaulted check would also
+                // have been satisfied by an unrelated fast fault.
+                error.ErrorInfo.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
+                error.ErrorInfo.Cause.Should().NotBeNull();
+                error.ErrorInfo.Cause.Code.Should().Be(ErrorCodes.ClientCallbackError);
+
+                // Comfortably inside the 30s the callback blocks for, and comfortably outside the
+                // 200ms bound so a loaded run does not flake.
+                sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                released.Set();
+            }
+        }
+
+        [Fact]
+        [Trait("spec", "RSA4c1")]
+        public async Task WhenTheAuthCallbackFails_ShouldSetTheCauseNotOnlyTheInnerException()
+        {
+            // RSA4c1 wants an ErrorInfo "with code 80019, statusCode 401, and cause set to the
+            // underlying cause". The four argument overload assigns InnerException instead, which is
+            // not the spec's field and is not serialised as one.
+            var client = GetClientWithFakeTransport(opts =>
+            {
+                opts.Key = ValidKey;
+                opts.AuthCallback = _ => throw new AblyException(new ErrorInfo("the underlying cause", 40100));
+            });
+
+            var error = await Assert.ThrowsAsync<AblyException>(() => client.Auth.AuthorizeAsync());
+
+            error.ErrorInfo.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
+            error.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            error.ErrorInfo.Cause.Should().NotBeNull();
+            error.ErrorInfo.Cause.Message.Should().Be("the underlying cause");
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(-2)]
+        [InlineData(int.MinValue)]
+        [Trait("spec", "RTN23a")]
+        public void WithANonPositiveHeartbeatMonitorDelay_ShouldReject(int milliseconds)
+        {
+            // The RTN23a monitor is a fire-and-forget loop, so a delay it cannot wait on disables
+            // idle detection for the life of the client. -1 is the quietest of the three: it is
+            // Timeout.Infinite, which Task.Delay accepts as genuine infinity, so the monitor ticks
+            // once and then never again with nothing thrown and nothing logged.
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.HeartbeatMonitorDelay = milliseconds);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN23a")]
+        public void WithTheSmallestUsableHeartbeatMonitorDelay_ShouldAccept()
+        {
+            var options = new ClientOptions(ValidKey);
+
+            options.HeartbeatMonitorDelay = 1;
+
+            options.HeartbeatMonitorDelay.Should().Be(1);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [Trait("spec", "TO3l11")]
+        public void WithANonPositiveRealtimeRequestTimeout_ShouldReject(int seconds)
+        {
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromSeconds(seconds));
+        }
+
+        [Fact]
+        [Trait("spec", "TO3l11")]
+        public void WithASubMillisecondRealtimeRequestTimeout_ShouldReject()
+        {
+            // Positive but below a millisecond is the same hazard as zero, and quieter:
+            // CountdownTimer hands the delay to System.Threading.Timer as (int)TotalMilliseconds,
+            // so it truncates to a zero delay timer and turns RTN14c into a hot loop.
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(0.5));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromTicks(1));
+
+            // Exactly one millisecond is the smallest the timers can carry, so it is allowed.
+            options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(1);
+            options.RealtimeRequestTimeout.Should().Be(TimeSpan.FromMilliseconds(1));
+        }
+
+        [Fact]
+        [Trait("spec", "TO3l11")]
+        public void WithARealtimeRequestTimeoutTooLargeForATimer_ShouldReject()
+        {
+            // TimeSpan.MaxValue is the idiomatic "never time out", and it reaches Task.Delay through
+            // TimeoutAfter, which rejects anything over uint.MaxValue - 1 ms - surfacing as a code-0
+            // error out of Authorize(). Rejected up front instead.
+            var options = new ClientOptions(ValidKey);
+
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.MaxValue);
+
+            // uint.MaxValue - 1 is Task.Delay's limit on .NET 6+ only: it is above what net46, Mono
+            // and Xamarin accept, and above what CountdownTimer's cast to int can carry into
+            // System.Threading.Timer on any framework.
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1));
+
+            // Just inside the limit is still allowed.
+            options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(int.MaxValue);
+            options.RealtimeRequestTimeout.TotalMilliseconds.Should().Be(int.MaxValue);
         }
 
         [Flags]

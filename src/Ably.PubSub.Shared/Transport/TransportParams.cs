@@ -187,6 +187,12 @@ namespace IO.Ably.Transport
             result["format"] = UseBinaryProtocol ? "msgpack" : "json";
             result["echo"] = EchoMessages.ToString().ToLower();
 
+            // RTN23b - ask Ably to keep the connection alive with Heartbeat protocol messages rather
+            // than a transport level mechanism. ClientWebSocket cannot observe an incoming websocket
+            // ping frame, so protocol messages are the only activity RTN23a can measure. Overridable
+            // through ClientOptions.TransportParams, which take precedence in the merge below.
+            result["heartbeats"] = "true";
+
             // RTN15b - resume connection using connectionKey
             if (ConnectionKey.IsNotEmpty())
             {

@@ -55,6 +55,9 @@ namespace IO.Ably.Transport.States.Connection
                         return true;
                     }
 
+                    // RTN15h3's immediate reconnect is granted by the SetDisconnectedStateCommand
+                    // handler, which recognises a disconnect arriving while connected. Not requested
+                    // here, which would bypass the RTN17j connectivity check.
                     Context.ExecuteCommand(SetDisconnectedStateCommand.Create(message.Error).TriggeredBy("ConnectedState.OnMessageReceived()"));
                     return true;
                 case ProtocolMessage.MessageAction.Error:

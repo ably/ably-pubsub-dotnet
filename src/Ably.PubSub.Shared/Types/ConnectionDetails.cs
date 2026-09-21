@@ -33,6 +33,16 @@ namespace IO.Ably
         public long MaxFrameSize { get; set; }
 
         /// <summary>
+        /// The maximum length of time that the server will allow no activity to occur in the
+        /// server to client direction. After such a period of inactivity the server will send a
+        /// Heartbeat or a transport level ping. A value of zero means the server allows
+        /// arbitrarily long levels of inactivity and no idle timeout should be applied.
+        /// See CD2h - https://sdk.ably.com/builds/ably/specification/main/features/#CD2h.
+        /// </summary>
+        [JsonProperty("maxIdleInterval")]
+        public TimeSpan? MaxIdleInterval { get; set; }
+
+        /// <summary>
         /// Max inbound rate.
         /// </summary>
         [JsonProperty("maxInboundRate")]

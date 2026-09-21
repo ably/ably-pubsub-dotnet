@@ -7,7 +7,7 @@
 * API Compatibility Level should be '.NET Standard 2.0'
 
 ### Downloading Unity Package
-- Please download the latest Unity package from the [GitHub releases page](https://github.com/ably/ably-dotnet/releases/latest). All releases from 1.2.4 have `.unitypackage` included.
+- Please download the latest Unity package from the [GitHub releases page](https://github.com/ably/ably-pubsub-dotnet/releases/latest). All releases from 1.2.4 have `.unitypackage` included.
 
 ### Importing Unity Package
 - You can import the package by going to Assets -> Import Package -> Custom Package in the Unity UI. For more detailed information on importing packages, visit https://docs.unity3d.com/Manual/AssetPackagesImport.html.
@@ -61,7 +61,7 @@ namespace Example.ChatApp
 - Also check blog on [Multiplayer game in unity with ably](https://ably.com/blog/multiplayer-game-in-unity-with-ably).
 
 ### Unsupported Platforms
-- It doesn't support **WebGL** due to incompatibility with WebSockets. Read the [Direct Socket Access](https://docs.unity3d.com/2019.3/Documentation/Manual/webgl-networking.html) section under WebGL Networking. We have active issue to add support for the same https://github.com/ably/ably-dotnet/issues/1211.
+- It doesn't support **WebGL** due to incompatibility with WebSockets. Read the [Direct Socket Access](https://docs.unity3d.com/2019.3/Documentation/Manual/webgl-networking.html) section under WebGL Networking. We have active issue to add support for the same https://github.com/ably/ably-pubsub-dotnet/issues/1211.
 - To support **WebGL**, you should refer to [interation with browser javascript from WebGL](https://docs.unity3d.com/Manual/webgl-interactingwithbrowserscripting.html). You can import [ably-js](https://github.com/ably/ably-js) as a browser javascript and call it from WebGL. For more information, refer to the project [Ably Tower Defence](https://github.com/ably-labs/ably-tower-defense/tree/js-branch/).
 
 

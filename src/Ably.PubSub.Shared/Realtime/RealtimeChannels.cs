@@ -237,12 +237,25 @@ namespace IO.Ably.Realtime
         {
             switch (_realtimeClient.Connection.State)
             {
+                case ConnectionState.Closing:
                 case ConnectionState.Closed:
                 case ConnectionState.Failed:
-                    /* (RTN11d)
-                     * If the [Connection] state is FAILED,
-                     * transitions all the channels to INITIALIZED */
+                    /* (RTN11d) From CLOSED or FAILED, every channel goes to INITIALIZED with its
+                     * errorReason unset (RTL24). CLOSING is included because RTN11b asks for the
+                     * channel half there - "reinitialize channels per RTN11d" - and for that half
+                     * only. The connection half stays CLOSED/FAILED, per RTN11d's own trigger.
+                     *
+                     * Passing no error is what unsets it: SetChannelState hands it to OnError, which
+                     * assigns either way, and does so before the same-state early return.
+                     *
+                     * The connection half of RTN11d - Connection.errorReason and msgSerial - is done
+                     * once in the workflow's ConnectCommand handler. */
                     channel.SetChannelState(ChannelState.Initialized);
+
+                    // RTN11d's "clear all internal connection data". RTL15b2 only nulls the serial
+                    // for Detached and Failed, and on a close an ATTACHED channel is left in
+                    // DETACHING with no DETACHED coming, so it needs clearing here.
+                    channel.Properties.ChannelSerial = null;
                     break;
             }
         }
@@ -264,7 +277,10 @@ namespace IO.Ably.Realtime
             var channelSerials = new Dictionary<string, string>();
             foreach (var realtimeChannel in this)
             {
-                if (realtimeChannel.State == ChannelState.Attached)
+                // Gated on the serial, not on the channel state. RTL15b2 keeps the serial through
+                // SUSPENDED and RTN16i needs it in the recovery key, so a state test would drop it
+                // in exactly the state RTN16g3 hands a key out for. ably-js gates on the serial too.
+                if (realtimeChannel.Properties.ChannelSerial.IsNotEmpty())
                 {
                     channelSerials[realtimeChannel.Name] = realtimeChannel.Properties.ChannelSerial;
                 }

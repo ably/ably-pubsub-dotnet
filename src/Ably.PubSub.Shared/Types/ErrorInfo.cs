@@ -29,6 +29,18 @@ namespace IO.Ably
         internal const string HrefBase = "https://help.ably.io/error/";
 
         /// <summary>
+        /// The error used when a transport is disconnected for seeing no activity from Ably for
+        /// longer than RTN23a allows. The observed idle time is included to make it diagnosable.
+        /// </summary>
+        /// <param name="idleFor">how long the transport has been idle.</param>
+        /// <returns>a Disconnected ErrorInfo describing the idle period.</returns>
+        internal static ErrorInfo NoActivityFrom(TimeSpan idleFor) =>
+            new ErrorInfo(
+                $"No activity from Ably for {idleFor.TotalSeconds:0.#}s, assuming the connection has dropped.",
+                ErrorCodes.Disconnected,
+                HttpStatusCode.RequestTimeout);
+
+        /// <summary>
         /// Ably error code (see https://github.com/ably/ably-common/blob/main/protocol/errors.json).
         /// </summary>
         [JsonProperty("code")]
