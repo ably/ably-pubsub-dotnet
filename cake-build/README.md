@@ -1,6 +1,6 @@
-# Cake Build System for ably-dotnet SDK
+# Cake Build System for ably-pubsub-dotnet SDK
 
-This is a C# Cake build project for building, testing and packaging the ably-dotnet SDK.
+This is a C# Cake build project for building, testing and packaging the ably-pubsub-dotnet SDK.
 
 ## Why Cake Build?
 

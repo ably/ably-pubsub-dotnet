@@ -10,7 +10,6 @@ namespace IO.Ably.Transport.States.Connection
     {
         public override ErrorInfo DefaultErrorInfo => ErrorInfo.ReasonClosed;
 
-        private const int CloseTimeout = 1000;
         private readonly bool _connectedTransport;
         private readonly ICountdownTimer _timer;
 
@@ -62,7 +61,9 @@ namespace IO.Ably.Transport.States.Connection
         {
             if (_connectedTransport)
             {
-                _timer.Start(TimeSpan.FromMilliseconds(CloseTimeout), OnTimeOut);
+                // RTN12b - the wait for the CLOSED message is realtimeRequestTimeout, which TO3l11
+                // makes a client option.
+                _timer.Start(Context.DefaultTimeout, OnTimeOut);
             }
         }
 
@@ -73,8 +74,12 @@ namespace IO.Ably.Transport.States.Connection
 
         public override RealtimeCommand Connect()
         {
+            // No key to clear for RTN11b's clean connection: entering CLOSING already ran
+            // ClearKeyAndId for RTN8d and RTN9d, and the single reader processed that before it can
+            // reach this. The following CONNECTED therefore finds no id to match and restarts the
+            // serial sequence under RTN15c7.
             _timer.Abort();
-            return SetConnectingStateCommand.Create(clearConnectionKey: true).TriggeredBy("ClosingState.Connect()");
+            return SetConnectingStateCommand.Create().TriggeredBy("ClosingState.Connect()");
         }
     }
 }

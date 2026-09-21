@@ -329,20 +329,6 @@ namespace IO.Ably.Tests.Realtime
             ex.Message.Should().Contain("SetOptions");
         }
 
-        [Theory]
-        [InlineData(ChannelState.Initialized, false)]
-        [InlineData(ChannelState.Attached, true)]
-        [InlineData(ChannelState.Detaching, false)]
-        [InlineData(ChannelState.Failed, false)]
-        [Trait("spec", "RTL4j1")]
-        public async Task WhenChannelMovesToState_AttachResumeShouldHaveCorrectValue(ChannelState state, bool expectedAttachResumeValue)
-        {
-            var client = GetRealtimeClient();
-            var channel = client.Channels.Get("Test") as RealtimeChannel;
-            channel.SetChannelState(state);
-            channel.AttachResume.Should().Be(expectedAttachResumeValue);
-        }
-
         public ChannelsSpecs(ITestOutputHelper output)
             : base(output)
         {

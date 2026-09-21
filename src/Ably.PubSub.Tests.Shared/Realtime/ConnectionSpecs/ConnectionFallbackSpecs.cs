@@ -8,6 +8,7 @@ using FluentAssertions;
 using IO.Ably.Realtime;
 using IO.Ably.Realtime.Workflow;
 using IO.Ably.Tests.Infrastructure;
+using IO.Ably.Transport;
 using IO.Ably.Types;
 using Xunit;
 using Xunit.Abstractions;
@@ -108,6 +109,280 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
             await client.ConnectClient();
 
             realtimeHosts.Last().Should().Be(Defaults.RealtimeHost);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN17")]
+        [Trait("spec", "RTN17j")]
+        public async Task WhenTheImmediateRetriesAreSpent_ShouldStillReachAFallbackHost()
+        {
+            // RTN17 - every attempt considers a fallback, including the timer driven ones. Skipping
+            // them would lock a client out entirely once the immediate retry budget is spent, since
+            // every remaining attempt is timer driven and would be pinned to the primary.
+            var client = await GetConnectedClient(opts => opts.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(10));
+
+            var hostsTried = new List<string>();
+            FakeTransportFactory.InitialiseFakeTransport = t => hostsTried.Add(t.Parameters.Host);
+
+            // Spend the immediate retry budget and then some, so the later attempts are all
+            // timer driven.
+            var domainCount = 1 + client.State.Connection.FallbackHosts.Count;
+            for (var i = 0; i < domainCount + 3; i++)
+            {
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+                {
+                    Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout },
+                });
+
+                await client.ProcessCommands();
+
+                if (client.Connection.State != ConnectionState.Connecting)
+                {
+                    await Task.Delay(50);
+                }
+            }
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(domainCount);
+            hostsTried.Should().Contain(x => client.State.Connection.FallbackHosts.Contains(x));
+        }
+
+        [Fact]
+        [Trait("spec", "RTN17i")]
+        public async Task AfterAnExceptionDropsAConnectedTransport_ShouldTryThePrimaryBeforeAnyFallback()
+        {
+            // RTN17i - "every connection attempt is first attempted to the primary domain ... even if
+            // a previous connection attempt to that endpoint has failed". A transport dropping out of
+            // CONNECTED is not grounds to move off the primary: it answered a moment ago. Sending the
+            // first reconnect to another datacenter would abandon a healthy primary on a blip, and
+            // pay the latency of a distant one to do it.
+            var client = await GetConnectedClient(opts =>
+                opts.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(10));
+
+            client.State.Connection.FallbackHosts.Should().NotBeEmpty("otherwise there is nothing to prefer the primary over");
+
+            var hostsTried = new List<string>();
+            FakeTransportFactory.InitialiseFakeTransport = t => hostsTried.Add(t.Parameters.Host);
+
+            // An ordinary socket error. This is the path that carries an Exception rather than an
+            // ErrorInfo, and so the one that used to count as a fallback-worthy failure.
+            LastCreatedTransport.Listener.OnTransportEvent(
+                LastCreatedTransport.Id,
+                TransportState.Closed,
+                new Exception("socket closed"));
+
+            await client.WaitForState(ConnectionState.Connecting);
+            await client.ProcessCommands();
+
+            hostsTried.Should().Equal(Defaults.RealtimeHost);
+
+            // The fallbacks are deferred by one attempt rather than lost. That reconnect to the
+            // primary now fails at connect time, which is the RSC15l1 "host unreachable" case RTN17f
+            // does admit, so the attempt after it moves off the primary.
+            LastCreatedTransport.Listener.OnTransportEvent(
+                LastCreatedTransport.Id,
+                TransportState.Closed,
+                new Exception("connect failed"));
+
+            await client.ProcessCommands();
+
+            // Asserted on the attempt straight after the primary failed, not on the last one: with
+            // instant retries and a 10ms timeout several attempts land here, so Last() would read as
+            // a fallback even if the primary had been tried twice over first.
+            hostsTried.Should().HaveCountGreaterThan(1);
+            hostsTried[1].Should().BeOneOf(client.State.Connection.FallbackHosts);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN17j")]
+        public async Task WhenAnImmediateRetryIsGranted_ShouldCheckConnectivityOnceForTheCycle()
+        {
+            // RTN17j asks for a connectivity check before an alternative host is used, and only
+            // there. One decision in the cycle needs the answer - whether this attempt may move off
+            // the primary - so one check is taken. Asking again to decide whether to retry at all
+            // would hold the workflow's single reader thread for a second MaxHttpOpenTimeout on
+            // every failing attempt, and would let the probe veto a retry RTN15h3 requires.
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(Defaults.InternetCheckOkMessage),
+            };
+
+            var handler = new FakeHttpMessageHandler(response);
+            var client = GetClientWithFakeTransportAndMessageHandler(messageHandler: handler);
+            client.Options.SkipInternetCheck = false;
+
+            await client.ConnectClient();
+            await client.ProcessCommands();
+
+            handler.Requests.Clear();
+
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout },
+            });
+
+            await client.ProcessCommands();
+            await client.WaitForState(ConnectionState.Connecting);
+            await client.ProcessCommands();
+
+            var checks = handler.Requests
+                .Count(x => x.RequestUri.ToString().EqualsTo(Defaults.InternetCheckUrl));
+
+            checks.Should().Be(1);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN17j")]
+        [Trait("spec", "RTN15h3")]
+        public async Task WhenTheCandidateIsThePrimary_ShouldRetryImmediatelyWithoutCheckingConnectivity()
+        {
+            // RTN17j scopes the check to "the use of an alternative host". An attempt that is going
+            // to stay on the primary has nothing to verify, so it should not pay for a probe - and
+            // must not be cancelled by one, or a probe failing while the realtime endpoint is fine
+            // defers the RTN15h3 reconnect to the RTB1 timer.
+            var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("no"),
+            });
+
+            var client = GetClientWithFakeTransportAndMessageHandler(
+                opts => opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10),
+                handler);
+            client.Options.SkipInternetCheck = false;
+
+            await client.ConnectClient();
+            await client.ProcessCommands();
+            handler.Requests.Clear();
+
+            // A non-token DISCONNECTED carrying no retryable status: RTN15h3 earns it an immediate
+            // reconnect, and with nothing fallback-worthy on record the candidate is the primary.
+            // Deliberately not a socket drop - that path arrives with retryInstantly already set by
+            // the caller, so it never reaches the decision under test.
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo("Something else went wrong", 50000),
+            });
+
+            await client.WaitForState(ConnectionState.Connecting);
+            await client.ProcessCommands();
+
+            handler.Requests
+                .Count(x => x.RequestUri.ToString().EqualsTo(Defaults.InternetCheckUrl))
+                .Should().Be(0, "the primary needs no RTN17j check");
+
+            // Immediately, not in ten minutes - and the unreachable probe did not veto it.
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
+            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN17j")]
+        [Trait("spec", "RTN15h3")]
+        public async Task WhenTheCandidateIsAFallbackAndTheInternetIsDown_ShouldStayOnThePrimaryAndStillRetry()
+        {
+            // The check governs the host, not whether to reconnect. A failed probe means the fallback
+            // cannot be trusted to answer either, so the attempt stays on the primary - but it still
+            // happens, because RTN15h3 asks for it unconditionally.
+            var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("no"),
+            });
+
+            var client = GetClientWithFakeTransportAndMessageHandler(
+                opts => opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10),
+                handler);
+            client.Options.SkipInternetCheck = false;
+
+            await client.ConnectClient();
+            await client.ProcessCommands();
+            handler.Requests.Clear();
+
+            // A 500-504 DISCONNECTED is fallback-worthy under RTN17f1, so the next attempt's
+            // candidate is a fallback domain.
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
+            {
+                Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout },
+            });
+
+            await client.WaitForState(ConnectionState.Connecting);
+            await client.ProcessCommands();
+
+            handler.Requests
+                .Count(x => x.RequestUri.ToString().EqualsTo(Defaults.InternetCheckUrl))
+                .Should().Be(1, "a fallback candidate is exactly what RTN17j wants checked");
+
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(1, "the probe governs the host, not the retry");
+            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN15h3")]
+        [Trait("spec", "RTN17j")]
+        public async Task WhenEveryConnectThrows_ShouldSpendTheRetryBudgetAndSettleInDisconnected()
+        {
+            // The instant retry is queued, not returned. Returned, it is processed inside the same
+            // command batch one level deeper, so a transport whose connect throws recurses
+            // DISCONNECTED -> CONNECTING -> DISCONNECTED within that batch until the command loop's
+            // nesting guard trips. The guard throws, the outer catch logs and swallows it, and the
+            // batch is abandoned - leaving the connection in CONNECTING with no transport and no
+            // timer, never reaching RTB1 or the RTN14e deadline. Only reachable once the retry is no
+            // longer vetoed by the RTN17j probe, which is why nothing caught it before.
+            var client = GetClientWithFakeTransport(opts =>
+            {
+                opts.AutoConnect = false;
+                opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10);
+            });
+
+            FakeTransportFactory.InitialiseFakeTransport = t => t.ThrowOnConnect = true;
+
+            client.Connect();
+            await client.ProcessCommands();
+
+            // Bounded by the budget the retry is meant to be bounded by, not by the nesting guard.
+            var domainCount = 1 + client.State.Connection.FallbackHosts.Count;
+            client.State.AttemptsInfo.InstantRetryCount.Should().Be(domainCount);
+
+            // And parked on the RTB1 timer rather than stranded mid-attempt.
+            client.Connection.State.Should().Be(ConnectionState.Disconnected);
+        }
+
+        [Fact]
+        [Trait("spec", "RTN17j")]
+        public async Task WhenRenewingATokenMidAttempt_ShouldNotReachAFallbackWithoutACheck()
+        {
+            // The token renewal path builds a transport directly instead of queueing a CONNECTING -
+            // the connection is already in that state, and the renewed token has to be picked up by
+            // the next transport rather than by a re-transition. So it never inherited the CONNECTING
+            // handler's RTN17j gate, and with a fallback-worthy failure on record it would open a
+            // transport against another datacenter on the strength of that alone, with no check.
+            var renewed = new TokenDetails("renewed") { Expires = TestHelpers.Now().AddHours(1) };
+
+            var client = await GetConnectedClient(
+                opts => opts.UseBinaryProtocol = false,
+                request => request.Url.Contains("/keys")
+                    ? renewed.ToJson().ToAblyJsonResponse()
+                    : "no".ToAblyResponse());
+
+            // Set after construction, not through the options action: GetRealtimeClient stamps
+            // SkipInternetCheck back to true for unit tests once the action has run.
+            client.Options.SkipInternetCheck = false;
+
+            // Seeded after connecting, because entering CONNECTED clears the attempt collection.
+            var attempt = new ConnectionAttempt(TestHelpers.Now());
+            attempt.FailedStates.Add(new AttemptFailedState(
+                ConnectionState.Disconnected,
+                new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout }));
+            client.State.AttemptsInfo.Attempts.Add(attempt);
+
+            AttemptsHelpers.GetHost(client.State, Defaults.RealtimeHost)
+                .Should().BeOneOf(client.State.Connection.FallbackHosts, "the candidate must really be a fallback, or this proves nothing");
+
+            await client.Workflow.ProcessCommand(HandleConnectingTokenErrorCommand.Create(
+                new ErrorInfo { Code = ErrorCodes.TokenError, StatusCode = HttpStatusCode.Unauthorized }));
+            await client.ProcessCommands();
+
+            // The internet is unreachable, so the fallback candidate is declined and the renewed
+            // token goes out against the primary.
+            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
         }
 
         [Fact]

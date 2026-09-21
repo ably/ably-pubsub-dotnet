@@ -77,6 +77,24 @@ namespace IO.Ably.Transport
                     }
                 }
 
+                // RTN23b - taken from the params this transport is actually built with, so the
+                // RTN23a monitor measures against what went on the wire rather than against
+                // ClientOptions, which the caller can mutate at any time. Read after the merge, so
+                // a caller entry that displaced ours is already reflected however it was spelled.
+                var wireParams = transportParams.GetParams();
+                var heartbeatsRequested = wireParams.TryGetValue("heartbeats", out var heartbeatsValue)
+                                          && heartbeatsValue.EqualsTo("true");
+                Connection.InnerState.ProtocolHeartbeatsRequested = heartbeatsRequested;
+
+                if (heartbeatsRequested == false)
+                {
+                    Logger.Warning(
+                        "This connection did not ask Ably for protocol heartbeats, so Ably may keep " +
+                        "it alive with websocket pings, which this library cannot see. Idle " +
+                        "connection detection is off and a silently dropped connection will not be " +
+                        "detected. Set transportParams heartbeats to 'true' to enable it.");
+                }
+
                 var transport = GetTransportFactory().CreateTransport(transportParams);
                 transport.Listener = this;
                 Transport = transport;
@@ -172,12 +190,14 @@ namespace IO.Ably.Transport
                 {
                     while (true)
                     {
-                        var (success, newState) = await waiter.Wait(Defaults.RealtimeRequestTimeout);
+                        // Options rather than Defaults, since TO3l11 makes realtimeRequestTimeout a
+                        // client option.
+                        var (success, newState) = await waiter.Wait(Options.RealtimeRequestTimeout);
                         if (success == false)
                         {
                             throw new AblyException(
                                 new ErrorInfo(
-                                $"Connection state didn't change after Auth updated within {Defaults.RealtimeRequestTimeout}",
+                                $"Connection state didn't change after Auth updated within {Options.RealtimeRequestTimeout}",
                                 40140));
                         }
 

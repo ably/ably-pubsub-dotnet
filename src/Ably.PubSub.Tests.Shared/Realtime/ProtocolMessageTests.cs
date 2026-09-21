@@ -12,6 +12,44 @@ namespace IO.Ably.Tests.Shared.Realtime
     public class ProtocolMessageTests
     {
         [Fact]
+        [Trait("spec", "CD2h")]
+        public void ConnectionDetails_ShouldDeserialiseMaxIdleIntervalAsMilliseconds()
+        {
+            // Pinned against a literal payload rather than a round-trip, which would not catch the
+            // unit being wrong. 15000 on the wire is 15 seconds.
+            const string connected = @"{
+                ""action"": 4,
+                ""connectionId"": ""abc"",
+                ""connectionDetails"": {
+                    ""connectionKey"": ""key"",
+                    ""connectionStateTtl"": 120000,
+                    ""maxIdleInterval"": 15000
+                }
+            }";
+
+            var message = JsonHelper.Deserialize<ProtocolMessage>(connected);
+
+            message.ConnectionDetails.MaxIdleInterval.Should().Be(TimeSpan.FromSeconds(15));
+            message.ConnectionDetails.ConnectionStateTtl.Should().Be(TimeSpan.FromSeconds(120));
+        }
+
+        [Fact]
+        [Trait("spec", "CD2h")]
+        public void ConnectionDetails_WithoutMaxIdleInterval_ShouldLeaveItNull()
+        {
+            // Absent is meaningfully different from zero, so it must not deserialise to zero.
+            const string connected = @"{
+                ""action"": 4,
+                ""connectionId"": ""abc"",
+                ""connectionDetails"": { ""connectionKey"": ""key"" }
+            }";
+
+            var message = JsonHelper.Deserialize<ProtocolMessage>(connected);
+
+            message.ConnectionDetails.MaxIdleInterval.Should().BeNull();
+        }
+
+        [Fact]
         [Trait("spec", "TR3")]
         public void ProtocolMessageFlagHaveCorrectValues()
         {

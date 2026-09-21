@@ -792,11 +792,22 @@ namespace IO.Ably.Realtime
 
         private void FailQueuedMessages(ErrorInfo reason)
         {
+            // RTL11 wants "an ErrorInfo indicating the failure". TaskWrapper has no branch for
+            // (false, null) and faults the task with a bare Exception, so the reason is coalesced
+            // here rather than at each call site.
+            var error = reason ?? ErrorInfo.ReasonUnknown;
+
             while (!PendingPresenceQueue.IsEmpty)
             {
                 if (PendingPresenceQueue.TryDequeue(out var queuedPresenceMessage))
                 {
-                    queuedPresenceMessage.Callback?.Invoke(false, reason);
+                    // Guarded like every other callback site: a throwing application callback would
+                    // otherwise abort the rest of the queue and skip the RTP5a map clearing in
+                    // ChannelDetachedOrFailed, which RealtimeChannels then swallows per channel.
+                    ActionUtils.SafeExecute(
+                        () => queuedPresenceMessage.Callback?.Invoke(false, error),
+                        Logger,
+                        nameof(FailQueuedMessages));
                 }
             }
         }

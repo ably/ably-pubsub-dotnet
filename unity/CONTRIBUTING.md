@@ -1,8 +1,8 @@
 # **Dev Setup**
-  Clone the `ably-dotnet` repo. and open `unity` folder. 
+  Clone the `ably-pubsub-dotnet` repo. and open `unity` folder. 
 
 ## **Requirements**
-1. Git - VCS for ably-dotnet
+1. Git - VCS for ably-pubsub-dotnet
 2. Unity - Unity game engine (Currently using LTS 2020.3.19f1) 
 3. Unity script editor - Visual studio (Official IDE)/ Visual studio code (Editor)/ Rider (Intellij IDE)
 4. Basics of unity [Official Unity Manual](https://docs.unity3d.com/Manual/index.html) and [Unity Beginner Manual](https://docs.google.com/document/d/1TJSKoqsElTjnAVKy-nFcARGHthwv18PFdt8pnuorxvw/edit?usp=sharing)
@@ -10,7 +10,7 @@
 ## **Installation**
 **1.** **Git -**
 - Download and install git binary from https://git-scm.com/downloads
-- Clone the code using `git clone https://github.com/ably/ably-dotnet`
+- Clone the code using `git clone https://github.com/ably/ably-pubsub-dotnet`
 
 **2.** **Unity -** 
 - Install unity hub (https://unity3d.com/get-unity/download) to manage unity projects and different versions of unity
@@ -86,15 +86,15 @@
 - After cloning this project, open the Unity Hub.
 
 ![](doc_images/unity_projects.PNG)
-- Click on the `ADD` button and open this project under `ably-dotnet\unity`.
+- Click on the `ADD` button and open this project under `ably-pubsub-dotnet\unity`.
 - The default project layout should look as below:
   
 ![](doc_images/unity_default_layout.PNG)  
-- The default layout displayed has the test runner missing. For a more optimized layout for development, we have a custom Unity layout found under `ably-dotnet\unity\unity_editor_layout.wlt`.
+- The default layout displayed has the test runner missing. For a more optimized layout for development, we have a custom Unity layout found under `ably-pubsub-dotnet\unity\unity_editor_layout.wlt`.
 - To apply our custom layout, you can click the selector named `Default` in the top-right corner.
   
 ![](doc_images/unity_change_layout.PNG)  
-- Select `Load Layout From File` and choose the file `ably-dotnet\unity\unity_editor_layout.wlt`. The new layout should look like this:
+- Select `Load Layout From File` and choose the file `ably-pubsub-dotnet\unity\unity_editor_layout.wlt`. The new layout should look like this:
 
 ![](doc_images/unity_custom_layout.PNG)  
 - We now have a test runner window in the bottom-left along with a user-friendly editor layout.

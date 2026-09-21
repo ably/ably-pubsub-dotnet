@@ -33,6 +33,7 @@ namespace IO.Ably.Transport
             ConnectionId = message.ConnectionId;
             ClientId = message.ConnectionDetails?.ClientId;
             ConnectionStateTtl = message.ConnectionDetails?.ConnectionStateTtl;
+            MaxIdleInterval = message.ConnectionDetails?.MaxIdleInterval;
             ConnectionKey = message.ConnectionDetails?.ConnectionKey;
         }
 
@@ -40,6 +41,12 @@ namespace IO.Ably.Transport
         /// current connection time to live.
         /// </summary>
         public TimeSpan? ConnectionStateTtl { get; private set; }
+
+        /// <summary>
+        /// The maximum period of inactivity the server will allow in the server to client
+        /// direction before it sends a Heartbeat or transport level ping. See CD2h.
+        /// </summary>
+        public TimeSpan? MaxIdleInterval { get; private set; }
 
         /// <summary>
         /// contains the client ID assigned to the connection.
