@@ -55,7 +55,6 @@ namespace IO.Ably.Tests.PubSub
                 .ToArray();
 
             // 1. Stamp a distinct, non-default value on every public settable property.
-#pragma warning disable 618 // FallbackHostsUseDefault / CaptureCurrentSynchronizationContext are [Obsolete]
             foreach (var p in props)
             {
                 p.SetValue(original, DistinctNonDefaultFor(p, defaults));
@@ -90,7 +89,6 @@ namespace IO.Ably.Tests.PubSub
                     p.GetValue(clone).Should().Be(p.GetValue(original), p.Name);
                 }
             }
-#pragma warning restore 618
 
             // 3. ChannelDefaults (internal setter, excluded from the public loop) is copied by
             //    reference.

@@ -21,40 +21,26 @@ namespace IO.Ably
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AblyRest"/> class using an api key.
-        /// Prefer <c>PubSubServer.CreateHttpClient</c> on the server package: a client constructed
-        /// directly here is not classified as device-side or server-side.</summary>
-        /// <remarks>
-        /// The device/server classification is an agent entry the door factories stamp onto the
-        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
-        /// client will be rejected once MAU-based pricing is live.
-        /// </remarks>
+        /// Not public: application code obtains a client from <c>PubSubServer.CreateHttpClient</c>,
+        /// which stamps the device/server classification the platform and MAU-based billing depend
+        /// on. The door assemblies (and this SDK's own tests) reach this constructor via
+        /// <c>InternalsVisibleTo</c>.
+        /// </summary>
         /// <param name="apiKey">Full api key.</param>
-        [Obsolete("Construct via PubSubServer.CreateHttpClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
-        public AblyRest(string apiKey)
+        internal AblyRest(string apiKey)
             : this(new ClientOptions(apiKey))
         {
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRest"/> class.
-        /// Convenience method for initializing the RestClient by passing a Action{ClientOptions}.
-        /// <example>
-        /// var rest = new AblyRest(opt => {
-        ///  opt.Key = "fake.key:value";
-        ///  opt.ClientId = "123";
-        /// });
-        /// </example>
-        /// Prefer <c>PubSubServer.CreateHttpClient</c> on the server package: a client constructed
-        /// directly here is not classified as device-side or server-side.
+        /// Initializes a new instance of the <see cref="AblyRest"/> class from an
+        /// Action{ClientOptions}. Not public: application code obtains a client from
+        /// <c>PubSubServer.CreateHttpClient</c>, which stamps the device/server classification the
+        /// platform and MAU-based billing depend on. The door assemblies (and this SDK's own tests)
+        /// reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
-        /// <remarks>
-        /// The device/server classification is an agent entry the door factories stamp onto the
-        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
-        /// client will be rejected once MAU-based pricing is live.
-        /// </remarks>
         /// <param name="init">Action delegate which receives a empty options object.</param>
-        [Obsolete("Construct via PubSubServer.CreateHttpClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
-        public AblyRest(Action<ClientOptions> init)
+        internal AblyRest(Action<ClientOptions> init)
         {
             Options = new ClientOptions();
             init(Options);
@@ -62,18 +48,14 @@ namespace IO.Ably
         }
 
         /// <summary>
-        /// Initialize the library with a custom set of options.
-        /// Prefer <c>PubSubServer.CreateHttpClient</c> on the server package: a client constructed
-        /// directly here is not classified as device-side or server-side.
+        /// Initializes a new instance of the <see cref="AblyRest"/> class with a custom set of
+        /// options. Not public: application code obtains a client from
+        /// <c>PubSubServer.CreateHttpClient</c>, which stamps the device/server classification the
+        /// platform and MAU-based billing depend on. The door assemblies (and this SDK's own tests)
+        /// reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
-        /// <remarks>
-        /// The device/server classification is an agent entry the door factories stamp onto the
-        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
-        /// client will be rejected once MAU-based pricing is live.
-        /// </remarks>
         /// <param name="clientOptions">instance of clientOptions.</param>
-        [Obsolete("Construct via PubSubServer.CreateHttpClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
-        public AblyRest(ClientOptions clientOptions)
+        internal AblyRest(ClientOptions clientOptions)
             : this(clientOptions, IoC.MobileDevice)
         {
         }
@@ -330,23 +312,6 @@ namespace IO.Ably
             }
 
             return await ExecuteHttpPaginatedRequest(request, requestParams, HttpPaginatedRequestInternal);
-        }
-
-        /// <summary>
-        /// Make a generic HTTP request against an endpoint representing a collection
-        /// of some type; this is to provide a forward compatibility path for new APIs.
-        /// </summary>
-        /// <param name="method">http method.</param>
-        /// <param name="path">the path component of the resource URI.</param>
-        /// <param name="requestParams">(optional; may be null): any parameters to send with the request; see API-specific documentation.</param>
-        /// <param name="body">(optional; may be null): RequestBody encoded into a JToken. It will be sent as a json object.</param>
-        /// <param name="headers">(optional; may be null): any additional headers to send; see API-specific documentation.</param>
-        /// <returns>a page of results.</returns>
-        [Obsolete("Use RequestV2 instead")]
-        public async Task<HttpPaginatedResponse> Request(string method, string path, Dictionary<string, string> requestParams = null, JToken body = null, Dictionary<string, string> headers = null)
-        {
-            var httpMethod = new HttpMethod(method);
-            return await Request(httpMethod, path, requestParams, body, headers);
         }
 
         /// <summary>

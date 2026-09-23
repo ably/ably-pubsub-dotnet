@@ -49,11 +49,9 @@ namespace IO.Ably.PubSub.Device
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="options"/> is null. </exception>
         public static AblyRealtime CreateClient(ClientOptions options)
         {
-            // The core constructor is [Obsolete] to steer consumers to the doors; this door is
-            // the sanctioned caller, constructing the client from the side-stamped copy.
-#pragma warning disable CS0618
+            // The core constructor is internal; this door is a sanctioned caller (granted access
+            // via InternalsVisibleTo), constructing the client from the side-stamped copy.
             return new AblyRealtime(Side.WithSideAgent(options, Side.DeviceAgentIdentifier));
-#pragma warning restore CS0618
         }
 
         /// <summary>

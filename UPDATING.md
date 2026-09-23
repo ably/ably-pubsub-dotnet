@@ -14,7 +14,7 @@ Choose the package by *where the code runs*, not by which Ably features you use.
 
 ## Construct clients through the door factories
 
-The `new AblyRealtime(...)` / `new AblyRest(...)` constructors still exist on the core, but a client built that way carries no device/server classification. Use the factories instead.
+The `new AblyRealtime(...)` / `new AblyRest(...)` constructors are internal in 2.0: application code cannot construct a client directly from the core, because a client built that way would carry no device/server classification. Use the factories instead.
 
 Device (was `new AblyRealtime("your-ably-api-key")`):
 
@@ -46,6 +46,23 @@ AblyRest rest = PubSubServer.CreateHttpClient("your-ably-api-key");
 
 Every factory accepts an API key string, an Ably token string, a `ClientOptions`, or an `Action<ClientOptions>`.
 
+## Deprecated API removed
+
+2.0 drops every member 1.x had marked `[Obsolete]`, and hides the client constructors behind the door factories.
+
+| Removed | Use instead |
+|---------|-------------|
+| `new AblyRealtime(...)` / `new AblyRest(...)` (now internal) | `PubSubDevice.CreateClient(...)`, `PubSubServer.CreateRealtimeClient(...)`, `PubSubServer.CreateHttpClient(...)` |
+| `Auth.Authorise(...)` / `Auth.AuthoriseAsync(...)` | `Auth.Authorize(...)` / `Auth.AuthorizeAsync(...)` |
+| `Auth.CreateTokenRequestObject(...)` / `Auth.CreateTokenRequestObjectAsync(...)` | `Auth.CreateTokenRequest(...)` / `Auth.CreateTokenRequestAsync(...)` (return the serialized token request) |
+| `Connection.RecoveryKey` | `Connection.CreateRecoveryKey()` |
+| `ClientOptions.FallbackHostsUseDefault` | Nothing — the default fallback hosts apply automatically; set `ClientOptions.FallbackHosts` only to supply custom hosts |
+| `ClientOptions.CaptureCurrentSynchronizationContext` | `ClientOptions.CustomContext` (pass the `SynchronizationContext` explicitly) |
+| `AblyRest.Request(string method, ..., JToken body, ...)` | `AblyRest.RequestV2(...)` (string body) or `AblyRest.Request(HttpMethod, ...)` |
+| `HistoryRequestParams` | `PaginatedRequestParams` |
+| `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
+| `Presence.IsSyncComplete` | `Presence.SyncComplete` |
+
 ## Do not mix 1.x and 2.0 in one project
 
 `ably.io` and `Ably.PubSub.*` both define the `IO.Ably` types. They are independent packages with no type-forwarding between them, so any project that resolves **both** — even transitively, through a library that still depends on `ably.io` 1.x — has each `IO.Ably` type defined twice. That is a compile error (CS0433) where your code names the type, or a runtime type-identity failure where a library exposes an `IO.Ably` type across its API. Move the whole graph to `Ably.PubSub.*` in one step; use `dotnet nuget why <project> ably.io` to find a stray transitive reference.
@@ -56,7 +73,7 @@ Every factory accepts an API key string, an Ably token string, a `ClientOptions`
 
 ## The MAU forcing function
 
-Once MAU-based pricing is live, a client that is not classified as device- or server-side is rejected. Constructing directly from `Ably.PubSub.Core`, or reusing a `ClientOptions` you already passed to a door and then handing it to `new AblyRealtime(...)`, produces such a client. Always go through the factories, and use a fresh or door-appropriate `ClientOptions` per client.
+Once MAU-based pricing is live, a client that is not classified as device- or server-side is rejected. The 2.0 core makes such a client impossible to construct from application code — the `AblyRealtime`/`AblyRest` constructors are internal, so the door factories are the only way in, and each factory stamps its side's classification. Always go through the factories, and use a fresh or door-appropriate `ClientOptions` per client.
 
 ## Xamarin and older device apps
 

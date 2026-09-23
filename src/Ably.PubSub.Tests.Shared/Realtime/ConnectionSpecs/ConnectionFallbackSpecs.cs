@@ -48,20 +48,6 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
 
         [Fact]
         [Trait("spec", "RTN17b")]
-        public async Task WithFallbackHostsUseDefault_ConnectionGoesStraightToFailedInsteadOfDisconnected()
-        {
-            var client = await GetConnectedClient(opts => opts.Port = 100);
-
-            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error)
-            {
-                Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout }
-            });
-
-            await client.WaitForState(ConnectionState.Failed);
-        }
-
-        [Fact]
-        [Trait("spec", "RTN17b")]
         public async Task WithCustomEnvironmentAndError_ConnectionGoesStraightToFailedInsteadOfDisconnected()
         {
             var client = await GetConnectedClient(opts => opts.Environment = "sandbox");

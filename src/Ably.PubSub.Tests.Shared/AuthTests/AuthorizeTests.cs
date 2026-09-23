@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Reflection;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
@@ -132,43 +131,14 @@ namespace IO.Ably.Tests.AuthTests
 
         [Fact]
         [Trait("spec", "RSA10l")]
-        public async Task Authorize_RestClientAuthoriseMethodsShouldBeMarkedObsoleteAndLogADeprecationWarning()
+        public void Authorize_TheBritishSpellingAliasesAreRemoved()
         {
-            /* Check for Obsolete Attribute  */
-            MethodBase method = typeof(AblyAuth).GetMethod("Authorise");
-            method.Should().NotBeNull();
-            var attr = (ObsoleteAttribute)method?.GetCustomAttribute(typeof(ObsoleteAttribute));
-            attr.Should().NotBeNull();
-
-            method = typeof(AblyAuth).GetMethod("AuthoriseAsync");
-            method.Should().NotBeNull();
-            attr = (ObsoleteAttribute)method?.GetCustomAttribute(typeof(ObsoleteAttribute));
-            attr.Should().NotBeNull();
-
-            method = typeof(AblyAuth).GetMethod("Authorize");
-            method.Should().NotBeNull();
-            attr = (ObsoleteAttribute)method?.GetCustomAttribute(typeof(ObsoleteAttribute));
-            attr.Should().BeNull();
-
-            method = typeof(AblyAuth).GetMethod("AuthorizeAsync");
-            method.Should().NotBeNull();
-            attr = (ObsoleteAttribute)method?.GetCustomAttribute(typeof(ObsoleteAttribute));
-            attr.Should().BeNull();
-
-#pragma warning disable CS0618 // Type or member is obsolete
-            /* Check for logged warning */
-            var testLogger1 = new TestLogger("AuthoriseAsync is deprecated and will be removed in the future, please replace with a call to AuthorizeAsync");
-            var client = GetRestClient(setOptionsAction: options => { options.Logger = testLogger1; });
-            var testAblyAuth = new TestAblyAuth(client.Options, client);
-            _ = await testAblyAuth.AuthoriseAsync();
-            testLogger1.MessageSeen.Should().BeTrue();
-
-            var testLogger2 = new TestLogger("Authorise is deprecated and will be removed in the future, please replace with a call to Authorize");
-            client = GetRestClient(setOptionsAction: options => { options.Logger = testLogger2; });
-            testAblyAuth = new TestAblyAuth(client.Options, client);
-            _ = testAblyAuth.Authorise();
-            testLogger2.MessageSeen.Should().BeTrue();
-#pragma warning restore CS0618 // Type or member is obsolete
+            // 2.0 removed the deprecated Authorise/AuthoriseAsync aliases (RSA10l);
+            // Authorize/AuthorizeAsync are the only spellings.
+            typeof(AblyAuth).GetMethod("Authorise").Should().BeNull();
+            typeof(AblyAuth).GetMethod("AuthoriseAsync").Should().BeNull();
+            typeof(AblyAuth).GetMethod("Authorize").Should().NotBeNull();
+            typeof(AblyAuth).GetMethod("AuthorizeAsync").Should().NotBeNull();
         }
 
         [Fact]

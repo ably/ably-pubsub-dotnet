@@ -924,7 +924,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             public async Task WhenConnectingFromClosed_ShouldResetTheSerialAtConnectTime()
             {
                 // RTN11d asks for the reset at connect(), not at the next CONNECTED. Not framed
-                // around Connection.RecoveryKey, which returns empty for the whole of that window.
+                // around Connection.CreateRecoveryKey(), which returns empty for the whole of that window.
                 var client = await GetClientWithHistory();
                 await MoveTo(client, ConnectionState.Closed);
 

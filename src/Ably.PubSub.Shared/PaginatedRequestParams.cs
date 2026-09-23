@@ -269,16 +269,4 @@ namespace IO.Ably
             }
         }
     }
-
-    /// <inheritdoc />
-    /// <summary>
-    ///     Data request query used for querying history.
-    ///     Functionally identical to <see cref="PaginatedRequestParams"/> and present for backwards compatibility with 0.8 release.
-    /// </summary>
-    [Obsolete("HistoryRequestParams may be removed in future versions, please use PaginatedRequestParams instead.")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1402:File may only contain a single type", Justification = "No need.")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1502:Element should not be on a single line", Justification = "No need.")]
-    public class HistoryRequestParams
-        : PaginatedRequestParams
-    { }
 }

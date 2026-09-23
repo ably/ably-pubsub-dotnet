@@ -137,15 +137,6 @@ namespace IO.Ably
             set => _fallbackHosts = value;
         }
 
-        /// <summary>
-        /// Gets or sets a value indicating whether to use default FallbackHosts even when overriding
-        /// environment or restHost/realtimeHost.
-        /// It will be removed in the next version of the library.
-        /// Default: false.
-        /// </summary>
-        [Obsolete("We will no longer support the FallbackHostsUseDefault in the library. This property will be removed in future versions")]
-        public bool FallbackHostsUseDefault { get; set; }
-
         internal bool IsProductionEnvironment => Environment.IsEmpty() || Environment.Equals("production", StringComparison.OrdinalIgnoreCase);
 
         internal bool IsDefaultPort => Tls ? TlsPort == Defaults.TlsPort : Port == Defaults.Port;
@@ -203,31 +194,6 @@ namespace IO.Ably
         /// <returns>FallbackHosts.</returns>
         public string[] GetFallbackHosts()
         {
-#pragma warning disable 618
-            if (FallbackHostsUseDefault)
-#pragma warning restore 618
-            {
-                if (_fallbackHosts != null)
-                {
-                    const string msg = "fallbackHosts and fallbackHostsUseDefault cannot both be set";
-                    throw new AblyException(new ErrorInfo(msg, ErrorCodes.BadRequest));
-                }
-
-                if (!IsDefaultPort)
-                {
-                    const string msg = "fallbackHostsUseDefault cannot be set when port or tlsPort are set";
-                    throw new AblyException(new ErrorInfo(msg, ErrorCodes.BadRequest));
-                }
-
-                if (Environment.IsNotEmpty())
-                {
-                    Logger.Warning("Deprecated fallbackHostsUseDefault : There is no longer a need to set this when the environment option is also set since the library will now generate the correct fallback hosts using the environment option.");
-                }
-
-                Logger.Warning("Deprecated fallbackHostsUseDefault : fallbackHosts: Ably.Defaults.FALLBACK_HOSTS");
-                return Defaults.FallbackHosts;
-            }
-
             if (_fallbackHosts is null && _restHost.IsEmpty() && _realtimeHost.IsEmpty() && IsDefaultPort)
             {
                 return IsProductionEnvironment
@@ -402,14 +368,6 @@ namespace IO.Ably
         /// Additional parameters to be sent in the querystring when initiating a realtime connection.
         /// </summary>
         public Dictionary<string, object> TransportParams { get; set; } = new Dictionary<string, object>();
-
-        /// <summary>
-        /// Useful where you want to execute callbacks on the main/UI thread instead of background thread in UI based apps.
-        /// Allows developers to capture their Current SynchronizationContext and trigger handlers and emitters on the same.
-        /// Default: false.
-        /// </summary>
-        [Obsolete("Use CustomContext property instead, CaptureCurrentSynchronizationContext property will be removed in future versions")]
-        public bool CaptureCurrentSynchronizationContext { get; set; } = false;
 
         /// <summary>
         /// Useful where you want to execute callbacks on the main/UI thread instead of background thread in UI based apps.
@@ -605,11 +563,6 @@ namespace IO.Ably
             copy._realtimeHost = _realtimeHost;
             copy._fallbackHosts = _fallbackHosts;
             copy._nowFunc = _nowFunc;
-
-#pragma warning disable 618
-            copy.FallbackHostsUseDefault = FallbackHostsUseDefault;
-            copy.CaptureCurrentSynchronizationContext = CaptureCurrentSynchronizationContext;
-#pragma warning restore 618
 
             return copy;
         }

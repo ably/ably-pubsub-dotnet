@@ -315,35 +315,6 @@ namespace IO.Ably.Tests.Rest
 
             [Fact]
             [Trait("spec", "RSL2b")]
-            public async Task WithOptions_AddsParametersToRequest_UsingCompatHistoryParams()
-            {
-                /*
-                 * In a breaking change in the 1.1 release HistoryRequestParams was replaced with PaginatedRequestParams.
-                 * To fix this backward compatibility issue a new HistoryRequestParams class the inherits from PaginatedRequestParams
-                 * has been created.
-                 *
-                 * This test demonstrates that HistoryRequestParams can be used to call
-                 * HistoryAsync (which accepts a PaginatedRequestParams instance as a parameter.
-                 */
-
-#pragma warning disable CS0618 // Type or member is obsolete
-                var query = new HistoryRequestParams();
-#pragma warning restore CS0618 // Type or member is obsolete
-                var now = DateTimeOffset.Now;
-                query.Start = now.AddHours(-1);
-                query.End = now;
-                query.Direction = QueryDirection.Forwards;
-                query.Limit = 1000;
-                await _channel.HistoryAsync(query);
-
-                LastRequest.AssertContainsParameter("start", query.Start.Value.ToUnixTimeInMilliseconds().ToString());
-                LastRequest.AssertContainsParameter("end", query.End.Value.ToUnixTimeInMilliseconds().ToString());
-                LastRequest.AssertContainsParameter("direction", query.Direction.ToString().ToLower());
-                LastRequest.AssertContainsParameter("limit", query.Limit.Value.ToString());
-            }
-
-            [Fact]
-            [Trait("spec", "RSL2b")]
             public async Task WithStartBeforeEnd_Throws()
             {
                 _ = await Assert.ThrowsAsync<AblyException>(() =>

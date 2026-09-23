@@ -1642,41 +1642,6 @@ namespace IO.Ably.Tests.Realtime
                 LastRequest.Url.Should().Be($"/channels/{channel.Name}/messages");
             }
 
-            [Fact]
-            [Trait("spec", "RTL10b")]
-            public async Task WithUntilAttach_ShouldPassAttachedSerialToHistoryQuery()
-            {
-                var client = await GetConnectedClient();
-
-                var channel = client.Channels.Get("history");
-                client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
-                {
-                    Channel = "history",
-                    ChannelSerial = "101"
-                });
-                await client.ProcessCommands();
-
-#pragma warning disable 618
-                await channel.HistoryAsync(true);
-#pragma warning restore 618
-
-                LastRequest.QueryParameters.Should()
-                    .ContainKey("fromSerial")
-                    .WhoseValue.Should().Be("101");
-            }
-
-            [Fact]
-            public async Task WithUntilAttachButChannelNotAttached_ShouldThrowException()
-            {
-                var client = await GetConnectedClient();
-
-                var channel = client.Channels.Get("history");
-
-#pragma warning disable 618
-                _ = await Assert.ThrowsAsync<AblyException>(() => channel.HistoryAsync(true));
-#pragma warning restore 618
-            }
-
             public HistorySpecs(ITestOutputHelper output)
                 : base(output)
             {

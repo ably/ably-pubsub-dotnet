@@ -42,13 +42,6 @@ namespace IO.Ably.Realtime
         /// Checks if presence sync has ended.
         /// </summary>
         ///
-        [Obsolete("This property is deprecated, use SyncComplete instead")]
-        public bool IsSyncComplete => SyncComplete; // RTP13.
-
-        /// <summary>
-        /// Checks if presence sync has ended.
-        /// </summary>
-        ///
         public bool SyncComplete => MembersMap.SyncCompleted && !SyncInProgress; // RTP13
 
         /// <summary>

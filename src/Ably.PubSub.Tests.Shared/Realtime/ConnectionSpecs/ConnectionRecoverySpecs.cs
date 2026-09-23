@@ -87,25 +87,6 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
         }
 
         [Fact]
-        [Trait("spec", "RTN16m")]
-        [System.Obsolete]
-        public async Task DeprecatedRecoveryKeyProperty_ShouldBehaveSameAsCreateRecoveryKey()
-        {
-            const string expectedRecoveryKey = "{\"connectionKey\":\"connectionKey\",\"msgSerial\":0,\"channelSerials\":{}}";
-
-            var client = GetClientWithFakeTransport();
-            var connectedProtocolMessage = new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
-            {
-                ConnectionDetails = new ConnectionDetails { ConnectionKey = "connectionKey" },
-                ConnectionId = "1"
-            };
-            client.FakeProtocolMessageReceived(connectedProtocolMessage);
-            await client.WaitForState(ConnectionState.Connected);
-
-            client.Connection.RecoveryKey.Should().Be(expectedRecoveryKey);
-        }
-
-        [Fact]
         [Trait("spec", "RTN16i")]
         [Trait("spec", "RTN16f")]
         [Trait("spec", "RTN16j")]

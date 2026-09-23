@@ -28,36 +28,26 @@ namespace IO.Ably
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AblyRealtime"/> class with an ably key.
-        /// Prefer <c>PubSubDevice.CreateClient</c> or <c>PubSubServer.CreateRealtimeClient</c> on
-        /// the device/server packages: a client constructed directly here is not classified as
-        /// device-side or server-side.
+        /// Not public: application code obtains a client from <c>PubSubDevice.CreateClient</c> or
+        /// <c>PubSubServer.CreateRealtimeClient</c>, which stamp the device/server classification
+        /// the platform and MAU-based billing depend on. The door assemblies (and this SDK's own
+        /// tests) reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
-        /// <remarks>
-        /// The device/server classification is an agent entry the door factories stamp onto the
-        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
-        /// client will be rejected once MAU-based pricing is live.
-        /// </remarks>
         /// <param name="key">String key (obtained from application dashboard).</param>
-        [Obsolete("Construct via PubSubDevice.CreateClient or PubSubServer.CreateRealtimeClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
-        public AblyRealtime(string key)
+        internal AblyRealtime(string key)
             : this(new ClientOptions(key))
         {
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AblyRealtime"/> class with the given options.
-        /// Prefer <c>PubSubDevice.CreateClient</c> or <c>PubSubServer.CreateRealtimeClient</c> on
-        /// the device/server packages: a client constructed directly here is not classified as
-        /// device-side or server-side.
+        /// Not public: application code obtains a client from <c>PubSubDevice.CreateClient</c> or
+        /// <c>PubSubServer.CreateRealtimeClient</c>, which stamp the device/server classification
+        /// the platform and MAU-based billing depend on. The door assemblies (and this SDK's own
+        /// tests) reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
-        /// <remarks>
-        /// The device/server classification is an agent entry the door factories stamp onto the
-        /// options; Ably's platform behaviour and billing depend on it, and an unclassified
-        /// client will be rejected once MAU-based pricing is live.
-        /// </remarks>
         /// <param name="options"><see cref="ClientOptions"/>.</param>
-        [Obsolete("Construct via PubSubDevice.CreateClient or PubSubServer.CreateRealtimeClient; a directly-constructed client is unclassified and will be rejected once MAU-based pricing is live.", error: false)]
-        public AblyRealtime(ClientOptions options)
+        internal AblyRealtime(ClientOptions options)
             : this(options, CreateRestFunc, IoC.MobileDevice)
         {
         }
@@ -112,10 +102,6 @@ namespace IO.Ably
             if (options.CustomContext != null)
             {
                 _synchronizationContext = options.CustomContext;
-            }
-            else if (options.CaptureCurrentSynchronizationContext)
-            {
-                _synchronizationContext = SynchronizationContext.Current;
             }
         }
 
