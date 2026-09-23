@@ -3,7 +3,7 @@ open System.IO
 open System.Linq
 open System.Text.RegularExpressions
 
-let testsPath = "src\\IO.Ably.Tests.Shared\\"
+let testsPath = "src\\Ably.PubSub.Tests.Shared\\"
 
 
 type SearchResult(lineNo:int,file:string,content:string seq) =

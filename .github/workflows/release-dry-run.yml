@@ -1,0 +1,91 @@
+# Everything publish.yml does except the push.
+#
+# Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server release in lockstep
+# at one version, and both doors pin the core with an exact version range. Those
+# invariants live in the version files and the nuspecs, none of which the compiler
+# reads, so a regression in them is invisible until release day - and a NuGet
+# version, once published, can never be changed. This job runs the release
+# pre-flight and a full pack on every pull request so that a version-file skew, a
+# loosened pin, a renamed package id or a nuspec files entry that no longer
+# resolves fails on the PR that introduced it.
+#
+# Windows, not Linux: the core and server packages carry a lib/net46 asset built
+# by an old-style MSBuild head, and packing on Linux would silently produce
+# packages missing that asset. (`dotnet pack -p:NuspecFile=...` does pack a
+# nuspec Mono-free, so the pack step itself is not what needs Windows - the
+# net462 build is.) _Release_Verify_Files fails rather than allowing that.
+
+name: Release dry run
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'integration/**'
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: windows-2022
+    env:
+      DOTNET_NOLOGO: true
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            3.1.426
+            6.0.428
+            7.0.410
+
+      - name: Download cake tool
+        run: dotnet tool restore
+
+      # The version is read from the committed files, never supplied by hand: the
+      # point of the dry run is to check what a release of this commit would do.
+      - name: Read the version under release
+        id: version
+        run: |
+          $match = Select-String -Path src/CommonAssemblyInfo.cs -Pattern 'AssemblyInformationalVersion\("([^"]+)"\)'
+          if (-not $match) { throw "No AssemblyInformationalVersion in src/CommonAssemblyInfo.cs" }
+          $version = $match.Matches[0].Groups[1].Value
+          Write-Host "Version under release: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # Runs on its own first so that a pre-flight failure is unmistakable in the
+      # log, and so a broken release is reported in seconds rather than after a
+      # full packaging build. Package depends on it again anyway.
+      - name: Release pre-flight
+        run: ./build.cmd -- --target=Release.Preflight --version=${{ steps.version.outputs.version }}
+
+      # Package = pre-flight -> build every head -> assert every nuspec files
+      # entry resolves -> pack all three -> assert the packed .nupkg files.
+      # Nothing is pushed: this target has never known how to push.
+      - name: Build and pack all three packages
+        run: ./build.cmd -- --target=Package --version=${{ steps.version.outputs.version }} --packageOutput=dry-run-packages
+
+      # Re-run standalone so the packed door -> core pin is asserted against the
+      # artifacts exactly as they are about to be uploaded, in a step whose name
+      # says what failed if it does.
+      - name: Assert the packed packages
+        run: ./build.cmd -- --target=Release.VerifyPackages --version=${{ steps.version.outputs.version }} --packageOutput=dry-run-packages
+
+      - name: List what a release would push
+        run: |
+          Get-ChildItem dry-run-packages/*.nupkg | ForEach-Object { "{0}  {1:N0} bytes" -f $_.Name, $_.Length }
+
+      - name: Archive the packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dry-run-packages-${{ steps.version.outputs.version }}
+          path: dry-run-packages/*.nupkg
+          if-no-files-found: error

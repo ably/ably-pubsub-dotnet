@@ -227,7 +227,7 @@ namespace Assets.Tests.EditMode
 
                 var keys = new List<string>()
                 {
-                    "ably-dotnet/",
+                    "ably-pubsub-dotnet/",
                     Agent.DotnetRuntimeIdentifier,
                     UnityHelper.UnityIdentifier,
                     Agent.OsIdentifier

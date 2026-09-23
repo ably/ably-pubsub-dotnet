@@ -1,5 +1,12 @@
 # Push Notifications
 
+> [!IMPORTANT]
+> **This document describes the 1.x push-receive packages, which are not part of the 2.0 package set.**
+>
+> `ably.io.push.android` and `ably.io.push.ios` are Xamarin-era projects. They depend on `ably.io` 1.x, stay supported from the 1.x maintenance branch, and have been removed from this branch along with the `DotnetPush` and `AndroidSample` examples. A modern `Ably.PubSub.Push.Android` / `Ably.PubSub.Push.iOS` port on `net8.0-android` / `net8.0-ios`, built on `Ably.PubSub.Device`, is a possible future follow-up (currently **parked** — no committed milestone); until it lands, a device application cannot combine the 2.0 SDK with Ably push receive.
+>
+> Push **administration** (`client.Push.Admin`) is unaffected: it lives in `Ably.PubSub.Core` and remains available.
+
 Push Notifications allow you to reach users irrespective of whether your application is running in the foreground, the background or has been terminated, even when your application is not connected to Ably.
 
 On iOS, Ably connects to [APNs](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html) to send messages to devices. On Android, Ably connects to [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging/) to send messages to devices. As both services do not guarantee message delivery and may even throttle messages to specific devices based on battery level, message frequency, and other criteria, messages may arrive much later than sent or ignored.
@@ -219,7 +226,7 @@ Push notifications containing both the notification and data objects will be tre
 
 ### Receiving Messages
 
-For examples of handling incoming messages and dealing with notifications, see [push_notification_handlers](example/lib/push_notifications/push_notification_handlers.dart) in the example app.
+For examples of handling incoming messages and dealing with notifications, see the push samples under the `examples/` directory.
 
 #### Notification Message / Alert Push Notification
 

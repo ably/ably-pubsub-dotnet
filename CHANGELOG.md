@@ -1,5 +1,20 @@
 # Change Log
 
+## [2.0.0](https://github.com/ably/ably-pubsub-dotnet/tree/2.0.0)
+
+Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so that every client is classified for MAU-based billing. See [UPDATING.md](UPDATING.md) for the full migration guide.
+
+**Breaking changes**
+
+- The `ably.io` package is no longer published from this repository. It is replaced by three packages: **`Ably.PubSub.Device`** (end-user device apps — mobile, desktop, Unity, set-top boxes), **`Ably.PubSub.Server`** (backends — ASP.NET, workers, console apps) and **`Ably.PubSub.Core`** (the shared implementation, resolved transitively; do not reference it directly).
+- Construct clients through the door factories, not the `AblyRealtime`/`AblyRest` constructors: `PubSubDevice.CreateClient(...)`, `PubSubServer.CreateRealtimeClient(...)`, `PubSubServer.CreateHttpClient(...)`. A client built directly from `Ably.PubSub.Core` is not classified as device- or server-side, and is rejected once MAU-based pricing is live.
+- The runtime API is otherwise unchanged: the namespace stays `IO.Ably` and the factories return the ordinary `AblyRealtime`/`AblyRest`.
+
+**Notes**
+
+- Device push-receive (push activation on Android/iOS) is not part of the 2.0 packages; a `net8.0-android`/`net8.0-ios` port on `Ably.PubSub.Device` is a possible future follow-up (currently **parked** — no committed milestone). Push administration (from a backend) is unaffected. See [PushNotifications.md](PushNotifications.md).
+- The `ably.io` 1.x line continues to receive security and critical fixes from its maintenance branch for one year from this release, then reaches end of life.
+
 ## [1.2.19](https://github.com/ably/ably-pubsub-dotnet/tree/1.2.19) (2026-09-11)
 
 [Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/1.2.18...1.2.19)
