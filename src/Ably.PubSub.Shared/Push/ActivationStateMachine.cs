@@ -11,7 +11,7 @@ namespace IO.Ably.Push
     internal partial class ActivationStateMachine : IDisposable
     {
         private readonly SemaphoreSlim _handleEventsLock = new SemaphoreSlim(1, 1);
-        private readonly AblyRest _restClient;
+        private readonly PubSubHttpClient _restClient;
         private readonly ILogger _logger;
         private readonly Action<string, string> _stateChangeHandler = (currentState, newState) => { };
         private State _currentState;
@@ -38,7 +38,7 @@ namespace IO.Ably.Push
 
         internal Queue<Event> PendingEvents { get; set; } = new Queue<Event>();
 
-        internal ActivationStateMachine(AblyRest restClient, ILogger logger = null)
+        internal ActivationStateMachine(PubSubHttpClient restClient, ILogger logger = null)
         {
             _restClient = restClient;
             ClientId = _restClient.Auth.ClientId;

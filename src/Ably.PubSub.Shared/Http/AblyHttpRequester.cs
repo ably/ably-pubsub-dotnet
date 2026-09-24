@@ -9,12 +9,12 @@ using System.Threading.Tasks;
 
 namespace IO.Ably
 {
-    internal class AblyHttpClient : IAblyHttpClient
+    internal class AblyHttpRequester : IAblyHttpRequester
     {
         private readonly Random _random = new Random();
         private string _realtimeConnectedFallbackHost;
 
-        internal AblyHttpClient(AblyHttpOptions options)
+        internal AblyHttpRequester(AblyHttpOptions options)
         {
             Now = options.NowFunc;
             Logger = options.Logger ?? DefaultLogger.LoggerInstance;

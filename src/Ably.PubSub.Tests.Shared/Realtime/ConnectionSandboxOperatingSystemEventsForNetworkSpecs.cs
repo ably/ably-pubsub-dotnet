@@ -137,14 +137,14 @@ namespace IO.Ably.Tests.Realtime
 
             await client.WaitForState(ConnectionState.Connected);
 
-            var initialToken = client.RestClient.AblyAuth.CurrentToken;
+            var initialToken = client.HttpClient.AblyAuth.CurrentToken;
             var initialClientId = client.ClientId;
 
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Auth));
 
             await client.ProcessCommands();
 
-            client.RestClient.AblyAuth.CurrentToken.Should().NotBe(initialToken);
+            client.HttpClient.AblyAuth.CurrentToken.Should().NotBe(initialToken);
             client.ClientId.Should().Be(initialClientId);
             client.Close();
         }
@@ -162,7 +162,7 @@ namespace IO.Ably.Tests.Realtime
 
             await client.WaitForState(ConnectionState.Connected);
 
-            var initialToken = client.RestClient.AblyAuth.CurrentToken;
+            var initialToken = client.HttpClient.AblyAuth.CurrentToken;
 
             client.Connection.Once(ConnectionEvent.Disconnected, state2 =>
             {
@@ -175,7 +175,7 @@ namespace IO.Ably.Tests.Realtime
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected) { Error = new ErrorInfo("testing RTN22a", ErrorCodes.TokenError) });
             var didReconnect = await reconnectAwaiter.Task;
             didReconnect.Should().BeTrue();
-            client.RestClient.AblyAuth.CurrentToken.Should().NotBe(initialToken);
+            client.HttpClient.AblyAuth.CurrentToken.Should().NotBe(initialToken);
             client.Close();
         }
 
@@ -199,7 +199,7 @@ namespace IO.Ably.Tests.Realtime
 
             await client.WaitForState(ConnectionState.Connected);
 
-            var initialToken = client.RestClient.AblyAuth.CurrentToken;
+            var initialToken = client.HttpClient.AblyAuth.CurrentToken;
 
             client.Connection.Once(ConnectionEvent.Disconnected, state2 =>
             {
@@ -212,7 +212,7 @@ namespace IO.Ably.Tests.Realtime
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected) { Error = new ErrorInfo("testing RTN22a", ErrorCodes.TokenError) });
             var didReconnect = await reconnectAwaiter.Task;
             didReconnect.Should().BeTrue();
-            client.RestClient.AblyAuth.CurrentToken.Should().NotBe(initialToken);
+            client.HttpClient.AblyAuth.CurrentToken.Should().NotBe(initialToken);
             client.Close();
         }
 

@@ -12,7 +12,7 @@ namespace Assets.Tests.AblySandbox
 {
     public class AblySandbox: IDisposable
     {
-        private readonly List<AblyRealtime> _realtimeClients = new List<AblyRealtime>();
+        private readonly List<PubSubRealtimeClient> _realtimeClients = new List<PubSubRealtimeClient>();
 
         public AblySandbox(AblySandboxFixture fixture)
         {
@@ -64,16 +64,16 @@ namespace Assets.Tests.AblySandbox
             ResetEvent?.Dispose();
         }
 
-        public async Task<AblyRest> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string environment = null)
+        public async Task<PubSubHttpClient> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string environment = null)
         {
             var settings = await Fixture.GetSettings(environment);
             var defaultOptions = settings.CreateDefaultOptions();
             defaultOptions.UseBinaryProtocol = protocol == Defaults.Protocol;
             optionsAction?.Invoke(defaultOptions);
-            return new AblyRest(defaultOptions);
+            return new PubSubHttpClient(defaultOptions);
         }
 
-        public async Task<AblyRealtime> GetRealtimeClient(Protocol protocol, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null, Func<ClientOptions, IMobileDevice, AblyRest> createRestFunc = null)
+        public async Task<PubSubRealtimeClient> GetRealtimeClient(Protocol protocol, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null, Func<ClientOptions, IMobileDevice, PubSubHttpClient> createRestFunc = null)
         {
             var settings = await Fixture.GetSettings();
             var defaultOptions = settings.CreateDefaultOptions();
@@ -81,7 +81,7 @@ namespace Assets.Tests.AblySandbox
             defaultOptions.TransportFactory = new TestTransportFactory();
 
             optionsAction?.Invoke(defaultOptions, settings);
-            var client = new AblyRealtime(defaultOptions, createRestFunc);
+            var client = new PubSubRealtimeClient(defaultOptions, createRestFunc);
 
             _realtimeClients.Add(client);
             return client;

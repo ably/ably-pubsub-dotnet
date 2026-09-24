@@ -22,10 +22,10 @@ namespace IO.Ably.Realtime
 
         private readonly LockedList<IRealtimeChannel> _orderedChannels = new LockedList<IRealtimeChannel>();
 
-        private readonly AblyRealtime _realtimeClient;
+        private readonly PubSubRealtimeClient _realtimeClient;
         private readonly IMobileDevice _mobileDevice;
 
-        internal RealtimeChannels(AblyRealtime realtimeClient, Connection connection, IMobileDevice mobileDevice = null)
+        internal RealtimeChannels(PubSubRealtimeClient realtimeClient, Connection connection, IMobileDevice mobileDevice = null)
         {
             _realtimeClient = realtimeClient;
             Logger = realtimeClient.Logger;

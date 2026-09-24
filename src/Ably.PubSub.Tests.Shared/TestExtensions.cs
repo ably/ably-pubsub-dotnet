@@ -11,9 +11,9 @@ namespace IO.Ably.Tests
         /// This method yields the current thread and waits until the whole command queue is processed.
         /// </summary>
         /// <returns></returns>
-        public static async Task ProcessCommands(this IRealtimeClient client)
+        public static async Task ProcessCommands(this IPubSubRealtimeClient client)
         {
-            var realtime = (AblyRealtime)client;
+            var realtime = (PubSubRealtimeClient)client;
             var taskAwaiter = new TaskCompletionAwaiter();
 
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
@@ -34,14 +34,14 @@ namespace IO.Ably.Tests
             await taskAwaiter.Task;
         }
 
-        internal static TestTransportWrapper GetTestTransport(this IRealtimeClient client)
+        internal static TestTransportWrapper GetTestTransport(this IPubSubRealtimeClient client)
         {
-            return ((AblyRealtime)client).ConnectionManager.Transport as TestTransportWrapper;
+            return ((PubSubRealtimeClient)client).ConnectionManager.Transport as TestTransportWrapper;
         }
 
-        internal static void BlockActionFromSending(this IRealtimeClient client, ProtocolMessage.MessageAction action)
+        internal static void BlockActionFromSending(this IPubSubRealtimeClient client, ProtocolMessage.MessageAction action)
         {
-            var transport = (TestTransportWrapper)((AblyRealtime)client).ConnectionManager.Transport;
+            var transport = (TestTransportWrapper)((PubSubRealtimeClient)client).ConnectionManager.Transport;
             if (transport is null)
             {
                 throw new Exception("Client is not using test transport so you can't add BlockedActions");
@@ -50,9 +50,9 @@ namespace IO.Ably.Tests
             transport.BlockSendActions.Add(action);
         }
 
-        internal static void BlockActionFromReceiving(this IRealtimeClient client, ProtocolMessage.MessageAction action)
+        internal static void BlockActionFromReceiving(this IPubSubRealtimeClient client, ProtocolMessage.MessageAction action)
         {
-            var transport = (TestTransportWrapper)((AblyRealtime)client).ConnectionManager.Transport;
+            var transport = (TestTransportWrapper)((PubSubRealtimeClient)client).ConnectionManager.Transport;
             if (transport is null)
             {
                 throw new Exception("Client is not using test transport so you can't add BlockedActions");
@@ -61,7 +61,7 @@ namespace IO.Ably.Tests
             transport.BlockReceiveActions.Add(action);
         }
 
-        internal static void BeforeProtocolMessageProcessed(this AblyRealtime client, Action<ProtocolMessage> action)
+        internal static void BeforeProtocolMessageProcessed(this PubSubRealtimeClient client, Action<ProtocolMessage> action)
         {
             var t = client.GetTestTransport();
             if (t != null)

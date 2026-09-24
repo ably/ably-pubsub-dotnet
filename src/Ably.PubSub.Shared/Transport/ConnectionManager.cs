@@ -22,15 +22,15 @@ namespace IO.Ably.Transport
 
         public TimeSpan RetryTimeout => Options.DisconnectedRetryTimeout;
 
-        public AblyRest RestClient => Connection.RestClient;
+        public PubSubHttpClient HttpClient => Connection.HttpClient;
 
-        public MessageHandler Handler => RestClient.MessageHandler;
+        public MessageHandler Handler => HttpClient.MessageHandler;
 
         public ConnectionStateBase State => Connection.ConnectionState;
 
         public ITransport Transport { get; internal set; }
 
-        public ClientOptions Options => RestClient.Options;
+        public ClientOptions Options => HttpClient.Options;
 
         public TimeSpan DefaultTimeout => Options.RealtimeRequestTimeout;
 
@@ -147,7 +147,7 @@ namespace IO.Ably.Transport
                 return false;
             }
 
-            return error.IsTokenError && state.AttemptsInfo.TriedToRenewToken == false && RestClient.AblyAuth.TokenRenewable;
+            return error.IsTokenError && state.AttemptsInfo.TriedToRenewToken == false && HttpClient.AblyAuth.TokenRenewable;
         }
 
         public void CloseConnection()
@@ -281,8 +281,8 @@ namespace IO.Ably.Transport
 
             Result VerifyMessageHasCompatibleClientId(ProtocolMessage protocolMessage)
             {
-                var messagesResult = RestClient.AblyAuth.ValidateClientIds(protocolMessage.Messages);
-                var presenceResult = RestClient.AblyAuth.ValidateClientIds(protocolMessage.Presence);
+                var messagesResult = HttpClient.AblyAuth.ValidateClientIds(protocolMessage.Messages);
+                var presenceResult = HttpClient.AblyAuth.ValidateClientIds(protocolMessage.Presence);
 
                 return Result.Combine(messagesResult, presenceResult);
             }
@@ -326,7 +326,7 @@ namespace IO.Ably.Transport
         {
             return await TransportParams.Create(
                 host,
-                RestClient.AblyAuth,
+                HttpClient.AblyAuth,
                 Options,
                 Connection.Key);
         }

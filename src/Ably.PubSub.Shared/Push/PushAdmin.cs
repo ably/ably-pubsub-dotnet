@@ -17,9 +17,9 @@ namespace IO.Ably.Push
         private const string ChannelSubUrl = "/push/channelSubscriptions";
 
         private readonly ILogger _logger;
-        private readonly AblyRest _restClient;
+        private readonly PubSubHttpClient _restClient;
 
-        internal PushAdmin(AblyRest restClient, ILogger logger)
+        internal PushAdmin(PubSubHttpClient restClient, ILogger logger)
         {
             _restClient = restClient;
             _logger = logger;

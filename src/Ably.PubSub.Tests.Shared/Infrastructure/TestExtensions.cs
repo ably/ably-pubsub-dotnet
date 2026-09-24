@@ -8,7 +8,7 @@ namespace IO.Ably.Tests.Infrastructure
 {
     public static class TestExtensions
     {
-        internal static Task WaitForState(this IRealtimeClient realtime, ConnectionState awaitedState = ConnectionState.Connected, TimeSpan? waitSpan = null)
+        internal static Task WaitForState(this IPubSubRealtimeClient realtime, ConnectionState awaitedState = ConnectionState.Connected, TimeSpan? waitSpan = null)
         {
             var connectionAwaiter = new ConnectionAwaiter(realtime.Connection, awaitedState);
             if (waitSpan.HasValue)
@@ -19,14 +19,14 @@ namespace IO.Ably.Tests.Infrastructure
             return connectionAwaiter.Wait();
         }
 
-        internal static void ExecuteCommand(this IRealtimeClient client, RealtimeCommand command)
+        internal static void ExecuteCommand(this IPubSubRealtimeClient client, RealtimeCommand command)
         {
-            ((AblyRealtime)client).Workflow.QueueCommand(command);
+            ((PubSubRealtimeClient)client).Workflow.QueueCommand(command);
         }
 
-        internal static async Task ProcessMessage(this IRealtimeClient client, ProtocolMessage message)
+        internal static async Task ProcessMessage(this IPubSubRealtimeClient client, ProtocolMessage message)
         {
-            ((AblyRealtime)client).Workflow.QueueCommand(ProcessMessageCommand.Create(message));
+            ((PubSubRealtimeClient)client).Workflow.QueueCommand(ProcessMessageCommand.Create(message));
             await client.ProcessCommands();
         }
     }

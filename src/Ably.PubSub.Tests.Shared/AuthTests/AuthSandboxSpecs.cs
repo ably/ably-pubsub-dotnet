@@ -48,7 +48,7 @@ namespace IO.Ably.Tests
             helper.Requests.Count.Should().Be(1);
             var realtimeClient = await helper.GetRealTimeClientWithRequests(protocol, token, invalidateKey: true);
             helper.Requests.Count.Should().Be(1);
-            await realtimeClient.RestClient.TimeAsync();
+            await realtimeClient.HttpClient.TimeAsync();
             helper.Requests.Count.Should().Be(2);
         }
 
@@ -173,7 +173,7 @@ namespace IO.Ably.Tests
                 options.AutoConnect = false;
             });
 
-            realtimeClient.RestClient.ExecuteHttpRequest = helper.AblyResponseWith500Status;
+            realtimeClient.HttpClient.ExecuteHttpRequest = helper.AblyResponseWith500Status;
 
             var awaiter = new TaskCompletionAwaiter(5000);
 
@@ -559,9 +559,9 @@ namespace IO.Ably.Tests
 
             var options = await AblySandboxFixture.GetSettings();
             var httpTokenAbly =
-                new AblyRest(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = false });
+                new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = false });
             var httpsTokenAbly =
-                new AblyRest(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = true });
+                new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = true });
 
             // If it doesn't throw we are good :)
             await httpTokenAbly.Channels.Get("foo").PublishAsync("test", "true");
@@ -598,7 +598,7 @@ namespace IO.Ably.Tests
 
             var token = ably.Auth.RequestTokenAsync(CreateTokenParams(capability)).Result;
 
-            var tokenAbly = new AblyRest(new ClientOptions { Token = token.Token, Environment = "sandbox" });
+            var tokenAbly = new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = "sandbox" });
 
             var error =
                 await
@@ -651,7 +651,7 @@ namespace IO.Ably.Tests
             var client = await GetRestClient(protocol, opts => opts.QueryTime = true);
             var settings = await AblySandboxFixture.GetSettings();
             var token = await client.Auth.RequestTokenAsync();
-            var tokenClient = new AblyRest(new ClientOptions
+            var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
                 Environment = settings.Environment,
@@ -674,7 +674,7 @@ namespace IO.Ably.Tests
             var client = await GetRestClient(protocol);
             var settings = await AblySandboxFixture.GetSettings();
             var token = await client.Auth.RequestTokenAsync();
-            var tokenClient = new AblyRest(new ClientOptions
+            var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
                 Environment = settings.Environment,
@@ -694,7 +694,7 @@ namespace IO.Ably.Tests
             var client = await GetRestClient(protocol);
             var settings = await AblySandboxFixture.GetSettings();
             var token = await client.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" });
-            var tokenClient = new AblyRest(new ClientOptions
+            var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
                 Environment = settings.Environment,
@@ -719,7 +719,7 @@ namespace IO.Ably.Tests
             var client = await GetRestClient(protocol);
             var settings = await AblySandboxFixture.GetSettings();
             var token = await client.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" });
-            var tokenClient = new AblyRest(new ClientOptions
+            var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
                 Environment = settings.Environment,
@@ -743,7 +743,7 @@ namespace IO.Ably.Tests
             var settings = await AblySandboxFixture.GetSettings();
             var authUrl = "http://echo.ably.io/?type=text&body=" + token.Token;
 
-            var authUrlClient = new AblyRest(new ClientOptions
+            var authUrlClient = new PubSubHttpClient(new ClientOptions
             {
                 AuthUrl = new Uri(authUrl),
                 Environment = settings.Environment,
@@ -767,7 +767,7 @@ namespace IO.Ably.Tests
             var settings = await AblySandboxFixture.GetSettings();
             var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeDataString(token.ToJson());
 
-            var authUrlClient = new AblyRest(new ClientOptions
+            var authUrlClient = new PubSubHttpClient(new ClientOptions
             {
                 AuthUrl = new Uri(authUrl),
                 Environment = settings.Environment,
@@ -793,7 +793,7 @@ namespace IO.Ably.Tests
             var tokenJson = token.ToJson();
             var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeDataString(tokenJson);
 
-            var client = new AblyRealtime(new ClientOptions
+            var client = new PubSubRealtimeClient(new ClientOptions
                                                  {
                                                      AuthUrl = new Uri(authUrl),
                                                      Environment = settings.Environment,
@@ -815,7 +815,7 @@ namespace IO.Ably.Tests
             var incorrectJson = $"[{token.ToJson()}]";
             var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeDataString(incorrectJson);
 
-            var client = new AblyRealtime(new ClientOptions
+            var client = new PubSubRealtimeClient(new ClientOptions
                                               {
                                                   AuthUrl = new Uri(authUrl),
                                                   Environment = settings.Environment,
@@ -902,7 +902,7 @@ namespace IO.Ably.Tests
         }
 
         /// <summary>
-        /// Helper methods that return an AblyRest or AblyRealtime instance and a list of AblyRequest that
+        /// Helper methods that return an PubSubHttpClient or PubSubRealtimeClient instance and a list of AblyRequest that
         /// will contain all the HTTP requests the client attempts
         /// </summary>
         private class Rsa4Helper
@@ -917,7 +917,7 @@ namespace IO.Ably.Tests
 
             private AuthSandboxSpecs Specs { get; }
 
-            public async Task<AblyRest> GetRestClientWithRequests(Protocol protocol, TokenDetails token, bool invalidateKey, Action<ClientOptions> optionsAction = null)
+            public async Task<PubSubHttpClient> GetRestClientWithRequests(Protocol protocol, TokenDetails token, bool invalidateKey, Action<ClientOptions> optionsAction = null)
             {
                 void DefaultOptionsAction(ClientOptions options)
                 {
@@ -946,7 +946,7 @@ namespace IO.Ably.Tests
                 return restClient;
             }
 
-            public async Task<AblyRealtime> GetRealTimeClientWithRequests(Protocol protocol, TokenDetails token, bool invalidateKey, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null)
+            public async Task<PubSubRealtimeClient> GetRealTimeClientWithRequests(Protocol protocol, TokenDetails token, bool invalidateKey, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null)
             {
                 var restClient = await GetRestClientWithRequests(protocol, token, invalidateKey);
 

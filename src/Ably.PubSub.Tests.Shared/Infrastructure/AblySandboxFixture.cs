@@ -46,7 +46,7 @@ namespace IO.Ably.Tests
                 CipherMode.CBC,
                 ((string)cipher["iv"]).FromBase64());
 
-            AblyHttpClient client = settings.GetHttpClient(environment);
+            AblyHttpRequester client = settings.GetHttpClient(environment);
             AblyRequest request = new AblyRequest("/apps", HttpMethod.Post);
             request.Headers.Add("Accept", "application/json");
             request.Headers.Add("Content-Type", "application/json");
@@ -112,8 +112,8 @@ namespace IO.Ably.Tests
             json = json.Replace("[[Interval2]]", interval2.ToString("yyyy-MM-dd:HH:mm"));
             json = json.Replace("[[Interval3]]", interval3.ToString("yyyy-MM-dd:HH:mm"));
 
-            AblyRest ablyRest = new AblyRest(settings.FirstValidKey);
-            AblyHttpClient client = settings.GetHttpClient();
+            PubSubHttpClient ablyRest = new PubSubHttpClient(settings.FirstValidKey);
+            AblyHttpRequester client = settings.GetHttpClient();
             var request = new AblyRequest("/stats", HttpMethod.Post);
             request.Protocol = Protocol.Json;
             request.Headers.Add("Accept", "application/json");

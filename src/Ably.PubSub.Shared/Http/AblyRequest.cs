@@ -52,7 +52,7 @@ namespace IO.Ably
         /// <summary>
         /// Tell the HTTP client to not raise an exception when a non 2XX status is returned.
         /// Set to 'true' when 4XX or 5XX HTTP status codes should not cause an exception.
-        /// Add to support AblyRest.Request(...).
+        /// Add to support PubSubHttpClient.Request(...).
         /// </summary>
         public bool NoExceptionOnHttpError { get; set; }
 

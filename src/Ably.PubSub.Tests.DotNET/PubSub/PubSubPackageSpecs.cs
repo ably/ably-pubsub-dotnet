@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading.Tasks;
 using FluentAssertions;
 using IO.Ably.PubSub.Device;
@@ -64,7 +65,7 @@ namespace IO.Ably.Tests.PubSub
         public async Task DeviceClient_SendsBareDeviceFlagOverHttp()
         {
             var agentValues = await CaptureHttpAgentTokens(
-                handler => PubSubDevice.CreateClient(options => UseFakeHttp(options, handler)).RestClient);
+                handler => PubSubDevice.CreateClient(options => UseFakeHttp(options, handler)).HttpClient);
 
             AssertDeviceSide(agentValues);
         }
@@ -85,7 +86,7 @@ namespace IO.Ably.Tests.PubSub
             {
                 var options = new ClientOptions();
                 UseFakeHttp(options, handler);
-                return new AblyRest(options);
+                return new PubSubHttpClient(options);
             });
 
             AssertNoSideFlag(agentValues);
@@ -98,10 +99,26 @@ namespace IO.Ably.Tests.PubSub
             {
                 var options = new ClientOptions();
                 UseFakeTransport(options, factory);
-                return new AblyRealtime(options);
+                return new PubSubRealtimeClient(options);
             });
 
             AssertNoSideFlag(agentValues);
+        }
+
+        [Fact]
+        public void ClientConstructors_AreNotPublic()
+        {
+            // The internal-constructor invariant is load-bearing: the door factories are the only
+            // way application code can construct a client, which is what guarantees every client
+            // carries a device/server classification. This test (and the tests above constructing
+            // via the internal constructors) compiles through InternalsVisibleTo; an accidental
+            // future `public` constructor would otherwise ship silently.
+            typeof(PubSubRealtimeClient)
+                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+                .Should().BeEmpty("application code must construct realtime clients through the door factories");
+            typeof(PubSubHttpClient)
+                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+                .Should().BeEmpty("application code must construct HTTP clients through the door factories");
         }
 
         [Fact]
@@ -138,7 +155,7 @@ namespace IO.Ably.Tests.PubSub
         {
             // Deliberately no key, token, authUrl or authCallback.
             Action viaDoor = () => PubSubServer.CreateHttpClient(options => { });
-            Action viaCore = () => _ = new AblyRest(new ClientOptions());
+            Action viaCore = () => _ = new PubSubHttpClient(new ClientOptions());
 
             // The door neither requires nor injects auth: with no credentials it fails
             // with exactly the core's own 40106 (and had it injected any credential,
@@ -215,14 +232,14 @@ namespace IO.Ably.Tests.PubSub
         {
             using (var realtime = PubSubServer.CreateRealtimeClient(NoConnectOptions()))
             {
-                realtime.Should().BeOfType<AblyRealtime>();
+                realtime.Should().BeOfType<PubSubRealtimeClient>();
             }
 
-            PubSubServer.CreateHttpClient(NoConnectOptions()).Should().BeOfType<AblyRest>();
+            PubSubServer.CreateHttpClient(NoConnectOptions()).Should().BeOfType<PubSubHttpClient>();
 
             using (var device = PubSubDevice.CreateClient(NoConnectOptions()))
             {
-                device.Should().BeOfType<AblyRealtime>();
+                device.Should().BeOfType<PubSubRealtimeClient>();
             }
         }
 
@@ -231,14 +248,14 @@ namespace IO.Ably.Tests.PubSub
         {
             using (var realtime = PubSubServer.CreateRealtimeClient(o => NoConnect(o)))
             {
-                realtime.Should().BeOfType<AblyRealtime>();
+                realtime.Should().BeOfType<PubSubRealtimeClient>();
             }
 
-            PubSubServer.CreateHttpClient(o => NoConnect(o)).Should().BeOfType<AblyRest>();
+            PubSubServer.CreateHttpClient(o => NoConnect(o)).Should().BeOfType<PubSubHttpClient>();
 
             using (var device = PubSubDevice.CreateClient(o => NoConnect(o)))
             {
-                device.Should().BeOfType<AblyRealtime>();
+                device.Should().BeOfType<PubSubRealtimeClient>();
             }
         }
 
@@ -311,7 +328,7 @@ namespace IO.Ably.Tests.PubSub
         /// Drives a real request through the door-created REST client and returns the
         /// `Ably-Agent` header the core actually put on the wire, split into tokens.
         /// </summary>
-        private static async Task<string[]> CaptureHttpAgentTokens(Func<FakeHttpMessageHandler, AblyRest> createClient)
+        private static async Task<string[]> CaptureHttpAgentTokens(Func<FakeHttpMessageHandler, PubSubHttpClient> createClient)
         {
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -340,7 +357,7 @@ namespace IO.Ably.Tests.PubSub
         /// bug is a separate question (plan step 14); this spec asserts on whatever key the core
         /// currently uses so it does not pre-empt the answer.
         /// </summary>
-        private static async Task<string[]> CaptureRealtimeAgentTokens(Func<FakeTransportFactory, AblyRealtime> createClient)
+        private static async Task<string[]> CaptureRealtimeAgentTokens(Func<FakeTransportFactory, PubSubRealtimeClient> createClient)
         {
             var factory = new FakeTransportFactory();
             using (createClient(factory))

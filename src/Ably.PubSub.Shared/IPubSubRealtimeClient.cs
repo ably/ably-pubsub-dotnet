@@ -8,7 +8,7 @@ namespace IO.Ably
     /// <summary>
     /// The top-level interface for the Ably Realtime library.
     /// </summary>
-    public interface IRealtimeClient : IStatsCommands
+    public interface IPubSubRealtimeClient : IStatsCommands
     {
         /// <summary>
         /// Initiate a connection.

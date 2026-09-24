@@ -6,11 +6,11 @@ using Xunit.Abstractions;
 
 namespace IO.Ably.Tests
 {
-    [Collection("AblyRest SandBox Collection")]
+    [Collection("PubSubHttpClient SandBox Collection")]
     [Trait("type", "integration")]
-    public class RestSandBoxSpecs : SandboxSpecs
+    public class HttpSandBoxSpecs : SandboxSpecs
     {
-        public RestSandBoxSpecs(AblySandboxFixture fixture, ITestOutputHelper output)
+        public HttpSandBoxSpecs(AblySandboxFixture fixture, ITestOutputHelper output)
             : base(fixture, output) { }
 
         [Theory]
@@ -41,9 +41,9 @@ namespace IO.Ably.Tests
             serverTime.Offset.Ticks.Should().Be(0);
         }
 
-        [Collection("AblyRest SandBox Collection")]
+        [Collection("PubSubHttpClient SandBox Collection")]
         [Trait("requires", "sandbox")]
-        public class WithTokenAuthAndInvalidToken : RestSandBoxSpecs
+        public class WithTokenAuthAndInvalidToken : HttpSandBoxSpecs
         {
             public WithTokenAuthAndInvalidToken(AblySandboxFixture fixture, ITestOutputHelper output)
                 : base(fixture, output) { }

@@ -110,7 +110,7 @@ namespace IO.Ably.Tests.Push
                 AutoConnect = false
             };
 
-            var realtime = new AblyRealtime(options, mobileDevice: mobileDevice);
+            var realtime = new PubSubRealtimeClient(options, mobileDevice: mobileDevice);
 
             realtime.Device.Should().NotBeNull();
         }
@@ -120,14 +120,14 @@ namespace IO.Ably.Tests.Push
         public void WhenPlatformsDoesNotSupportPushNotifications_DeviceShouldBeNull()
         {
             // Realtime check
-            var realtime = new AblyRealtime(new ClientOptions(ValidKey)
+            var realtime = new PubSubRealtimeClient(new ClientOptions(ValidKey)
             {
                 AutoConnect = false
             });
             realtime.Device.Should().BeNull();
 
             // Rest check
-            var rest = new AblyRest(ValidKey);
+            var rest = new PubSubHttpClient(ValidKey);
             rest.MobileDevice.Should().BeNull();
         }
 
@@ -196,7 +196,7 @@ namespace IO.Ably.Tests.Push
             // Arrange
             var options = new ClientOptions(ValidKey) { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true };
             var mobileDevice = new FakeMobileDevice();
-            var realtime = new AblyRealtime(options, mobileDevice: mobileDevice);
+            var realtime = new PubSubRealtimeClient(options, mobileDevice: mobileDevice);
             const string newClientId = "testId";
 
             var localDevice = realtime.Device;
@@ -225,7 +225,7 @@ namespace IO.Ably.Tests.Push
             const string initialClientId = "123";
             var options = new ClientOptions(ValidKey) { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true, ClientId = initialClientId };
             var mobileDevice = new FakeMobileDevice();
-            var realtime = new AblyRealtime(options, mobileDevice: mobileDevice);
+            var realtime = new PubSubRealtimeClient(options, mobileDevice: mobileDevice);
             const string newClientId = "testId";
 
             var localDevice = realtime.Device;
@@ -271,7 +271,7 @@ namespace IO.Ably.Tests.Push
             const string initialClientId = "123";
             var options = new ClientOptions(ValidKey) { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true, ClientId = initialClientId };
             var mobileDevice = new FakeMobileDevice();
-            var realtime = new AblyRealtime(options, mobileDevice: mobileDevice);
+            var realtime = new PubSubRealtimeClient(options, mobileDevice: mobileDevice);
             const string newClientId = "testId";
 
             var localDevice = realtime.Device;
@@ -313,7 +313,7 @@ namespace IO.Ably.Tests.Push
             var options = new ClientOptions(ValidKey)
                 { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true, ClientId = initialClientId };
             var mobileDevice = new FakeMobileDevice();
-            var setupRealtime = new AblyRealtime(options, mobileDevice: mobileDevice);
+            var setupRealtime = new PubSubRealtimeClient(options, mobileDevice: mobileDevice);
 
             setupRealtime.Push.InitialiseStateMachine();
             setupRealtime.Push.StateMachine.CurrentState =
@@ -321,10 +321,10 @@ namespace IO.Ably.Tests.Push
             setupRealtime.Push.StateMachine.PendingEvents.Enqueue(new ActivationStateMachine.CalledActivate());
             setupRealtime.Push.StateMachine.PersistState();
 
-            var testRealtime = new AblyRealtime(options, mobileDevice: mobileDevice);
+            var testRealtime = new PubSubRealtimeClient(options, mobileDevice: mobileDevice);
 
-            // We let the RestClient create the local device.
-            testRealtime.RestClient.Device.Id = null;
+            // We let the HttpClient create the local device.
+            testRealtime.HttpClient.Device.Id = null;
 
             testRealtime.Push.InitialiseStateMachine();
             var stateMachine = testRealtime.Push.StateMachine;
@@ -360,11 +360,11 @@ namespace IO.Ably.Tests.Push
                 return new AblyResponse() { TextResponse = "{}" };
             }
 
-            var realtime = new AblyRealtime(options, (clientOptions, device) => GetRestClient(HandleRequestFunc, options, device), mobileDevice);
+            var realtime = new PubSubRealtimeClient(options, (clientOptions, device) => GetRestClient(HandleRequestFunc, options, device), mobileDevice);
 
             // Setup the local device
-            var localDevice = PushTestHelpers.GetRegisteredLocalDevice(realtime.RestClient);
-            realtime.RestClient.Device = localDevice;
+            var localDevice = PushTestHelpers.GetRegisteredLocalDevice(realtime.HttpClient);
+            realtime.HttpClient.Device = localDevice;
             localDevice.ClientId.Should().BeNull();
 
             realtime.Push.InitialiseStateMachine();

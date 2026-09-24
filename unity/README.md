@@ -27,7 +27,7 @@ namespace Example.ChatApp
 {
     public class AblyConsole : MonoBehaviour
     {
-        private AblyRealtime _ably;
+        private PubSubRealtimeClient _ably;
         private ClientOptions _clientOptions;
 
         // It's recommended to use other forms of authentication. E.g. JWT, Token Auth 

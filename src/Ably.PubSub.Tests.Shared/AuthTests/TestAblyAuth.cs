@@ -5,7 +5,7 @@ namespace IO.Ably.Tests.AuthTests
 {
     internal class TestAblyAuth : AblyAuth
     {
-        public TestAblyAuth(ClientOptions options, AblyRest rest, Func<Task<DateTimeOffset>> serverTimeFunc = null)
+        public TestAblyAuth(ClientOptions options, PubSubHttpClient rest, Func<Task<DateTimeOffset>> serverTimeFunc = null)
             : base(options, rest)
         {
             if (serverTimeFunc != null)

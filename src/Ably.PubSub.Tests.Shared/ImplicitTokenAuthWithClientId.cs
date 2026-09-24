@@ -8,7 +8,7 @@ namespace IO.Ably.Tests
     {
         private const string ApiKey = "123.456:789";
 
-        public AblyRest Client { get; set; }
+        public PubSubHttpClient Client { get; set; }
 
         public int ExecutionCount { get; set; }
 
@@ -17,7 +17,7 @@ namespace IO.Ably.Tests
         public ImplicitTokenAuthWithClientId()
         {
             const string clientId = "123";
-            Client = new AblyRest(new ClientOptions { Key = ApiKey, ClientId = clientId, UseBinaryProtocol = false });
+            Client = new PubSubHttpClient(new ClientOptions { Key = ApiKey, ClientId = clientId, UseBinaryProtocol = false });
             Client.ExecuteHttpRequest = request =>
             {
                 ExecutionCount++;

@@ -6,14 +6,14 @@ namespace IO.Ably
     /// <summary>
     /// Interface for managing channel objects.
     /// </summary>
-    /// <typeparam name="T">type of channel (RealtimeChannel or RestChannel).</typeparam>
+    /// <typeparam name="T">type of channel (RealtimeChannel or HttpChannel).</typeparam>
     public interface IChannels<out T> : IEnumerable<T>
     {
         /// <summary>
         /// Create or retrieve a channel with the specified name.
         /// </summary>
         /// <param name="name">name of the channel.</param>
-        /// <returns>an instance of <see cref="RestChannel"/>.</returns>
+        /// <returns>an instance of <see cref="HttpChannel"/>.</returns>
         T Get(string name);
 
         /// <summary>
@@ -23,14 +23,14 @@ namespace IO.Ably
         /// </summary>
         /// <param name="name">name of the channel.</param>
         /// <param name="options"><see cref="ChannelOptions"/>.</param>
-        /// <returns>an instance of <see cref="RestChannel"/>.</returns>
+        /// <returns>an instance of <see cref="HttpChannel"/>.</returns>
         T Get(string name, ChannelOptions options);
 
         /// <summary>
         /// Same as the Get(string name)/>.
         /// </summary>
         /// <param name="name">name of the channel.</param>
-        /// <returns>an instance of <see cref="RestChannel"/>.</returns>
+        /// <returns>an instance of <see cref="HttpChannel"/>.</returns>
         T this[string name] { get; }
 
         /// <summary>

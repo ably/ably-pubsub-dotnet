@@ -112,7 +112,7 @@ namespace IO.Ably.Tests
             paginatedResponse.ErrorMessage.Should().BeNull();
             paginatedResponse.Items.Should().HaveCount(1);
             paginatedResponse.Items.First().Should().BeOfType<JObject>();
-            paginatedResponse.Response.ContentType.Should().Be(AblyHttpClient.GetHeaderValue(protocol));
+            paginatedResponse.Response.ContentType.Should().Be(AblyHttpRequester.GetHeaderValue(protocol));
             var channelDetails = paginatedResponse.Items.First() as JObject; // cast from JToken
             channelDetails["channelId"].ToString().Should().BeEquivalentTo(_channelName);
         }
@@ -133,7 +133,7 @@ namespace IO.Ably.Tests
                 paginatedResponse.Success.Should().BeTrue();
                 paginatedResponse.ErrorCode.Should().Be(0);
                 paginatedResponse.ErrorMessage.Should().BeNull();
-                paginatedResponse.Response.ContentType.Should().Be(AblyHttpClient.GetHeaderValue(protocol));
+                paginatedResponse.Response.ContentType.Should().Be(AblyHttpRequester.GetHeaderValue(protocol));
 
                 paginatedResponse.Items.Should().HaveCount(4);
                 foreach (var item in paginatedResponse.Items)
@@ -227,7 +227,7 @@ namespace IO.Ably.Tests
             paginatedResponse.StatusCode.Should().Be(HttpStatusCode.OK); // 200
             paginatedResponse.Success.Should().BeTrue();
             paginatedResponse.ErrorCode.Should().Be(0);
-            paginatedResponse.Response.ContentType.Should().Be(AblyHttpClient.GetHeaderValue(protocol));
+            paginatedResponse.Response.ContentType.Should().Be(AblyHttpRequester.GetHeaderValue(protocol));
             var items = paginatedResponse.Items;
             items.Should().HaveCount(2);
             foreach (var item in items)
@@ -256,7 +256,7 @@ namespace IO.Ably.Tests
             paginatedResponse.StatusCode.Should().Be(HttpStatusCode.OK); // 200
             paginatedResponse.Success.Should().BeTrue();
             paginatedResponse.ErrorCode.Should().Be(0);
-            paginatedResponse.Response.ContentType.Should().Be(AblyHttpClient.GetHeaderValue(protocol));
+            paginatedResponse.Response.ContentType.Should().Be(AblyHttpRequester.GetHeaderValue(protocol));
             var items = paginatedResponse.Items;
             items.Should().HaveCount(1);
             foreach (var item in items)
@@ -269,7 +269,7 @@ namespace IO.Ably.Tests
             page2.StatusCode.Should().Be(HttpStatusCode.OK); // 200
             page2.Success.Should().BeTrue();
             page2.ErrorCode.Should().Be(0);
-            page2.Response.ContentType.Should().Be(AblyHttpClient.GetHeaderValue(protocol));
+            page2.Response.ContentType.Should().Be(AblyHttpRequester.GetHeaderValue(protocol));
 
             // show that the 2 pages are different
             var item1 = items[0] as JObject;
@@ -299,7 +299,7 @@ namespace IO.Ably.Tests
             paginatedResponse.Success.Should().BeTrue();
             paginatedResponse.ErrorCode.Should().Be(0);
             paginatedResponse.ErrorMessage.Should().BeNull();
-            paginatedResponse.Response.ContentType.Should().Be(AblyHttpClient.GetHeaderValue(protocol));
+            paginatedResponse.Response.ContentType.Should().Be(AblyHttpRequester.GetHeaderValue(protocol));
 
             await client.Request(HttpMethod.Post, _channelMessagesPath, null, body2);
 
@@ -383,7 +383,7 @@ namespace IO.Ably.Tests
             response.ErrorMessage.Should().BeNull();
         }
 
-        private AblyRest TrackLastRequest(AblyRest client)
+        private PubSubHttpClient TrackLastRequest(PubSubHttpClient client)
         {
             var exec = client.ExecuteHttpRequest;
             client.ExecuteHttpRequest = request =>

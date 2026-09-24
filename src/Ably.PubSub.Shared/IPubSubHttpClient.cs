@@ -6,9 +6,9 @@ using IO.Ably.Rest;
 namespace IO.Ably
 {
     /// <summary>
-    /// Interface for a rest client.
+    /// Interface for the HTTP (REST API) client.
     /// </summary>
-    public interface IRestClient : IStatsCommands
+    public interface IPubSubHttpClient : IStatsCommands
     {
         /// <summary>Authentication methods.</summary>
         IAblyAuth Auth { get; }
@@ -16,10 +16,10 @@ namespace IO.Ably
         // /// <summary>
         // /// Methods for managing Push notifications subscriptions and device registrations.
         // /// </summary>
-        // PushRest Push { get; }
+        // PushHttp Push { get; }
 
         /// <summary>Channel methods.</summary>
-        RestChannels Channels { get; }
+        HttpChannels Channels { get; }
 
         /// <summary>Retrieves the ably service time.</summary>
         /// <returns>DateTimeOffset of the server time.</returns>

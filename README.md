@@ -23,7 +23,7 @@ Find out more:
 > | `Ably.PubSub.Server` | Server-side and backend applications (ASP.NET, Azure hosts, workers, console apps) |
 > | `Ably.PubSub.Core` | Internal implementation shared by the two packages above. Not intended for direct use; you receive it transitively |
 >
-> Install the package for the side your code runs on, and create clients through that package's factory methods — **they are the supported entry points**. `Ably.PubSub.Core` is internal: a client constructed directly from `AblyRealtime` or `AblyRest` is not classified as device-side or server-side, which Ably's platform behaviour and billing depend on.
+> Install the package for the side your code runs on, and create clients through that package's factory methods — **they are the supported entry points**. `Ably.PubSub.Core` is internal: the `PubSubRealtimeClient`/`PubSubHttpClient` constructors are not public, because a directly-constructed client would not be classified as device-side or server-side, which Ably's platform behaviour and billing depend on.
 >
 > ```sh
 > dotnet add package Ably.PubSub.Server
@@ -46,7 +46,7 @@ Find out more:
 > var realtime = PubSubDevice.CreateClient("<API_KEY>");
 > ```
 >
-> Each factory also takes a `ClientOptions` or an `Action<ClientOptions>`. The returned clients are the ordinary `AblyRealtime` and `AblyRest`, so the whole of the `IO.Ably` API remains available — including device-side connectionless operations such as message history, presence reads and token requests, which is why the device package has one door and no separate HTTP factory.
+> Each factory also takes a `ClientOptions` or an `Action<ClientOptions>`. The returned clients are the ordinary `PubSubRealtimeClient` and `PubSubHttpClient` (the classes formerly named `AblyRealtime` and `AblyRest`), so the whole of the `IO.Ably` API remains available — including device-side connectionless operations such as message history, presence reads and token requests, which is why the device package has one door and no separate HTTP factory.
 >
 > All three packages are released together, always, at one version, and each door package declares an **exact** dependency on `[<that version>]` of `Ably.PubSub.Core`. There is no supported combination of different versions of them: NuGet will refuse to resolve a `Ably.PubSub.Device` and a `Ably.PubSub.Server` that were not built from the same release, which is deliberate — it is what guarantees that a project cannot end up running two copies of the core, and that the door you installed is the door that was tested against the core it gets. When you upgrade, upgrade all the `Ably.PubSub.*` packages you reference to the same version. This applies to prereleases too: a `2.0.0-beta.1` door pins exactly `[2.0.0-beta.1]` of the core, so keep every `Ably.PubSub.*` reference on the same full prerelease version.
 >

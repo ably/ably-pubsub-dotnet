@@ -5,7 +5,7 @@ namespace IO.Ably.Tests.Push
 {
     public static class PushTestHelpers
     {
-        public static LocalDevice GetTestLocalDevice(AblyRest client, string clientId = null)
+        public static LocalDevice GetTestLocalDevice(PubSubHttpClient client, string clientId = null)
         {
             var device = LocalDevice.Create(clientId);
             device.FormFactor = "phone";
@@ -20,7 +20,7 @@ namespace IO.Ably.Tests.Push
             return device;
         }
 
-        public static LocalDevice GetRegisteredLocalDevice(AblyRest client, string clientId = null, string identityToken = "token")
+        public static LocalDevice GetRegisteredLocalDevice(PubSubHttpClient client, string clientId = null, string identityToken = "token")
         {
             var device = GetTestLocalDevice(client, clientId);
             device.DeviceIdentityToken = identityToken;

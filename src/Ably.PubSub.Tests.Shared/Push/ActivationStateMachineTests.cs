@@ -235,7 +235,7 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             public void Dispose()
@@ -244,13 +244,13 @@ namespace IO.Ably.Tests.Push
                 ClearLocalDeviceStaticInstance();
             }
 
-            public AblyRest RestClient { get; }
+            public PubSubHttpClient HttpClient { get; }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            private ActivationStateMachine GetStateMachine(AblyRest restClient = null)
+            private ActivationStateMachine GetStateMachine(PubSubHttpClient restClient = null)
             {
-                var stateMachine = new ActivationStateMachine(restClient ?? RestClient, (restClient ?? RestClient).Logger);
+                var stateMachine = new ActivationStateMachine(restClient ?? HttpClient, (restClient ?? HttpClient).Logger);
                 return stateMachine;
             }
 
@@ -525,13 +525,13 @@ namespace IO.Ably.Tests.Push
 
             private ActivationStateMachine.NotActivated GetState()
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.NotActivated(stateMachine);
             }
 
-            private (ActivationStateMachine.NotActivated, ActivationStateMachine) GetStateAndStateMachine(AblyRest restClient = null)
+            private (ActivationStateMachine.NotActivated, ActivationStateMachine) GetStateAndStateMachine(PubSubHttpClient restClient = null)
             {
-                var stateMachine = new ActivationStateMachine(restClient ?? RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(restClient ?? HttpClient, HttpClient.Logger);
                 return (new ActivationStateMachine.NotActivated(stateMachine), stateMachine);
             }
 
@@ -539,10 +539,10 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
-            public AblyRest RestClient { get; }
+            public PubSubHttpClient HttpClient { get; }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
@@ -629,7 +629,7 @@ namespace IO.Ably.Tests.Push
 
                 machine.LocalDevice = LocalDevice.Create(mobileDevice: MobileDevice);
                 machine.LocalDevice.Push.Recipient = new JObject();
-                RestClient.ExecuteHttpRequest = request =>
+                HttpClient.ExecuteHttpRequest = request =>
                 {
                     var localDevice = JObject.FromObject(new LocalDevice());
                     localDevice["deviceIdentityToken"] = JObject.FromObject(new { token });
@@ -655,7 +655,7 @@ namespace IO.Ably.Tests.Push
 
                 machine.LocalDevice = LocalDevice.Create(mobileDevice: MobileDevice);
                 machine.LocalDevice.Push.Recipient = new JObject();
-                RestClient.ExecuteHttpRequest = request => throw new AblyException("Error", ErrorCodes.InternalError);
+                HttpClient.ExecuteHttpRequest = request => throw new AblyException("Error", ErrorCodes.InternalError);
 
                 var (nextState, nextStateFunction) =
                     await state.Transition(new ActivationStateMachine.GotPushDeviceDetails());
@@ -712,24 +712,24 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             private ActivationStateMachine.WaitingForPushDeviceDetails GetState()
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.WaitingForPushDeviceDetails(stateMachine);
             }
 
-            private (ActivationStateMachine.WaitingForPushDeviceDetails, ActivationStateMachine) GetStateAndStateMachine(AblyRest restClient = null)
+            private (ActivationStateMachine.WaitingForPushDeviceDetails, ActivationStateMachine) GetStateAndStateMachine(PubSubHttpClient restClient = null)
             {
-                var stateMachine = new ActivationStateMachine(restClient ?? RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(restClient ?? HttpClient, HttpClient.Logger);
                 return (new ActivationStateMachine.WaitingForPushDeviceDetails(stateMachine), stateMachine);
             }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            public AblyRest RestClient { get; set; }
+            public PubSubHttpClient HttpClient { get; set; }
 
             public void Dispose()
             {
@@ -841,24 +841,24 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             private ActivationStateMachine.WaitingForDeviceRegistration GetState()
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.WaitingForDeviceRegistration(stateMachine);
             }
 
-            private (ActivationStateMachine.WaitingForDeviceRegistration, ActivationStateMachine) GetStateAndStateMachine(AblyRest restClient = null)
+            private (ActivationStateMachine.WaitingForDeviceRegistration, ActivationStateMachine) GetStateAndStateMachine(PubSubHttpClient restClient = null)
             {
-                var stateMachine = new ActivationStateMachine(restClient ?? RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(restClient ?? HttpClient, HttpClient.Logger);
                 return (new ActivationStateMachine.WaitingForDeviceRegistration(stateMachine), stateMachine);
             }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            public AblyRest RestClient { get; set; }
+            public PubSubHttpClient HttpClient { get; set; }
 
             public void Dispose()
             {
@@ -917,7 +917,7 @@ namespace IO.Ably.Tests.Push
                 machine.LocalDevice = LocalDevice.Create();
 
                 var awaiter = new TaskCompletionAwaiter();
-                RestClient.ExecuteHttpRequest = request =>
+                HttpClient.ExecuteHttpRequest = request =>
                 {
                     request.Method.Should().Be(HttpMethod.Delete);
 
@@ -943,7 +943,7 @@ namespace IO.Ably.Tests.Push
                 machine.LocalDevice = LocalDevice.Create();
 
                 var error = new ErrorInfo();
-                RestClient.ExecuteHttpRequest = request => throw new AblyException(error);
+                HttpClient.ExecuteHttpRequest = request => throw new AblyException(error);
 
                 var (nextState, nextEventFunc) = await state.Transition(new ActivationStateMachine.CalledDeactivate());
 
@@ -970,7 +970,7 @@ namespace IO.Ably.Tests.Push
                 machine.LocalDevice.Push.Recipient = new JObject();
 
                 var awaiter = new TaskCompletionAwaiter();
-                RestClient.ExecuteHttpRequest = request =>
+                HttpClient.ExecuteHttpRequest = request =>
                 {
                     request.Url.Should().Be($"/push/deviceRegistrations/{machine.LocalDevice.Id}");
                     request.Method.Should().Be(new HttpMethod("PATCH"));
@@ -996,7 +996,7 @@ namespace IO.Ably.Tests.Push
                 machine.LocalDevice.DeviceIdentityToken = "token";
                 machine.LocalDevice.Push.Recipient = new JObject();
 
-                RestClient.ExecuteHttpRequest = request => Task.FromResult(new AblyResponse() { StatusCode = HttpStatusCode.OK, TextResponse = string.Empty });
+                HttpClient.ExecuteHttpRequest = request => Task.FromResult(new AblyResponse() { StatusCode = HttpStatusCode.OK, TextResponse = string.Empty });
 
                 var (nextState, nextEventFunc) = await state.Transition(new ActivationStateMachine.GotPushDeviceDetails());
 
@@ -1016,7 +1016,7 @@ namespace IO.Ably.Tests.Push
                 machine.LocalDevice.Push.Recipient = new JObject();
 
                 var error = new ErrorInfo();
-                RestClient.ExecuteHttpRequest = request => throw new AblyException(error);
+                HttpClient.ExecuteHttpRequest = request => throw new AblyException(error);
 
                 var (nextState, nextEventFunc) = await state.Transition(new ActivationStateMachine.GotPushDeviceDetails());
 
@@ -1028,24 +1028,24 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             private ActivationStateMachine.WaitingForNewPushDeviceDetails GetState()
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.WaitingForNewPushDeviceDetails(stateMachine);
             }
 
-            private (ActivationStateMachine.WaitingForNewPushDeviceDetails, ActivationStateMachine) GetStateAndStateMachine(AblyRest restClient = null)
+            private (ActivationStateMachine.WaitingForNewPushDeviceDetails, ActivationStateMachine) GetStateAndStateMachine(PubSubHttpClient restClient = null)
             {
-                var stateMachine = new ActivationStateMachine(restClient ?? RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(restClient ?? HttpClient, HttpClient.Logger);
                 return (new ActivationStateMachine.WaitingForNewPushDeviceDetails(stateMachine), stateMachine);
             }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            public AblyRest RestClient { get; set; }
+            public PubSubHttpClient HttpClient { get; set; }
 
             public void Dispose()
             {
@@ -1204,18 +1204,18 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             private ActivationStateMachine.WaitingForRegistrationSync GetState(ActivationStateMachine.Event fromEvent)
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.WaitingForRegistrationSync(stateMachine, fromEvent);
             }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            public AblyRest RestClient { get; set; }
+            public PubSubHttpClient HttpClient { get; set; }
 
             public void Dispose()
             {
@@ -1272,7 +1272,7 @@ namespace IO.Ably.Tests.Push
 
                 machine.LocalDevice = LocalDevice.Create();
                 var awaiter = new TaskCompletionAwaiter();
-                RestClient.ExecuteHttpRequest = request =>
+                HttpClient.ExecuteHttpRequest = request =>
                 {
                     request.Url.Should().StartWith("/push");
                     request.Method.Should().Be(HttpMethod.Delete);
@@ -1294,7 +1294,7 @@ namespace IO.Ably.Tests.Push
                 var (state, machine) = GetStateAndStateMachine();
                 machine.LocalDevice = LocalDevice.Create();
                 var error = new ErrorInfo();
-                RestClient.ExecuteHttpRequest = request => throw new AblyException(error);
+                HttpClient.ExecuteHttpRequest = request => throw new AblyException(error);
                 var (nextState, nextEventFunc) = await state.Transition(new ActivationStateMachine.CalledDeactivate());
 
                 nextState.Should().BeOfType<ActivationStateMachine.WaitingForDeregistration>();
@@ -1305,28 +1305,28 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             private ActivationStateMachine.AfterRegistrationSyncFailed GetState()
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.AfterRegistrationSyncFailed(stateMachine);
             }
 
-            private (ActivationStateMachine.AfterRegistrationSyncFailed, StubActivationStateMachine) GetStateAndStateMachine(AblyRest restClient = null)
+            private (ActivationStateMachine.AfterRegistrationSyncFailed, StubActivationStateMachine) GetStateAndStateMachine(PubSubHttpClient restClient = null)
             {
-                var stateMachine = new StubActivationStateMachine(restClient ?? RestClient, RestClient.Logger);
+                var stateMachine = new StubActivationStateMachine(restClient ?? HttpClient, HttpClient.Logger);
                 return (new ActivationStateMachine.AfterRegistrationSyncFailed(stateMachine), stateMachine);
             }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            public AblyRest RestClient { get; set; }
+            public PubSubHttpClient HttpClient { get; set; }
 
             private class StubActivationStateMachine : ActivationStateMachine
             {
-                internal StubActivationStateMachine(AblyRest restClient, ILogger logger = null)
+                internal StubActivationStateMachine(PubSubHttpClient restClient, ILogger logger = null)
                     : base(restClient, logger)
                 {
                 }
@@ -1446,24 +1446,24 @@ namespace IO.Ably.Tests.Push
                 : base(output)
             {
                 MobileDevice = new FakeMobileDevice();
-                RestClient = GetRestClient(mobileDevice: MobileDevice);
+                HttpClient = GetRestClient(mobileDevice: MobileDevice);
             }
 
             private ActivationStateMachine.WaitingForDeregistration GetState(Func<ActivationStateMachine, ActivationStateMachine.State> getPreviousState)
             {
-                var stateMachine = new ActivationStateMachine(RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(HttpClient, HttpClient.Logger);
                 return new ActivationStateMachine.WaitingForDeregistration(stateMachine, getPreviousState(stateMachine));
             }
 
-            private (ActivationStateMachine.WaitingForDeregistration, ActivationStateMachine) GetStateAndStateMachine(Func<ActivationStateMachine, ActivationStateMachine.State> getPreviousState, AblyRest restClient = null)
+            private (ActivationStateMachine.WaitingForDeregistration, ActivationStateMachine) GetStateAndStateMachine(Func<ActivationStateMachine, ActivationStateMachine.State> getPreviousState, PubSubHttpClient restClient = null)
             {
-                var stateMachine = new ActivationStateMachine(restClient ?? RestClient, RestClient.Logger);
+                var stateMachine = new ActivationStateMachine(restClient ?? HttpClient, HttpClient.Logger);
                 return (new ActivationStateMachine.WaitingForDeregistration(stateMachine, getPreviousState(stateMachine)), stateMachine);
             }
 
             public FakeMobileDevice MobileDevice { get; set; }
 
-            public AblyRest RestClient { get; }
+            public PubSubHttpClient HttpClient { get; }
 
             public void Dispose()
             {

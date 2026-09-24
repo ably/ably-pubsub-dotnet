@@ -15,9 +15,9 @@ namespace IO.Ably
         public Func<TokenDetails, bool, Task> OnAuthUpdated = (token, wait) => Task.CompletedTask; // By default nothing should happen
         public Action<(string oldClientId, string newClientId)> OnClientIdChanged = (tuple) => { };
 
-        private readonly AblyRest _rest;
+        private readonly PubSubHttpClient _rest;
 
-        internal AblyAuth(ClientOptions options, AblyRest rest)
+        internal AblyAuth(ClientOptions options, PubSubHttpClient rest)
         {
             Now = options.NowFunc;
             Options = options;

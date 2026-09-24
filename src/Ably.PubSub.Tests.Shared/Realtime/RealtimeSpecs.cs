@@ -16,14 +16,14 @@ namespace IO.Ably.Tests
         {
             var options = new ClientOptions(ValidKey);
 
-            var client = new AblyRealtime(options);
+            var client = new PubSubRealtimeClient(options);
 
-            client.Options.Should().BeSameAs(client.RestClient.Options);
+            client.Options.Should().BeSameAs(client.HttpClient.Options);
         }
 
         public class RealtimePropertiesSpec : MockHttpRealtimeSpecs
         {
-            private readonly AblyRealtime _client;
+            private readonly PubSubRealtimeClient _client;
 
             [Fact]
             [Trait("spec", "RTC2")]
@@ -45,7 +45,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RTC4")]
             public void ShouldHaveAccessToRestAuth()
             {
-                _client.Auth.Should().BeSameAs(_client.RestClient.Auth);
+                _client.Auth.Should().BeSameAs(_client.HttpClient.Auth);
             }
 
             [Fact]
@@ -89,7 +89,7 @@ namespace IO.Ably.Tests
         [Fact]
         public void Connection_AllowAccessToConnectionObject()
         {
-            var client = new AblyRealtime(ValidKey);
+            var client = new PubSubRealtimeClient(ValidKey);
             client.Connection.Should().NotBeNull();
         }
 
@@ -111,21 +111,21 @@ namespace IO.Ably.Tests
         [Fact]
         public void New_Realtime_HasConnection()
         {
-            AblyRealtime realtime = new AblyRealtime(ValidKey);
+            PubSubRealtimeClient realtime = new PubSubRealtimeClient(ValidKey);
             realtime.Connection.Should().NotBeNull();
         }
 
         [Fact]
         public void New_Realtime_HasChannels()
         {
-            AblyRealtime realtime = new AblyRealtime(ValidKey);
+            PubSubRealtimeClient realtime = new PubSubRealtimeClient(ValidKey);
             realtime.Channels.Should().NotBeNull();
         }
 
         [Fact]
         public void New_Realtime_HasAuth()
         {
-            AblyRealtime realtime = new AblyRealtime(ValidKey);
+            PubSubRealtimeClient realtime = new PubSubRealtimeClient(ValidKey);
             realtime.Auth.Should().NotBeNull();
         }
 
@@ -140,7 +140,7 @@ namespace IO.Ably.Tests
 
             Platform.HookedUpToNetworkEvents = false;
 
-            _ = new AblyRealtime(new ClientOptions(ValidKey)
+            _ = new PubSubRealtimeClient(new ClientOptions(ValidKey)
             {
                 AutomaticNetworkStateMonitoring = enabled,
             });

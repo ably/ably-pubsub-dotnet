@@ -22,7 +22,7 @@ namespace IO.Ably.Tests.Rest
             public void ChannelsIsACollectionOfChannelObjects()
             {
                 var client = GetRestClient();
-                client.Channels.Should().BeAssignableTo<IEnumerable<IRestChannel>>();
+                client.Channels.Should().BeAssignableTo<IEnumerable<IHttpChannel>>();
             }
 
             [Fact]
@@ -51,7 +51,7 @@ namespace IO.Ably.Tests.Rest
                 var task2 = Task.Run(() => client.Channels.Get("test", options));
 
                 await Task.WhenAll(task1, task2);
-                var channel2 = (RestChannel)client.Channels.Get("test");
+                var channel2 = (HttpChannel)client.Channels.Get("test");
                 channel2.Options.Should().BeSameAs(options);
             }
 
@@ -86,7 +86,7 @@ namespace IO.Ably.Tests.Rest
         [Trait("spec", "RSN3")]
         public class GettingAChannel : ChannelSpecs
         {
-            private readonly AblyRest _client;
+            private readonly PubSubHttpClient _client;
 
             public GettingAChannel(ITestOutputHelper output)
                 : base(output)
@@ -118,7 +118,7 @@ namespace IO.Ably.Tests.Rest
             {
                 var options = new ChannelOptions();
                 var channel = _client.Channels.Get("test", options);
-                ((RestChannel)channel).Options.Should().BeEquivalentTo(options);
+                ((HttpChannel)channel).Options.Should().BeEquivalentTo(options);
             }
 
             [Fact]
@@ -128,7 +128,7 @@ namespace IO.Ably.Tests.Rest
                 _ = _client.Channels.Get("test");
                 var newOptions = new ChannelOptions(true);
                 var secondTime = _client.Channels.Get("test", newOptions);
-                ((RestChannel)secondTime).Options.Should().BeEquivalentTo(newOptions);
+                ((HttpChannel)secondTime).Options.Should().BeEquivalentTo(newOptions);
             }
         }
 
@@ -281,8 +281,8 @@ namespace IO.Ably.Tests.Rest
 
         public class ChannelHistory : ChannelSpecs
         {
-            private readonly IRestChannel _channel;
-            private AblyRest _client;
+            private readonly IHttpChannel _channel;
+            private PubSubHttpClient _client;
 
             [Fact]
             [Trait("spec", "RSL2a")]

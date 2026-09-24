@@ -25,7 +25,7 @@ namespace IO.Ably.Tests
             FakeTransportFactory = new FakeTransportFactory();
         }
 
-        private List<AblyRealtime> RealtimeClients { get; } = new List<AblyRealtime>();
+        private List<PubSubRealtimeClient> RealtimeClients { get; } = new List<PubSubRealtimeClient>();
 
         protected FakeTransportFactory FakeTransportFactory { get; private set; }
 
@@ -64,15 +64,15 @@ namespace IO.Ably.Tests
             }
         }
 
-        internal AblyRealtime GetRealtimeClient(ClientOptions options = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null, IMobileDevice mobileDevice = null)
+        internal PubSubRealtimeClient GetRealtimeClient(ClientOptions options = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null, IMobileDevice mobileDevice = null)
         {
             var clientOptions = options ?? new ClientOptions(ValidKey);
             clientOptions.SkipInternetCheck = true; // This is for the Unit tests
-            var client = new AblyRealtime(clientOptions, (opts, device) => GetRestClient(handleRequestFunc, clientOptions, device), mobileDevice);
+            var client = new PubSubRealtimeClient(clientOptions, (opts, device) => GetRestClient(handleRequestFunc, clientOptions, device), mobileDevice);
             return client;
         }
 
-        private static AblyRealtime GetRealtimeClientWithFakeMessageHandler(ClientOptions options = null, FakeHttpMessageHandler fakeMessageHandler = null, IMobileDevice mobileDevice = null)
+        private static PubSubRealtimeClient GetRealtimeClientWithFakeMessageHandler(ClientOptions options = null, FakeHttpMessageHandler fakeMessageHandler = null, IMobileDevice mobileDevice = null)
         {
             var clientOptions = options ?? new ClientOptions(ValidKey);
             clientOptions.SkipInternetCheck = true; // This is for the Unit tests
@@ -81,16 +81,16 @@ namespace IO.Ably.Tests
                 clientOptions.HttpClient = new HttpClient(fakeMessageHandler);
             }
 
-            return new AblyRealtime(clientOptions, mobileDevice);
+            return new PubSubRealtimeClient(clientOptions, mobileDevice);
         }
 
-        internal AblyRealtime GetRealtimeClient(Action<ClientOptions> optionsAction, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
+        internal PubSubRealtimeClient GetRealtimeClient(Action<ClientOptions> optionsAction, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
         {
             var options = new ClientOptions(ValidKey);
             options.SkipInternetCheck = true; // This is for the Unit tests
             optionsAction?.Invoke(options);
 
-            var client = new AblyRealtime(options, (clientOptions, device) => GetRestClient(handleRequestFunc, clientOptions, device));
+            var client = new PubSubRealtimeClient(options, (clientOptions, device) => GetRestClient(handleRequestFunc, clientOptions, device));
             return client;
         }
 
@@ -98,7 +98,7 @@ namespace IO.Ably.Tests
 
         protected List<FakeTransport> CreatedTransports => FakeTransportFactory.CreatedTransports;
 
-        internal AblyRealtime GetClientWithFakeTransport(Action<ClientOptions> optionsAction = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
+        internal PubSubRealtimeClient GetClientWithFakeTransport(Action<ClientOptions> optionsAction = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
         {
             var options = new ClientOptions(ValidKey) { TransportFactory = FakeTransportFactory };
             optionsAction?.Invoke(options);
@@ -106,7 +106,7 @@ namespace IO.Ably.Tests
             return client;
         }
 
-        internal AblyRealtime GetClientWithFakeTransportAndMessageHandler(Action<ClientOptions> optionsAction = null, FakeHttpMessageHandler messageHandler = null)
+        internal PubSubRealtimeClient GetClientWithFakeTransportAndMessageHandler(Action<ClientOptions> optionsAction = null, FakeHttpMessageHandler messageHandler = null)
         {
             var options = new ClientOptions(ValidKey) { TransportFactory = FakeTransportFactory };
             optionsAction?.Invoke(options);
@@ -114,7 +114,7 @@ namespace IO.Ably.Tests
             return client;
         }
 
-        internal async Task<AblyRealtime> GetConnectedClient(Action<ClientOptions> optionsAction = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
+        internal async Task<PubSubRealtimeClient> GetConnectedClient(Action<ClientOptions> optionsAction = null, Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null)
         {
             var client = GetClientWithFakeTransport(optionsAction, handleRequestFunc);
             client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
@@ -133,7 +133,7 @@ namespace IO.Ably.Tests
             _signal.Set();
         }
 
-        protected AblyRealtime GetDisconnectedClient(ClientOptions options = null)
+        protected PubSubRealtimeClient GetDisconnectedClient(ClientOptions options = null)
         {
             var clientOptions = options ?? new ClientOptions(ValidKey);
 
@@ -156,10 +156,10 @@ namespace IO.Ably.Tests
 
         protected Task<IRealtimeChannel> GetChannel(Action<ClientOptions> optionsAction = null) => GetConnectedClient(optionsAction).MapAsync(client => client.Channels.Get("test"));
 
-        protected Task<(AblyRealtime, IRealtimeChannel)> GetClientAndChannel(Action<ClientOptions> optionsAction = null) =>
+        protected Task<(PubSubRealtimeClient, IRealtimeChannel)> GetClientAndChannel(Action<ClientOptions> optionsAction = null) =>
             GetConnectedClient(optionsAction).MapAsync(x => (x, x.Channels.Get("test")));
 
-        protected Task<IRealtimeChannel> GetTestChannel(IRealtimeClient client = null, ChannelOptions channelOptions = null)
+        protected Task<IRealtimeChannel> GetTestChannel(IPubSubRealtimeClient client = null, ChannelOptions channelOptions = null)
         {
             if (client == null)
             {

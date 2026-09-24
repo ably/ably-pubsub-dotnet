@@ -7,8 +7,10 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 **Breaking changes**
 
 - The `ably.io` package is no longer published from this repository. It is replaced by three packages: **`Ably.PubSub.Device`** (end-user device apps — mobile, desktop, Unity, set-top boxes), **`Ably.PubSub.Server`** (backends — ASP.NET, workers, console apps) and **`Ably.PubSub.Core`** (the shared implementation, resolved transitively; do not reference it directly).
-- Construct clients through the door factories, not the `AblyRealtime`/`AblyRest` constructors: `PubSubDevice.CreateClient(...)`, `PubSubServer.CreateRealtimeClient(...)`, `PubSubServer.CreateHttpClient(...)`. A client built directly from `Ably.PubSub.Core` is not classified as device- or server-side, and is rejected once MAU-based pricing is live.
-- The runtime API is otherwise unchanged: the namespace stays `IO.Ably` and the factories return the ordinary `AblyRealtime`/`AblyRest`.
+- Clients are constructed through the door factories only: `PubSubDevice.CreateClient(...)`, `PubSubServer.CreateRealtimeClient(...)`, `PubSubServer.CreateHttpClient(...)`. The client constructors are internal in 2.0, so a client that is not classified as device- or server-side (which the platform's behaviour and MAU-based billing depend on) cannot be constructed from application code.
+- The client-facing "REST" identifiers are renamed to "HTTP", matching the other Ably Pub/Sub SDKs: `AblyRealtime` → `PubSubRealtimeClient`, `AblyRest` → `PubSubHttpClient`, `IRealtimeClient` → `IPubSubRealtimeClient`, `IRestClient` → `IPubSubHttpClient`, `RestChannel`/`RestChannels`/`IRestChannel` → `HttpChannel`/`HttpChannels`/`IHttpChannel`, and the realtime client's `RestClient` property → `HttpClient`. Names that refer to Ably's REST API service or wire options (`ClientOptions.RestHost`, `ClientOptions.IdempotentRestPublishing`, ...) are unchanged.
+- Every member the 1.x line had marked `[Obsolete]` is removed (`Auth.Authorise[Async]`, `Connection.RecoveryKey`, `ClientOptions.FallbackHostsUseDefault`, `ClientOptions.CaptureCurrentSynchronizationContext`, the legacy `CreateTokenRequestObject[Async]` and string-method `Request` overloads, `HistoryRequestParams`, the `HistoryAsync(untilAttach)` overloads and `Presence.IsSyncComplete`). See the "Deprecated API removed" table in [UPDATING.md](UPDATING.md).
+- The namespace stays `IO.Ably`, and the API is otherwise unchanged.
 
 **Notes**
 

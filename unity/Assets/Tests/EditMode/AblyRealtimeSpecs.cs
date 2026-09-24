@@ -215,7 +215,7 @@ namespace Assets.Tests.EditMode
             {
                 var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("Success") };
                 var handler = new FakeHttpMessageHandler(response);
-                var client = new AblyHttpClient(new AblyHttpOptions { HttpClient = new HttpClient(handler) });
+                var client = new AblyHttpRequester(new AblyHttpOptions { HttpClient = new HttpClient(handler) });
 
                 await client.Execute(new AblyRequest("/test", HttpMethod.Get));
                 string[] values = handler.LastRequest.Headers.GetValues("Ably-Agent").ToArray();

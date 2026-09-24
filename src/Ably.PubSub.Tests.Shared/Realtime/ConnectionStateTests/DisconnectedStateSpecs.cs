@@ -222,9 +222,9 @@ namespace IO.Ably.Tests
         /// what ClampToStateTtl reads. The shared FakeConnectionContext has no client at all, so every
         /// other test in this class takes that method's null-state early return.
         /// </summary>
-        private AblyRealtime NewClientWithFirstAttemptAt(DateTimeOffset firstAttempt, TimeSpan connectionStateTtl)
+        private PubSubRealtimeClient NewClientWithFirstAttemptAt(DateTimeOffset firstAttempt, TimeSpan connectionStateTtl)
         {
-            var client = new AblyRealtime(new ClientOptions(ValidKey) { AutoConnect = false });
+            var client = new PubSubRealtimeClient(new ClientOptions(ValidKey) { AutoConnect = false });
             client.State.Connection.ConnectionStateTtl = connectionStateTtl;
             client.State.AttemptsInfo.Attempts.Add(new ConnectionAttempt(firstAttempt));
             return client;

@@ -353,7 +353,7 @@ namespace NotificationsPublisher
             }
         }
 
-        public static IRealtimeClient Ably;
+        public static IPubSubRealtimeClient Ably;
 
         private static MenuBar _menu = null;
 

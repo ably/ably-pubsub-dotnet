@@ -13,7 +13,7 @@ namespace IO.Ably.Tests
 {
     public abstract class SandboxSpecs : IClassFixture<AblySandboxFixture>, IDisposable
     {
-        private readonly List<AblyRealtime> _realtimeClients = new List<AblyRealtime>();
+        private readonly List<PubSubRealtimeClient> _realtimeClients = new List<PubSubRealtimeClient>();
         private bool _disposedValue;
 
         protected SandboxSpecs(AblySandboxFixture fixture, ITestOutputHelper output)
@@ -80,26 +80,26 @@ namespace IO.Ably.Tests
             }
         }
 
-        protected async Task<AblyRest> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string environment = null)
+        protected async Task<PubSubHttpClient> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string environment = null)
         {
             var settings = await AblySandboxFixture.GetSettings(environment);
             var defaultOptions = settings.CreateDefaultOptions();
             defaultOptions.UseBinaryProtocol = protocol == Defaults.Protocol;
             optionsAction?.Invoke(defaultOptions);
-            return new AblyRest(defaultOptions);
+            return new PubSubHttpClient(defaultOptions);
         }
 
-        protected async Task<AblyRealtime> GetRealtimeClient(
+        protected async Task<PubSubRealtimeClient> GetRealtimeClient(
             Protocol protocol,
             Action<ClientOptions, TestEnvironmentSettings> optionsAction = null)
         {
             return await GetRealtimeClient(protocol, optionsAction, null);
         }
 
-        protected async Task<AblyRealtime> GetRealtimeClient(
+        protected async Task<PubSubRealtimeClient> GetRealtimeClient(
             Protocol protocol,
             Action<ClientOptions, TestEnvironmentSettings> optionsAction,
-            Func<ClientOptions, IMobileDevice, AblyRest> createRestFunc)
+            Func<ClientOptions, IMobileDevice, PubSubHttpClient> createRestFunc)
         {
             var settings = await AblySandboxFixture.GetSettings();
             var defaultOptions = settings.CreateDefaultOptions();
@@ -107,7 +107,7 @@ namespace IO.Ably.Tests
             defaultOptions.TransportFactory = new TestTransportFactory();
 
             optionsAction?.Invoke(defaultOptions, settings);
-            var client = new AblyRealtime(defaultOptions, createRestFunc);
+            var client = new PubSubRealtimeClient(defaultOptions, createRestFunc);
 
             _realtimeClients.Add(client);
             return client;
@@ -152,12 +152,12 @@ namespace IO.Ably.Tests
             await TestHelpers.WaitFor(20000, taskCount, done, onFail);
         }
 
-        protected Task WaitToBecomeConnected(AblyRealtime realtime, TimeSpan? waitSpan = null)
+        protected Task WaitToBecomeConnected(PubSubRealtimeClient realtime, TimeSpan? waitSpan = null)
         {
             return WaitForState(realtime, waitSpan: waitSpan);
         }
 
-        protected Task WaitForState(AblyRealtime realtime, ConnectionState awaitedState = ConnectionState.Connected, TimeSpan? waitSpan = null)
+        protected Task WaitForState(PubSubRealtimeClient realtime, ConnectionState awaitedState = ConnectionState.Connected, TimeSpan? waitSpan = null)
         {
             var connectionAwaiter = new ConnectionAwaiter(realtime.Connection, awaitedState);
             if (waitSpan.HasValue)

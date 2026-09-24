@@ -9,7 +9,7 @@ namespace IO.Ably.Push
     /// </summary>
     public class PushChannel
     {
-        private readonly AblyRest _rest;
+        private readonly PubSubHttpClient _rest;
         private readonly ILogger _logger;
 
         internal string ChannelName { get; }
@@ -18,8 +18,8 @@ namespace IO.Ably.Push
         /// Create a new instance of PushChannel.
         /// </summary>
         /// <param name="channelName">Name of the channel.</param>
-        /// <param name="rest"><see cref="AblyRest"/> client.</param>
-        internal PushChannel(string channelName, AblyRest rest)
+        /// <param name="rest"><see cref="PubSubHttpClient"/> client.</param>
+        internal PushChannel(string channelName, PubSubHttpClient rest)
         {
             ChannelName = channelName;
             _rest = rest;
@@ -38,7 +38,7 @@ namespace IO.Ably.Push
             {
                 // TODO: What error code should we use here
                 throw new AblyException(
-                    $"Cannot Subscribe device to channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call AblyRest.Push.Activate() and wait for it to complete");
+                    $"Cannot Subscribe device to channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call PubSubHttpClient.Push.Activate() and wait for it to complete");
             }
 
             var subscription = await _rest.Push.Admin.ChannelSubscriptions.SaveAsync(new PushChannelSubscription()
@@ -63,7 +63,7 @@ namespace IO.Ably.Push
             {
                 // TODO: What error code should we use here
                 throw new AblyException(
-                    $"Cannot Unsubscribe device from channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call AblyRest.Push.Activate() and wait for it to complete");
+                    $"Cannot Unsubscribe device from channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call PubSubHttpClient.Push.Activate() and wait for it to complete");
             }
 
             await _rest.Push.Admin.ChannelSubscriptions.RemoveAsync(new PushChannelSubscription()
@@ -89,7 +89,7 @@ namespace IO.Ably.Push
             {
                 // TODO: What error code should we use here
                 throw new AblyException(
-                    $"Cannot Subscribe device to channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call AblyRest.Push.Activate() and wait for it to complete");
+                    $"Cannot Subscribe device to channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call PubSubHttpClient.Push.Activate() and wait for it to complete");
             }
 
             if (localDevice.ClientId.IsEmpty())
@@ -120,7 +120,7 @@ namespace IO.Ably.Push
             {
                 // TODO: What error code should we use here
                 throw new AblyException(
-                    $"Cannot Unsubscribe device from channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call AblyRest.Push.Activate() and wait for it to complete");
+                    $"Cannot Unsubscribe device from channel '{ChannelName}' because the device is missing deviceIdentityToken. Please call PubSubHttpClient.Push.Activate() and wait for it to complete");
             }
 
             if (localDevice.ClientId.IsEmpty())
@@ -143,7 +143,7 @@ namespace IO.Ably.Push
         /// Returns a list of <see cref="PushChannelSubscription"/> for the current channel, filtered by the currently set clientId and deviceId.
         /// </summary>
         /// <param name="listRequest">A custom <see cref="ListSubscriptionsRequest"/> can be passed. However the current clientId and deviceId are always used. It's mainly to provide further parameters.
-        /// If more flexibility is required, please use AblyRest.Push.Admin.ChannelSubscriptions.ListAsync.</param>
+        /// If more flexibility is required, please use PubSubHttpClient.Push.Admin.ChannelSubscriptions.ListAsync.</param>
         /// <returns>A PaginatedResult of PushChannelSubscription.</returns>
         /// <exception cref="AblyException">Throws an exception if the local device is not activated. Please make sure Push.Activate() has completed.</exception>
         public async Task<PaginatedResult<PushChannelSubscription>> ListSubscriptions(ListSubscriptionsRequest listRequest = null)
@@ -156,7 +156,7 @@ namespace IO.Ably.Push
             {
                 // TODO: What error code should we use here
                 throw new AblyException(
-                    $"Cannot list channel subscriptions for '{ChannelName}' because the device is missing deviceIdentityToken. Please call AblyRest.Push.Activate() and wait for it to complete.");
+                    $"Cannot list channel subscriptions for '{ChannelName}' because the device is missing deviceIdentityToken. Please call PubSubHttpClient.Push.Activate() and wait for it to complete.");
             }
 
             if (localDevice.ClientId.IsNotEmpty())

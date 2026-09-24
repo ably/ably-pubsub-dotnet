@@ -7,7 +7,7 @@ namespace IO.Ably.Tests
 {
     public static class SandboxSpecExtension
     {
-        internal static Task<TimeSpan> WaitForState(this AblyRealtime realtime, ConnectionState awaitedState, TimeSpan? waitSpan = null)
+        internal static Task<TimeSpan> WaitForState(this PubSubRealtimeClient realtime, ConnectionState awaitedState, TimeSpan? waitSpan = null)
         {
             if (realtime.Connection.State == awaitedState)
             {

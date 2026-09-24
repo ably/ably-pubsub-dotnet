@@ -9,12 +9,12 @@ namespace IO.Ably.PubSub.Server
     /// <para>
     /// These factory methods are the only supported way to create a client from this package.
     /// The Ably.PubSub.Core package that carries the implementation is an internal dependency: a
-    /// client constructed directly from <see cref="AblyRealtime"/> or <see cref="AblyRest"/> is
+    /// client constructed directly from <see cref="PubSubRealtimeClient"/> or <see cref="PubSubHttpClient"/> is
     /// not classified as server-side, which Ably's platform behaviour and billing depend on.
     /// </para>
     /// <para>
-    /// The returned clients are the ordinary <see cref="AblyRealtime"/> and
-    /// <see cref="AblyRest"/>, so the whole of the <c>IO.Ably</c> API remains available;
+    /// The returned clients are the ordinary <see cref="PubSubRealtimeClient"/> and
+    /// <see cref="PubSubHttpClient"/>, so the whole of the <c>IO.Ably</c> API remains available;
     /// installing this package rather than Ably.PubSub.Device states where the code runs. What
     /// the doors add is an agent entry declaring the server side, and per PDR-091 that entry is
     /// what earns the monthly-active-user exemption on API-key authentication.
@@ -30,7 +30,7 @@ namespace IO.Ably.PubSub.Server
         /// The core applies the same colon rule its own constructors use to tell them apart.
         /// </param>
         /// <returns> A connected-on-demand realtime client. </returns>
-        public static AblyRealtime CreateRealtimeClient(string keyOrToken)
+        public static PubSubRealtimeClient CreateRealtimeClient(string keyOrToken)
         {
             return CreateRealtimeClient(new ClientOptions(keyOrToken));
         }
@@ -41,11 +41,11 @@ namespace IO.Ably.PubSub.Server
         /// <param name="options"> The client options. </param>
         /// <returns> A connected-on-demand realtime client. </returns>
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="options"/> is null. </exception>
-        public static AblyRealtime CreateRealtimeClient(ClientOptions options)
+        public static PubSubRealtimeClient CreateRealtimeClient(ClientOptions options)
         {
             // The core constructor is internal; this door is a sanctioned caller (granted access
             // via InternalsVisibleTo), constructing the client from the side-stamped copy.
-            return new AblyRealtime(Side.WithSideAgent(options, Side.ServerAgentIdentifier));
+            return new PubSubRealtimeClient(Side.WithSideAgent(options, Side.ServerAgentIdentifier));
         }
 
         /// <summary>
@@ -54,7 +54,7 @@ namespace IO.Ably.PubSub.Server
         /// <param name="configure"> Action that populates the client options. </param>
         /// <returns> A connected-on-demand realtime client. </returns>
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="configure"/> is null. </exception>
-        public static AblyRealtime CreateRealtimeClient(Action<ClientOptions> configure)
+        public static PubSubRealtimeClient CreateRealtimeClient(Action<ClientOptions> configure)
         {
             return CreateRealtimeClient(Side.Configure(configure));
         }
@@ -67,7 +67,7 @@ namespace IO.Ably.PubSub.Server
         /// The core applies the same colon rule its own constructors use to tell them apart.
         /// </param>
         /// <returns> An HTTP client. </returns>
-        public static AblyRest CreateHttpClient(string keyOrToken)
+        public static PubSubHttpClient CreateHttpClient(string keyOrToken)
         {
             return CreateHttpClient(new ClientOptions(keyOrToken));
         }
@@ -78,11 +78,11 @@ namespace IO.Ably.PubSub.Server
         /// <param name="options"> The client options. </param>
         /// <returns> An HTTP client. </returns>
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="options"/> is null. </exception>
-        public static AblyRest CreateHttpClient(ClientOptions options)
+        public static PubSubHttpClient CreateHttpClient(ClientOptions options)
         {
             // The core constructor is internal; this door is a sanctioned caller (granted access
             // via InternalsVisibleTo), constructing the client from the side-stamped copy.
-            return new AblyRest(Side.WithSideAgent(options, Side.ServerAgentIdentifier));
+            return new PubSubHttpClient(Side.WithSideAgent(options, Side.ServerAgentIdentifier));
         }
 
         /// <summary>
@@ -91,7 +91,7 @@ namespace IO.Ably.PubSub.Server
         /// <param name="configure"> Action that populates the client options. </param>
         /// <returns> An HTTP client. </returns>
         /// <exception cref="ArgumentNullException"> Thrown when <paramref name="configure"/> is null. </exception>
-        public static AblyRest CreateHttpClient(Action<ClientOptions> configure)
+        public static PubSubHttpClient CreateHttpClient(Action<ClientOptions> configure)
         {
             return CreateHttpClient(Side.Configure(configure));
         }

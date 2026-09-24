@@ -32,17 +32,17 @@ namespace IO.Ably.Tests.Realtime
             return $"presence-{id}".AddRandomSuffix();
         }
 
-        private static RealtimeChannel GetRandomChannel(IRealtimeClient client, string channelNamePrefix)
+        private static RealtimeChannel GetRandomChannel(IPubSubRealtimeClient client, string channelNamePrefix)
         {
             return GetChannel(client, channelNamePrefix.AddRandomSuffix());
         }
 
-        private static void BlockAblyServerSentSyncAction(IRealtimeClient client)
+        private static void BlockAblyServerSentSyncAction(IPubSubRealtimeClient client)
         {
             client.BlockActionFromReceiving(ProtocolMessage.MessageAction.Sync);
         }
 
-        private static RealtimeChannel GetChannel(IRealtimeClient client, string channelName)
+        private static RealtimeChannel GetChannel(IPubSubRealtimeClient client, string channelName)
         {
             var channel = client.Channels.Get(channelName) as RealtimeChannel;
             channel.Should().NotBeNull();
@@ -317,7 +317,7 @@ namespace IO.Ably.Tests.Realtime
             {
                 var channelName = "RTP17e".AddRandomSuffix();
 
-                async Task<(AblyRealtime, IRestClient, TestTransportWrapper)> InitializeRealtimeAndConnect()
+                async Task<(PubSubRealtimeClient, IPubSubHttpClient, TestTransportWrapper)> InitializeRealtimeAndConnect()
                 {
                     var capability = new Capability();
                     capability.AddResource(channelName).AllowAll();
@@ -331,12 +331,12 @@ namespace IO.Ably.Tests.Realtime
                     });
                     await clientA.WaitForState(ConnectionState.Connected);
 
-                    return (clientA, clientA.RestClient, transport);
+                    return (clientA, clientA.HttpClient, transport);
                 }
 
-                async Task<(IRealtimeChannel, IRestChannel)> GetChannelsAndEnsurePresenceSynced(
-                    IRealtimeClient rt,
-                    IRestClient rest)
+                async Task<(IRealtimeChannel, IHttpChannel)> GetChannelsAndEnsurePresenceSynced(
+                    IPubSubRealtimeClient rt,
+                    IPubSubHttpClient rest)
                 {
                     var realtimeChan = rt.Channels.Get(channelName);
 
@@ -349,7 +349,7 @@ namespace IO.Ably.Tests.Realtime
                     return (realtimeChan, restChan);
                 }
 
-                async Task<bool> WaitForRestPresence(IRestChannel restChan, bool shouldBePresent = true)
+                async Task<bool> WaitForRestPresence(IHttpChannel restChan, bool shouldBePresent = true)
                 {
                     int count = 0;
                     while (true)
@@ -382,7 +382,7 @@ namespace IO.Ably.Tests.Realtime
 
                 Task Sleep(int seconds) => Task.Delay(seconds * 1000);
 
-                async Task<bool> WaitForNoPresenceOnChannel(IRestChannel rChannel)
+                async Task<bool> WaitForNoPresenceOnChannel(IHttpChannel rChannel)
                 {
                     return await WaitForRestPresence(rChannel, false);
                 }
@@ -1076,7 +1076,7 @@ namespace IO.Ably.Tests.Realtime
                 client.ExecuteCommand(SendMessageCommand.Create(syncMessage));
 
                 await awaiter.Task;
-                var serverPresence = await client.RestClient.Channels.Get(channelName).Presence.GetAsync();
+                var serverPresence = await client.HttpClient.Channels.Get(channelName).Presence.GetAsync();
                 serverPresence.Items.Count.Should().Be(1);
 
                 // A LEAVE event should have be published for the injected member
@@ -2033,7 +2033,7 @@ namespace IO.Ably.Tests.Realtime
                     p1.Should().NotBeNull();
                     p1.Should().HaveCount(1);
 
-                    var restPresence = await ably.RestClient.Channels.Get(channelName).Presence.GetAsync();
+                    var restPresence = await ably.HttpClient.Channels.Get(channelName).Presence.GetAsync();
 
                     // Before the fix this would return no items as the presence had not been re-entered
                     restPresence.Items.Should().HaveCount(1);

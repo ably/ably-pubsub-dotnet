@@ -1370,7 +1370,7 @@ namespace IO.Ably.Tests.Realtime
         [Trait("issue", "104")]
         public async Task AttachWithMultipleConcurrentClientsShouldWork(Protocol protocol)
         {
-            var clients = new List<IRealtimeClient>
+            var clients = new List<IPubSubRealtimeClient>
             {
                 await GetRealtimeClient(protocol, (opts, _) => opts.AutoConnect = false),
                 await GetRealtimeClient(protocol, (opts, _) => opts.AutoConnect = false),

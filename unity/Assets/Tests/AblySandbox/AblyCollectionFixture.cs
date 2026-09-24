@@ -54,11 +54,11 @@ namespace Assets.Tests.AblySandbox
             };
         }
 
-        internal AblyHttpClient GetHttpClient(string environment = null)
+        internal AblyHttpRequester GetHttpClient(string environment = null)
         {
             var ablyHttpOptions = new AblyHttpOptions { IsSecure = Tls };
             ablyHttpOptions.Host = CreateDefaultOptions(environment).FullRestHost();
-            return new AblyHttpClient(ablyHttpOptions);
+            return new AblyHttpRequester(ablyHttpOptions);
         }
     }
 }

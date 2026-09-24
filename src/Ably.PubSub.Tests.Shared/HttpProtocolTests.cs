@@ -3,13 +3,13 @@ using Xunit;
 
 namespace IO.Ably.Tests
 {
-    public class RestProtocolTests
+    public class HttpProtocolTests
     {
 #if MSGPACK
         [Fact]
         public void WhenProtocolIsNotDefined_AndMsgPackEnabled_DefaultsToMsgPack()
         {
-            var rest = new AblyRest(new ClientOptions());
+            var rest = new PubSubHttpClient(new ClientOptions());
             rest.Protocol.Should().Be(Protocol.MsgPack);
             Defaults.Protocol.Should().Be(Protocol.MsgPack);
         }
@@ -17,7 +17,7 @@ namespace IO.Ably.Tests
         [Fact]
         public void WhenProtocolIsMsgPack_ProtocolIsSetToMsgPack()
         {
-            var rest = new AblyRest(new ClientOptions() { UseBinaryProtocol = true});
+            var rest = new PubSubHttpClient(new ClientOptions() { UseBinaryProtocol = true});
             rest.Protocol.Should().Be(Defaults.Protocol);
         }
 #else
@@ -25,14 +25,14 @@ namespace IO.Ably.Tests
         public void WhenProtocolIsNotDefined_AndMsgPackDisabled_DefaultsToJson()
         {
             Defaults.Protocol.Should().Be(Protocol.Json);
-            var rest = new AblyRest(new ClientOptions { Key = "best.test:key" });
+            var rest = new PubSubHttpClient(new ClientOptions { Key = "best.test:key" });
             rest.Protocol.Should().Be(Protocol.Json);
         }
 
         [Fact]
         public void WhenMsgPackIsDisabled_AndUseBinaryIsTrue_ProtocolIsSetToJson()
         {
-            var rest = new AblyRest(new ClientOptions { UseBinaryProtocol = true, Key = "best.test:key" });
+            var rest = new PubSubHttpClient(new ClientOptions { UseBinaryProtocol = true, Key = "best.test:key" });
             rest.Protocol.Should().Be(Protocol.Json);
         }
 #endif
@@ -40,14 +40,14 @@ namespace IO.Ably.Tests
         [Fact]
         public void WhenProtocolIsJson_RestProtocolIsSetToJson()
         {
-            var rest = new AblyRest(new ClientOptions { UseBinaryProtocol = false, Key = "best.test:key" });
+            var rest = new PubSubHttpClient(new ClientOptions { UseBinaryProtocol = false, Key = "best.test:key" });
             rest.Protocol.Should().Be(Protocol.Json);
         }
 
         [Fact]
         public void WhenUseBinaryIsFalse_ProtocolIsSetToJson()
         {
-            var rest = new AblyRest(new ClientOptions { UseBinaryProtocol = false, Key = "best.test:key" });
+            var rest = new PubSubHttpClient(new ClientOptions { UseBinaryProtocol = false, Key = "best.test:key" });
             rest.Protocol.Should().Be(Protocol.Json);
         }
     }

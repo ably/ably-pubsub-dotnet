@@ -27,7 +27,7 @@ namespace IO.Ably.Realtime
     }
 
     /// <summary>
-    /// A class representing the connection associated with an AblyRealtime instance.
+    /// A class representing the connection associated with an PubSubRealtimeClient instance.
     /// The Connection object exposes the lifecycle and parameters of the realtime connection.
     /// </summary>
     public sealed class Connection : EventEmitter<ConnectionEvent, ConnectionStateChange>
@@ -105,9 +105,9 @@ namespace IO.Ably.Realtime
             }
         }
 
-        internal AblyRest RestClient => RealtimeClient.RestClient;
+        internal PubSubHttpClient HttpClient => RealtimeClient.HttpClient;
 
-        internal AblyRealtime RealtimeClient { get; }
+        internal PubSubRealtimeClient RealtimeClient { get; }
 
         internal ConnectionManager ConnectionManager { get; set; }
 
@@ -120,7 +120,7 @@ namespace IO.Ably.Realtime
                  || State == Realtime.ConnectionState.Disconnected)
                 && RealtimeClient.Options.QueueMessages);
 
-        internal Connection(AblyRealtime realtimeClient, Func<DateTimeOffset> nowFunc, ILogger logger = null)
+        internal Connection(PubSubRealtimeClient realtimeClient, Func<DateTimeOffset> nowFunc, ILogger logger = null)
             : base(logger)
         {
             Now = nowFunc;

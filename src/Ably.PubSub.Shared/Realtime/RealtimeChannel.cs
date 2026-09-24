@@ -50,7 +50,7 @@ namespace IO.Ably.Realtime
 
         public event EventHandler<ChannelErrorEventArgs> Error = delegate { };
 
-        internal AblyRealtime RealtimeClient { get; }
+        internal PubSubRealtimeClient RealtimeClient { get; }
 
         private ConnectionState ConnectionState => Connection.State;
 
@@ -58,7 +58,7 @@ namespace IO.Ably.Realtime
 
         private Connection Connection => RealtimeClient.Connection;
 
-        internal IRestChannel RestChannel => RealtimeClient.RestClient.Channels.Get(Name);
+        internal IHttpChannel HttpChannel => RealtimeClient.HttpClient.Channels.Get(Name);
 
         internal ChannelAwaiter AttachedAwaiter { get; }
 
@@ -117,7 +117,7 @@ namespace IO.Ably.Realtime
         internal RealtimeChannel(
             string name,
             string clientId,
-            AblyRealtime realtimeClient,
+            PubSubRealtimeClient realtimeClient,
             ChannelOptions options = null,
             IMobileDevice mobileDevice = null)
             : base(options?.Logger)
@@ -133,7 +133,7 @@ namespace IO.Ably.Realtime
 
             if (mobileDevice != null)
             {
-                _pushChannel = new PushChannel(name, realtimeClient.RestClient);
+                _pushChannel = new PushChannel(name, realtimeClient.HttpClient);
             }
         }
 
@@ -568,13 +568,13 @@ namespace IO.Ably.Realtime
         public Task<PaginatedResult<Message>> HistoryAsync()
         {
             var query = new PaginatedRequestParams();
-            return RestChannel.HistoryAsync(query);
+            return HttpChannel.HistoryAsync(query);
         }
 
         public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query)
         {
             query = query ?? new PaginatedRequestParams();
-            return RestChannel.HistoryAsync(query);
+            return HttpChannel.HistoryAsync(query);
         }
 
         public void OnError(ErrorInfo error)

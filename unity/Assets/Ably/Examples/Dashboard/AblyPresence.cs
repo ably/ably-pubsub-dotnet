@@ -6,7 +6,7 @@ namespace Assets.Ably.Examples.Chat
 {
     public class AblyPresence
     {
-        private AblyRealtime _ably;
+        private PubSubRealtimeClient _ably;
         private readonly IUiConsole _uiConsole;
 
         private Button _presenceSubscribe;
@@ -18,20 +18,20 @@ namespace Assets.Ably.Examples.Chat
         private InputField _channelName;
         private InputField _payload;
 
-        private AblyPresence(AblyRealtime ably, IUiConsole uiConsole)
+        private AblyPresence(PubSubRealtimeClient ably, IUiConsole uiConsole)
         {
             _ably = ably;
             _uiConsole = uiConsole;
         }
 
-        internal static AblyPresence CreateInstance(AblyRealtime ably, IUiConsole uiConsole)
+        internal static AblyPresence CreateInstance(PubSubRealtimeClient ably, IUiConsole uiConsole)
         {
             return new AblyPresence(ably, uiConsole);
         }
 
         // The client is recreated at connect time (so the latest ClientId is captured);
         // point this console at the current instance.
-        internal void UpdateClient(AblyRealtime ably)
+        internal void UpdateClient(PubSubRealtimeClient ably)
         {
             _ably = ably;
         }

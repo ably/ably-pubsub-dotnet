@@ -70,7 +70,7 @@ namespace IO.Ably.Tests.Realtime
             errors.Should().HaveCount(1);
             errors.First().Should().Be(_tokenErrorInfo);
 
-            var currentToken = client.RestClient.AblyAuth.CurrentToken;
+            var currentToken = client.HttpClient.AblyAuth.CurrentToken;
             currentToken.Token.Should().Be(_returnedDummyTokenDetails.Token);
             currentToken.ClientId.Should().Be(_returnedDummyTokenDetails.ClientId);
             currentToken.Expires.Should().BeCloseTo(_returnedDummyTokenDetails.Expires, TimeSpan.Zero);
@@ -535,7 +535,7 @@ namespace IO.Ably.Tests.Realtime
             FailRenewal = 4,
         }
 
-        private Task<AblyRealtime> SetupConnectedClient(ConnectedClientErrors errors = ConnectedClientErrors.None)
+        private Task<PubSubRealtimeClient> SetupConnectedClient(ConnectedClientErrors errors = ConnectedClientErrors.None)
         {
             return GetConnectedClient(
                 opts =>
@@ -564,7 +564,7 @@ namespace IO.Ably.Tests.Realtime
                 });
         }
 
-        private async Task CloseAndWaitToReconnect(AblyRealtime client, ProtocolMessage connectedMessage = null)
+        private async Task CloseAndWaitToReconnect(PubSubRealtimeClient client, ProtocolMessage connectedMessage = null)
         {
             connectedMessage = connectedMessage ?? new ProtocolMessage(ProtocolMessage.MessageAction.Connected);
             LastCreatedTransport.Listener.OnTransportEvent(LastCreatedTransport.Id, TransportState.Closed);
