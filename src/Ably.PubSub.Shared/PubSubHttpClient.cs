@@ -91,10 +91,10 @@ namespace IO.Ably
         public IAblyAuth Auth => AblyAuth;
 
         /// <summary>
-        /// Expose Push Admin Rest APIs.
-        /// Rest API documentation: https://ably.com/docs/rest-api#push.
+        /// Expose the Push Admin APIs.
+        /// Ably REST API documentation: https://ably.com/docs/rest-api#push.
         /// </summary>
-        public PushRest Push { get; private set; }
+        public PushHttp Push { get; private set; }
 
         /// <summary>
         /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
@@ -156,7 +156,7 @@ namespace IO.Ably
             ExecuteHttpRequest = HttpClient.Execute;
             AblyAuth = new AblyAuth(Options, this);
             Channels = new HttpChannels(this, mobileDevice);
-            Push = new PushRest(this, Logger);
+            Push = new PushHttp(this, Logger);
             MobileDevice = mobileDevice;
             AblyAuth.OnClientIdChanged = OnAuthClientIdChanged;
         }

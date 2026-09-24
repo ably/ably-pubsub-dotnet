@@ -46,7 +46,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Push\PersistKeys.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdmin.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushRealtime.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Push\PushRest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Push\PushHttp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\RegistrationToken.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelEvent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AttemptsHelpers.cs" />

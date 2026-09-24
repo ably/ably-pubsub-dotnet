@@ -60,6 +60,7 @@ Every factory accepts an API key string, an Ably token string, a `ClientOptions`
 | `RestChannels` | `HttpChannels` |
 | `IRestChannel` | `IHttpChannel` |
 | `AblyRealtime.RestClient` (property) | `PubSubRealtimeClient.HttpClient` |
+| `PushRest` (the `AblyRest.Push` type) | `PushHttp` (the `PubSubHttpClient.Push` type) |
 
 Names that refer to Ably's REST API service or wire options are unchanged (`ClientOptions.RestHost`, `ClientOptions.IdempotentRestPublishing`, and so on).
 

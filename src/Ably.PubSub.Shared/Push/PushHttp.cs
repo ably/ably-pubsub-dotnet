@@ -1,11 +1,11 @@
 ﻿namespace IO.Ably.Push
 {
     /// <summary>
-    /// Push Apis for Rest clients.
+    /// Push APIs for HTTP clients.
     /// </summary>
-    public class PushRest
+    public class PushHttp
     {
-        internal PushRest(PubSubHttpClient rest, ILogger logger)
+        internal PushHttp(PubSubHttpClient rest, ILogger logger)
         {
             Admin = new PushAdmin(rest, logger);
         }

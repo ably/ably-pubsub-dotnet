@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Threading.Tasks;
 using FluentAssertions;
 using IO.Ably.PubSub.Device;
@@ -102,6 +103,22 @@ namespace IO.Ably.Tests.PubSub
             });
 
             AssertNoSideFlag(agentValues);
+        }
+
+        [Fact]
+        public void ClientConstructors_AreNotPublic()
+        {
+            // The internal-constructor invariant is load-bearing: the door factories are the only
+            // way application code can construct a client, which is what guarantees every client
+            // carries a device/server classification. This test (and the tests above constructing
+            // via the internal constructors) compiles through InternalsVisibleTo; an accidental
+            // future `public` constructor would otherwise ship silently.
+            typeof(PubSubRealtimeClient)
+                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+                .Should().BeEmpty("application code must construct realtime clients through the door factories");
+            typeof(PubSubHttpClient)
+                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+                .Should().BeEmpty("application code must construct HTTP clients through the door factories");
         }
 
         [Fact]

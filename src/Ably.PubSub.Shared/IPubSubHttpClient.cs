@@ -6,7 +6,7 @@ using IO.Ably.Rest;
 namespace IO.Ably
 {
     /// <summary>
-    /// Interface for a rest client.
+    /// Interface for the HTTP (REST API) client.
     /// </summary>
     public interface IPubSubHttpClient : IStatsCommands
     {
@@ -16,7 +16,7 @@ namespace IO.Ably
         // /// <summary>
         // /// Methods for managing Push notifications subscriptions and device registrations.
         // /// </summary>
-        // PushRest Push { get; }
+        // PushHttp Push { get; }
 
         /// <summary>Channel methods.</summary>
         HttpChannels Channels { get; }
