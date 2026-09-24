@@ -67,7 +67,7 @@ namespace IO.Ably.Tests.Realtime
         {
             var client = GetRealtime();
 
-            var result = await client.RestClient.CanFallback(new ErrorInfo("test", 111, (HttpStatusCode)httpCode));
+            var result = await client.HttpClient.CanFallback(new ErrorInfo("test", 111, (HttpStatusCode)httpCode));
             result.Should().BeTrue();
         }
 
@@ -75,7 +75,7 @@ namespace IO.Ably.Tests.Realtime
         public async Task CanAttemptFallback_WhenInternetCheckFails_ShouldBeFalse()
         {
             var client = GetRealtime(internetCheckOk: false);
-            var result = await client.RestClient.CanFallback(ErrorInfo.ReasonUnknown);
+            var result = await client.HttpClient.CanFallback(ErrorInfo.ReasonUnknown);
             result.Should().BeFalse();
         }
 
@@ -84,7 +84,7 @@ namespace IO.Ably.Tests.Realtime
         {
         }
 
-        private AblyRealtime GetRealtime(Action<ClientOptions> optionsAction = null, bool internetCheckOk = true)
+        private PubSubRealtimeClient GetRealtime(Action<ClientOptions> optionsAction = null, bool internetCheckOk = true)
         {
             return GetRealtimeClient(
                 request =>

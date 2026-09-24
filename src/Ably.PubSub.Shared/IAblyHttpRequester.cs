@@ -6,7 +6,7 @@ namespace IO.Ably
         "StyleCop.CSharp.DocumentationRules",
         "SA1600:Elements should be documented",
         Justification = "Internal interface.")]
-    internal interface IAblyHttpClient
+    internal interface IAblyHttpRequester
     {
         Task<AblyResponse> Execute(AblyRequest request);
     }

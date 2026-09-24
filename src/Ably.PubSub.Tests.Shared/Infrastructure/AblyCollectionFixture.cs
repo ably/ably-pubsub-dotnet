@@ -6,7 +6,7 @@ namespace IO.Ably.Tests
 {
     public class AblyCollectionFixture : ICollectionFixture<AblySandboxFixture> { }
 
-    [CollectionDefinition("AblyRest SandBox Collection")]
+    [CollectionDefinition("PubSubHttpClient SandBox Collection")]
     public class SandboxRestFixture : AblyCollectionFixture
     {
     }
@@ -70,11 +70,11 @@ namespace IO.Ably.Tests
             return new ClientOptions { Key = key ?? FirstValidKey, Tls = Tls, Environment = env };
         }
 
-        internal AblyHttpClient GetHttpClient(string environment = null)
+        internal AblyHttpRequester GetHttpClient(string environment = null)
         {
             var ablyHttpOptions = new AblyHttpOptions { IsSecure = Tls };
             ablyHttpOptions.Host = CreateDefaultOptions(null, environment).FullRestHost();
-            return new AblyHttpClient(ablyHttpOptions);
+            return new AblyHttpRequester(ablyHttpOptions);
         }
     }
 }

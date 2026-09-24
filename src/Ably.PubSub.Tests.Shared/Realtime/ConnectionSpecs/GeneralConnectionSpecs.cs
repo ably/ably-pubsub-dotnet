@@ -87,7 +87,7 @@ namespace IO.Ably.Tests.Realtime
 
             await client.ProcessCommands();
 
-            client.RestClient.AblyAuth.ClientId.Should().Be("realtimeClient");
+            client.HttpClient.AblyAuth.ClientId.Should().Be("realtimeClient");
         }
 
         public GeneralConnectionSpecs(ITestOutputHelper output)

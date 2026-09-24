@@ -27,7 +27,7 @@ namespace IO.Ably.Tests.Push
             [Fact]
             public void RestChannel_ShouldInitialisePushChannel()
             {
-                var restClient = GetRealtimeClient().RestClient;
+                var restClient = GetRealtimeClient().HttpClient;
                 var channel = restClient.Channels.Get("test");
                 channel.Push.Should().NotBeNull();
                 channel.Push.ChannelName.Should().Be(channel.Name);
@@ -41,14 +41,14 @@ namespace IO.Ably.Tests.Push
                 channel.Push.ChannelName.Should().Be(channel.Name);
             }
 
-            private AblyRealtime GetRealtimeClient()
+            private PubSubRealtimeClient GetRealtimeClient()
             {
-                return new AblyRealtime(new ClientOptions(ValidKey) { AutoConnect = false }, mobileDevice: new FakeMobileDevice());
+                return new PubSubRealtimeClient(new ClientOptions(ValidKey) { AutoConnect = false }, mobileDevice: new FakeMobileDevice());
             }
 
-            private AblyRest GetRestClient()
+            private PubSubHttpClient GetRestClient()
             {
-                return new AblyRest(new ClientOptions(ValidKey), mobileDevice: new FakeMobileDevice());
+                return new PubSubHttpClient(new ClientOptions(ValidKey), mobileDevice: new FakeMobileDevice());
             }
 
             public WhenPlatformSupportsPushNotifications(ITestOutputHelper output)
@@ -67,9 +67,9 @@ namespace IO.Ably.Tests.Push
                 channel.Push.Should().BeNull();
             }
 
-            private AblyRealtime GetRealtimeClient()
+            private PubSubRealtimeClient GetRealtimeClient()
             {
-                return new AblyRealtime(new ClientOptions(ValidKey) { AutoConnect = false });
+                return new PubSubRealtimeClient(new ClientOptions(ValidKey) { AutoConnect = false });
             }
 
             public WhenPlatformDoesNotSupportPushNotifications(ITestOutputHelper output)

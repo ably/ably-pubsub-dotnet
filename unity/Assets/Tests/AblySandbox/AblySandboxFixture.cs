@@ -53,7 +53,7 @@ namespace Assets.Tests.AblySandbox
             request.RequestBody = testAppSpec["post_apps"].ToString().GetBytes();
             request.Protocol = Protocol.Json;
 
-            AblyHttpClient client = settings.GetHttpClient(environment);
+            AblyHttpRequester client = settings.GetHttpClient(environment);
             var response = await RetryExecute(() => client.Execute(request));
 
             var json = JObject.Parse(response.TextResponse);
@@ -113,13 +113,13 @@ namespace Assets.Tests.AblySandbox
             json = json.Replace("[[Interval2]]", interval2.ToString("yyyy-MM-dd:HH:mm"));
             json = json.Replace("[[Interval3]]", interval3.ToString("yyyy-MM-dd:HH:mm"));
 
-            AblyHttpClient client = settings.GetHttpClient();
+            AblyHttpRequester client = settings.GetHttpClient();
             var request = new AblyRequest("/stats", HttpMethod.Post);
             request.Protocol = Protocol.Json;
             request.Headers.Add("Accept", "application/json");
             request.Headers.Add("Content-Type", "application/json");
 
-            AblyRest ablyRest = new AblyRest(settings.FirstValidKey);
+            PubSubHttpClient ablyRest = new PubSubHttpClient(settings.FirstValidKey);
             await ablyRest.AblyAuth.AddAuthHeader(request);
             request.RequestBody = json.GetBytes();
 

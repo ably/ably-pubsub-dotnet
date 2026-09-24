@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace IO.Ably.Tests.Rest
 {
-    [Collection("AblyRest SandBox Collection")]
+    [Collection("PubSubHttpClient SandBox Collection")]
     [Trait("type", "integration")]
     public class ChannelSandboxSpecs : SandboxSpecs
     {
@@ -352,8 +352,8 @@ namespace IO.Ably.Tests.Rest
         {
             var items = (JArray)_examples["items"];
 
-            AblyRest ably = await GetRestClient(protocol);
-            IRestChannel channel = ably.Channels.Get("persisted:test".AddRandomSuffix(), GetOptions(_examples));
+            PubSubHttpClient ably = await GetRestClient(protocol);
+            IHttpChannel channel = ably.Channels.Get("persisted:test".AddRandomSuffix(), GetOptions(_examples));
             var count = 0;
             foreach (var item in items)
             {
@@ -389,8 +389,8 @@ namespace IO.Ably.Tests.Rest
         {
             var items = (JArray)_examples256["items"];
 
-            AblyRest ably = await GetRestClient(protocol);
-            IRestChannel channel = ably.Channels.Get("persisted:test".AddRandomSuffix(), GetOptions(_examples256));
+            PubSubHttpClient ably = await GetRestClient(protocol);
+            IHttpChannel channel = ably.Channels.Get("persisted:test".AddRandomSuffix(), GetOptions(_examples256));
             var count = 0;
             foreach (var item in items)
             {
@@ -425,7 +425,7 @@ namespace IO.Ably.Tests.Rest
         {
             // Arrange
             var client = await GetRestClient(protocol);
-            IRestChannel channel = client.Channels.Get("persisted:historyTest:" + protocol);
+            IHttpChannel channel = client.Channels.Get("persisted:historyTest:" + protocol);
 
             // Act
             for (int i = 0; i < 20; i++)
@@ -452,7 +452,7 @@ namespace IO.Ably.Tests.Rest
         {
             // Arrange
             var client = await GetRestClient(protocol);
-            IRestChannel channel = client.Channels.Get("persisted:historyTest:" + protocol);
+            IHttpChannel channel = client.Channels.Get("persisted:historyTest:" + protocol);
 
             // Act
             for (int i = 0; i < 20; i++)
@@ -660,8 +660,8 @@ namespace IO.Ably.Tests.Rest
         {
             const string Name = "Test";
 
-            AblyRest client = await GetRestClient(protocol);
-            IRestChannel c = client.Channels.Get(Name);
+            PubSubHttpClient client = await GetRestClient(protocol);
+            IHttpChannel c = client.Channels.Get(Name);
 
             ChannelDetails cd = await c.StatusAsync();
             cd.ChannelId.Should().Be(Name);

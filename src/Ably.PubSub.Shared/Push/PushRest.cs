@@ -5,7 +5,7 @@
     /// </summary>
     public class PushRest
     {
-        internal PushRest(AblyRest rest, ILogger logger)
+        internal PushRest(PubSubHttpClient rest, ILogger logger)
         {
             Admin = new PushAdmin(rest, logger);
         }

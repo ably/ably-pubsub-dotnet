@@ -46,7 +46,7 @@ namespace IO.Ably.PubSub.Internal
         /// The core stores the options object it is given <b>by reference</b>, so stamping the
         /// side onto the caller's own instance would leak the flag into any other client built
         /// from the same options — both doors reused on one options object, or a plain
-        /// <c>new AblyRealtime(options)</c>. To prevent that, the options are copied via
+        /// <c>new PubSubRealtimeClient(options)</c>. To prevent that, the options are copied via
         /// <see cref="ClientOptions.Clone()"/> and the side is stamped onto the copy; the caller's
         /// instance and its <c>Agents</c> dictionary are left untouched. The copy lives in the core
         /// (not here) because <c>RestHost</c>/<c>RealtimeHost</c>/<c>FallbackHosts</c> are

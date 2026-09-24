@@ -25,7 +25,7 @@ namespace IO.Ably.Tests
         protected static string KeyId => ValidKey.Split(':')[0];
 
         private async Task<TokenRequest> CreateTokenRequest(
-            AblyRest client,
+            PubSubHttpClient client,
             TokenParams @params = null,
             AuthOptions options = null)
         {
@@ -52,7 +52,7 @@ namespace IO.Ably.Tests
                 // Success
             }
 
-            private static TokenRequest CreateDefaultTokenRequest(AblyRest client)
+            private static TokenRequest CreateDefaultTokenRequest(PubSubHttpClient client)
             {
                 return JsonHelper.Deserialize<TokenRequest>(client.Auth.CreateTokenRequestAsync().Result);
             }
@@ -123,7 +123,7 @@ namespace IO.Ably.Tests
             {
             }
 
-            private AblyRest GetClientWithTokenParams()
+            private PubSubHttpClient GetClientWithTokenParams()
             {
                 return GetRestClient(null, options =>
                 {
@@ -288,14 +288,14 @@ namespace IO.Ably.Tests
             [Fact]
             public async Task WithOutKeyIdThrowsException()
             {
-                var client = new AblyRest(new ClientOptions { UseTokenAuth = true });
+                var client = new PubSubHttpClient(new ClientOptions { UseTokenAuth = true });
                 await Assert.ThrowsAsync<AblyException>(() => client.Auth.CreateTokenRequestAsync());
             }
 
             [Fact]
             public async Task WithOutKeyValueThrowsException()
             {
-                var client = new AblyRest(new ClientOptions { Key = "111.222" });
+                var client = new PubSubHttpClient(new ClientOptions { Key = "111.222" });
                 await Assert.ThrowsAsync<AblyException>(() => client.Auth.CreateTokenRequestAsync());
             }
 
@@ -305,7 +305,7 @@ namespace IO.Ably.Tests
                 Client = GetRestClient();
             }
 
-            private AblyRest Client { get; }
+            private PubSubHttpClient Client { get; }
         }
 
         public class ClientIdSpecs : AuthorizationTests
@@ -317,7 +317,7 @@ namespace IO.Ably.Tests
             {
             }
 
-            private AblyRest GetRestClientWithClientId()
+            private PubSubHttpClient GetRestClientWithClientId()
             {
                 return GetRestClient(null, options => options.ClientId = ClientId);
             }
@@ -365,7 +365,7 @@ namespace IO.Ably.Tests
             public void WhenClientIdInOptions_ShouldPassClientIdToAblyAuth()
             {
                 var options = new ClientOptions(ValidKey) { ClientId = "123" };
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
                 client.AblyAuth.ClientId.Should().Be(options.ClientId);
             }
 
@@ -374,7 +374,7 @@ namespace IO.Ably.Tests
             public void WhenClientIsInitialisedWithTokenDetails_AuthClientIdShouldBeTheSame()
             {
                 var options = new ClientOptions { TokenDetails = new TokenDetails { ClientId = "*" } };
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
                 client.AblyAuth.ClientId.Should().Be("*");
             }
 
@@ -384,7 +384,7 @@ namespace IO.Ably.Tests
             {
                 // Arrange
                 var options = new ClientOptions(ValidKey) { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true };
-                var realtime = new AblyRealtime(options);
+                var realtime = new PubSubRealtimeClient(options);
                 const string clientId = "testId";
 
                 // Act
@@ -409,7 +409,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WhenConnectionClientIdIsSet_ShouldFireOnClientIdChangedFires()
             {
-                var rest = new AblyRest(ValidKey);
+                var rest = new PubSubHttpClient(ValidKey);
                 var updateClientIdCalled = false;
                 const string newClientId = "newClientId";
 
@@ -426,7 +426,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WhenConnectionTokenParamsAreUpdatedWithNewClientId_ShouldFireOnClientIdChanged()
             {
-                var rest = new AblyRest(ValidKey);
+                var rest = new PubSubHttpClient(ValidKey);
                 var updateClientIdCalled = false;
                 const string newClientId = "newClientId";
 
@@ -443,7 +443,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WhenCurrentTokenIsUpdatedWithNewClientId_ShouldFireOnClientIdChanged()
             {
-                var rest = new AblyRest(ValidKey);
+                var rest = new PubSubHttpClient(ValidKey);
                 var updateClientIdCalled = false;
                 const string newClientId = "newClientId";
 

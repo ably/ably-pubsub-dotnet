@@ -764,7 +764,7 @@ namespace IO.Ably.Tests.Realtime
                 await Task.Delay(10);
             }
 
-            private Task ReceiveAttachedMessage(AblyRealtime client)
+            private Task ReceiveAttachedMessage(PubSubRealtimeClient client)
             {
                 client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
                 {
@@ -952,7 +952,7 @@ namespace IO.Ably.Tests.Realtime
                 detachTask.Result.Error.Should().NotBeNull();
             }
 
-            private Task ReceiveDetachedMessage(AblyRealtime client)
+            private Task ReceiveDetachedMessage(PubSubRealtimeClient client)
             {
                 client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached)
                 {
@@ -1771,7 +1771,7 @@ namespace IO.Ably.Tests.Realtime
             /// Attaches the channel and hands it an ATTACHED carrying a channelSerial, which is what
             /// RTL15b reads. Asserting the serial landed makes RTL15b itself part of every case below.
             /// </summary>
-            private async Task AttachWithChannelSerial(AblyRealtime client, IRealtimeChannel channel, string serial)
+            private async Task AttachWithChannelSerial(PubSubRealtimeClient client, IRealtimeChannel channel, string serial)
             {
                 channel.Attach();
                 await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)

@@ -1,6 +1,6 @@
 # Upgrading from ably.io 1.x to Ably Pub/Sub 2.0
 
-Ably Pub/Sub 2.0 splits the single `ably.io` package into device-side and server-side packages. This lets Ably classify every client as device-side or server-side, which the platform's behaviour and monthly-active-user (MAU) billing depend on. The runtime API is unchanged — the namespace is still `IO.Ably`, and you still get an `AblyRealtime` or `AblyRest` — only the package you install and the way you construct the client change.
+Ably Pub/Sub 2.0 splits the single `ably.io` package into device-side and server-side packages. This lets Ably classify every client as device-side or server-side, which the platform's behaviour and monthly-active-user (MAU) billing depend on. The namespace is still `IO.Ably` and the API shape is unchanged, but the client classes are renamed for 2.0 — `AblyRealtime` is now `PubSubRealtimeClient` and `AblyRest` is now `PubSubHttpClient` (see [Renamed types](#renamed-types)) — and both the package you install and the way you construct the client change.
 
 ## Package coordinates
 
@@ -14,7 +14,7 @@ Choose the package by *where the code runs*, not by which Ably features you use.
 
 ## Construct clients through the door factories
 
-The `new AblyRealtime(...)` / `new AblyRest(...)` constructors are internal in 2.0: application code cannot construct a client directly from the core, because a client built that way would carry no device/server classification. Use the factories instead.
+The client constructors are internal in 2.0: application code cannot construct a client directly from the core, because a client built that way would carry no device/server classification. Use the factories instead.
 
 Device (was `new AblyRealtime("your-ably-api-key")`):
 
@@ -22,7 +22,7 @@ Device (was `new AblyRealtime("your-ably-api-key")`):
 using IO.Ably;
 using IO.Ably.PubSub.Device;
 
-AblyRealtime realtime = PubSubDevice.CreateClient("your-ably-api-key");
+PubSubRealtimeClient realtime = PubSubDevice.CreateClient("your-ably-api-key");
 // also: CreateClient(ClientOptions), CreateClient(o => o.ClientId = "...")
 ```
 
@@ -32,7 +32,7 @@ Server realtime (was `new AblyRealtime(options)` in a backend):
 using IO.Ably;
 using IO.Ably.PubSub.Server;
 
-AblyRealtime realtime = PubSubServer.CreateRealtimeClient("your-ably-api-key");
+PubSubRealtimeClient realtime = PubSubServer.CreateRealtimeClient("your-ably-api-key");
 ```
 
 Server REST (was `new AblyRest(options)`):
@@ -41,10 +41,27 @@ Server REST (was `new AblyRest(options)`):
 using IO.Ably;
 using IO.Ably.PubSub.Server;
 
-AblyRest rest = PubSubServer.CreateHttpClient("your-ably-api-key");
+PubSubHttpClient rest = PubSubServer.CreateHttpClient("your-ably-api-key");
 ```
 
 Every factory accepts an API key string, an Ably token string, a `ClientOptions`, or an `Action<ClientOptions>`.
+
+## Renamed types
+
+2.0 renames the client-facing "REST" identifiers to "HTTP", matching the other Ably Pub/Sub SDKs. The namespace stays `IO.Ably`; only the type and member names change.
+
+| 1.x name | 2.0 name |
+|----------|----------|
+| `AblyRealtime` | `PubSubRealtimeClient` |
+| `AblyRest` | `PubSubHttpClient` |
+| `IRealtimeClient` | `IPubSubRealtimeClient` |
+| `IRestClient` | `IPubSubHttpClient` |
+| `RestChannel` | `HttpChannel` |
+| `RestChannels` | `HttpChannels` |
+| `IRestChannel` | `IHttpChannel` |
+| `AblyRealtime.RestClient` (property) | `PubSubRealtimeClient.HttpClient` |
+
+Names that refer to Ably's REST API service or wire options are unchanged (`ClientOptions.RestHost`, `ClientOptions.IdempotentRestPublishing`, and so on).
 
 ## Deprecated API removed
 
@@ -58,7 +75,7 @@ Every factory accepts an API key string, an Ably token string, a `ClientOptions`
 | `Connection.RecoveryKey` | `Connection.CreateRecoveryKey()` |
 | `ClientOptions.FallbackHostsUseDefault` | Nothing — the default fallback hosts apply automatically; set `ClientOptions.FallbackHosts` only to supply custom hosts |
 | `ClientOptions.CaptureCurrentSynchronizationContext` | `ClientOptions.CustomContext` (pass the `SynchronizationContext` explicitly) |
-| `AblyRest.Request(string method, ..., JToken body, ...)` | `AblyRest.RequestV2(...)` (string body) or `AblyRest.Request(HttpMethod, ...)` |
+| `AblyRest.Request(string method, ..., JToken body, ...)` | `PubSubHttpClient.RequestV2(...)` (string body) or `PubSubHttpClient.Request(HttpMethod, ...)` |
 | `HistoryRequestParams` | `PaginatedRequestParams` |
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
@@ -73,7 +90,7 @@ Every factory accepts an API key string, an Ably token string, a `ClientOptions`
 
 ## The MAU forcing function
 
-Once MAU-based pricing is live, a client that is not classified as device- or server-side is rejected. The 2.0 core makes such a client impossible to construct from application code — the `AblyRealtime`/`AblyRest` constructors are internal, so the door factories are the only way in, and each factory stamps its side's classification. Always go through the factories, and use a fresh or door-appropriate `ClientOptions` per client.
+Once MAU-based pricing is live, a client that is not classified as device- or server-side is rejected. The 2.0 core makes such a client impossible to construct from application code — the `PubSubRealtimeClient`/`PubSubHttpClient` constructors are internal, so the door factories are the only way in, and each factory stamps its side's classification. Always go through the factories, and use a fresh or door-appropriate `ClientOptions` per client.
 
 ## Xamarin and older device apps
 

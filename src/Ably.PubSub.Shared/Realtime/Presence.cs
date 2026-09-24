@@ -821,7 +821,7 @@ namespace IO.Ably.Realtime
                 _channel.AddUntilAttachParameter(query);
             }
 
-            return _channel.RestChannel.Presence.HistoryAsync(query);
+            return _channel.HttpChannel.Presence.HistoryAsync(query);
         }
 
         /// <summary>
@@ -841,7 +841,7 @@ namespace IO.Ably.Realtime
                 _channel.AddUntilAttachParameter(query);
             }
 
-            return _channel.RestChannel.Presence.HistoryAsync(query);
+            return _channel.HttpChannel.Presence.HistoryAsync(query);
         }
 
         private void NotifySyncCompleted()

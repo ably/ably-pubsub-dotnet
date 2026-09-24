@@ -20,14 +20,14 @@ namespace IO.Ably.Tests.GithubSamples
         public void InitializeClient()
         {
             // If you do not have an API key, [sign up for a free API key now](https://www.ably.com/sign-up)
-            var realtimeBasic = new AblyRealtime(PlaceholderKey);
-            var realtimeToken = new AblyRealtime(new ClientOptions { Token = "token" });
+            var realtimeBasic = new PubSubRealtimeClient(PlaceholderKey);
+            var realtimeToken = new PubSubRealtimeClient(new ClientOptions { Token = "token" });
         }
 
         [Fact]
         public void SuccessfulConnection()
         {
-            var realtime = new AblyRealtime(PlaceholderKey);
+            var realtime = new PubSubRealtimeClient(PlaceholderKey);
 
             realtime.Connection.On(ConnectionEvent.Connected, args =>
             {
@@ -47,7 +47,7 @@ namespace IO.Ably.Tests.GithubSamples
         [Fact]
         public void AutoConnectOff()
         {
-            var realtime = new AblyRealtime(new ClientOptions(PlaceholderKey) { AutoConnect = false });
+            var realtime = new PubSubRealtimeClient(new ClientOptions(PlaceholderKey) { AutoConnect = false });
             realtime.Connect();
 
             realtime.Connection.On(args =>
@@ -61,7 +61,7 @@ namespace IO.Ably.Tests.GithubSamples
         [Fact(Skip = "Used to make sure samples compile")]
         public async Task ChannelSubscribe()
         {
-            var realtime = new AblyRealtime(new ClientOptions(PlaceholderKey) { AutoConnect = false });
+            var realtime = new PubSubRealtimeClient(new ClientOptions(PlaceholderKey) { AutoConnect = false });
             IRealtimeChannel channel = realtime.Channels.Get("test");
 
             // Or ...
@@ -112,7 +112,7 @@ namespace IO.Ably.Tests.GithubSamples
         [Fact(Skip = "Just need to make sure it compiles")]
         public async Task ChannelHistory()
         {
-            var realtime = new AblyRealtime(PlaceholderKey);
+            var realtime = new PubSubRealtimeClient(PlaceholderKey);
             IRealtimeChannel channel = realtime.Channels.Get("test");
             var history = await channel.HistoryAsync();
 
@@ -138,8 +138,8 @@ namespace IO.Ably.Tests.GithubSamples
         [Fact(Skip = "Making sure the samples compile")]
         public async Task RestApiSamples()
         {
-            var client = new AblyRest(PlaceholderKey);
-            IRestChannel channel = client.Channels.Get("test");
+            var client = new PubSubHttpClient(PlaceholderKey);
+            IHttpChannel channel = client.Channels.Get("test");
 
             try
             {
@@ -185,7 +185,7 @@ namespace IO.Ably.Tests.GithubSamples
 
             // Publishing encrypted messages
             var secret = Crypto.GenerateRandomKey();
-            IRestChannel encryptedChannel = client.Channels.Get("encryptedChannel", new ChannelOptions(secret));
+            IHttpChannel encryptedChannel = client.Channels.Get("encryptedChannel", new ChannelOptions(secret));
             await encryptedChannel.PublishAsync("name", "sensitive data"); // Data will be encrypted before publish
             var history = await encryptedChannel.HistoryAsync();
             var data = history.Items.First().Data;
@@ -195,7 +195,7 @@ namespace IO.Ably.Tests.GithubSamples
             // Generate a token
             var token = await client.Auth.RequestTokenAsync();
             var tokenString = token.Token; // "xVLyHw.CLchevH3hF....MDh9ZC_Q"
-            var tokenClient = new AblyRest(new ClientOptions { TokenDetails = token });
+            var tokenClient = new PubSubHttpClient(new ClientOptions { TokenDetails = token });
 
             var tokenRequest = await client.Auth.CreateTokenRequestAsync();
 
@@ -214,7 +214,7 @@ namespace IO.Ably.Tests.GithubSamples
             var options = new ClientOptions();
             var websocketOptions = new MsWebSocketOptions { SendBufferInBytes = maxBufferSize, ReceiveBufferInBytes = maxBufferSize };
             options.TransportFactory = new MsWebSocketTransport.TransportFactory(websocketOptions);
-            var realtime = new AblyRealtime(options);
+            var realtime = new PubSubRealtimeClient(options);
         }
     }
 

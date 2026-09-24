@@ -14,13 +14,13 @@ namespace IO.Ably.Tests
 
         internal List<AblyRequest> Requests { get; } = new List<AblyRequest>();
 
-        internal AblyRealtime GetRealtimeClient(Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null, Action<ClientOptions> setOptionsAction = null)
+        internal PubSubRealtimeClient GetRealtimeClient(Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null, Action<ClientOptions> setOptionsAction = null)
         {
             var options = new ClientOptions(ValidKey) { UseBinaryProtocol = false };
             setOptionsAction?.Invoke(options);
 
-            var client = new AblyRealtime(options);
-            client.RestClient.ExecuteHttpRequest = request =>
+            var client = new PubSubRealtimeClient(options);
+            client.HttpClient.ExecuteHttpRequest = request =>
             {
                 Requests.Add(request);
                 if (handleRequestFunc != null)

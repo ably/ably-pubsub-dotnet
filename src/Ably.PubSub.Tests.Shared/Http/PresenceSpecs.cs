@@ -33,8 +33,8 @@ namespace IO.Ably.Tests
 
         public class GetSpecs : PresenceSpecs
         {
-            private AblyRest _client;
-            private readonly IRestChannel _channel;
+            private PubSubHttpClient _client;
+            private readonly IHttpChannel _channel;
 
             [Theory]
             [InlineData(null, "100", false)]

@@ -14,7 +14,7 @@ namespace IO.Ably.Tests.Samples
     {
         public static async Task AuthSamples1()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var tokenParams = new TokenParams { ClientId = "Bob" };
             string tokenRequest = await realtime.Auth.CreateTokenRequestAsync(tokenParams);
             // ... issue the TokenRequest to a client ...
@@ -22,7 +22,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task AuthSamples2()
         {
-            var client = new AblyRealtime("{{API_KEY}}");
+            var client = new PubSubRealtimeClient("{{API_KEY}}");
             try
             {
                 var tokenParams = new TokenParams { ClientId = "bob" };
@@ -37,7 +37,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task AuthSample3()
         {
-            var client = new AblyRealtime("{{API_KEY}}");
+            var client = new PubSubRealtimeClient("{{API_KEY}}");
             try
             {
                 var tokenParams = new TokenParams { ClientId = "bob" };
@@ -52,7 +52,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task AuthSample4()
         {
-            var client = new AblyRealtime("{{API_KEY}}");
+            var client = new PubSubRealtimeClient("{{API_KEY}}");
             try
             {
                 var tokenParams = new TokenParams { ClientId = "bob" };
@@ -67,7 +67,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void ChannelSample1()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             channel.Subscribe(message =>
                         Console.WriteLine($"Message: {message.Name}:{message.Data} received"));
@@ -80,7 +80,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void ChannelSample2()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("chatroom");
             channel.Attach((success, error) =>
             {
@@ -90,7 +90,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void ChannelSample3()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("chatroom");
             channel.Subscribe(message => Console.WriteLine($"Message received:{message.Data}"));
             channel.Publish("action", "boom");
@@ -98,7 +98,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task ChannelSample4()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("chatroom");
             channel.On(ChannelEvent.Attached, args => Console.WriteLine($"channel {channel.Name} is now attached"));
             channel.On(args => Console.WriteLine($"channel state is {channel.State}"));
@@ -151,7 +151,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task ChannelHistory()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("chatroom");
             var history = await channel.HistoryAsync();
             Console.WriteLine($"{history.Items.Count} messages received in the first page");
@@ -163,7 +163,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task StatsExample()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var query = new StatsRequestParams { Unit = StatsIntervalGranularity.Hour };
             var results = await realtime.StatsAsync(query);
             Stats thisHour = results.Items[0];
@@ -173,7 +173,7 @@ namespace IO.Ably.Tests.Samples
         public static async Task PresenceExample()
         {
             var options = new ClientOptions("{{API_KEY}}") { ClientId = "bob" };
-            var realtime = new AblyRealtime(options);
+            var realtime = new PubSubRealtimeClient(options);
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             channel.Presence.Subscribe(member => Console.WriteLine($"Member {member.ClientId} : {member.Action}"));
             await channel.Presence.EnterAsync(null);
@@ -212,14 +212,14 @@ namespace IO.Ably.Tests.Samples
         public static async Task PresenceExamples2()
         {
             // request a wildcard token
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             var @params = new TokenParams { ClientId = "*" };
             var options = new ClientOptions
             {
                 TokenDetails = await rest.Auth.RequestTokenAsync(@params),
             };
 
-            var realtime = new AblyRealtime(options);
+            var realtime = new PubSubRealtimeClient(options);
             var channel = realtime.Channels.Get("realtime-chat");
 
             channel.Presence.Subscribe(member =>
@@ -233,7 +233,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void HistoryExamples()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             channel.Publish("example", "message data", async (success, error) =>
             {
@@ -245,7 +245,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task HistoryExample2()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             await channel.AttachAsync();
             PaginatedResult<Message> resultPage = await channel.HistoryAsync();
@@ -266,7 +266,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void EncryptionExample()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var key = Crypto.GenerateRandomKey();
             var options = new ChannelOptions(key);
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}", options);
@@ -281,13 +281,13 @@ namespace IO.Ably.Tests.Samples
         {
             var @params = Crypto.GetDefaultParams();
             var options = new ChannelOptions(@params);
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}", options);
         }
 
         public static void EncryptionExample3()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             byte[] key = Crypto.GenerateRandomKey(128);
             var options = new ChannelOptions(key);
             var channel = realtime.Channels.Get("{{RANDOM_CHANNEL_NAME}}", options);
@@ -295,7 +295,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void ConnectionExamples()
         {
-            var realtime = new AblyRealtime("{{API_KEY}}");
+            var realtime = new PubSubRealtimeClient("{{API_KEY}}");
             realtime.Connection.On(ConnectionEvent.Connected, args => Console.WriteLine("Connected, that was easy"));
             void Action(ConnectionStateChange args) => Console.WriteLine($"New state is {args.Current}");
             realtime.Connection.On(Action);
@@ -304,12 +304,12 @@ namespace IO.Ably.Tests.Samples
 
         public static void RestInit()
         {
-            var rest = new AblyRest(new ClientOptions { AuthUrl = new Uri("https://my.website/auth") });
+            var rest = new PubSubHttpClient(new ClientOptions { AuthUrl = new Uri("https://my.website/auth") });
         }
 
         public static async Task RestWithClientId()
         {
-            var rest = new AblyRest(new ClientOptions { Key = "{{API_KEY}}" });
+            var rest = new PubSubHttpClient(new ClientOptions { Key = "{{API_KEY}}" });
             var tokenParams = new TokenParams { ClientId = "Bob" };
             string tokenRequest = await rest.Auth.CreateTokenRequestAsync(tokenParams);
             // ... issue the TokenRequest to a client ...
@@ -323,7 +323,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestAuthorizeSample()
         {
-            var client = new AblyRest("{{API_KEY}}");
+            var client = new PubSubHttpClient("{{API_KEY}}");
             try
             {
                 var tokenParams = new TokenParams { ClientId = "bob" };
@@ -360,7 +360,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestChannelSamples()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             var channel = rest.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             await channel.PublishAsync("example", "message data");
             PaginatedResult<Message> resultPage = await channel.HistoryAsync();
@@ -374,7 +374,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestChannelHistory()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             var channel = rest.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
 
             PaginatedResult<Message> resultPage = await channel.HistoryAsync();
@@ -388,7 +388,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestEncryption()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             var key = Crypto.GenerateRandomKey();
             var options = new ChannelOptions(key);
             var channel = rest.Channels.Get("{{RANDOM_CHANNEL_NAME}}", options);
@@ -400,7 +400,7 @@ namespace IO.Ably.Tests.Samples
 
         public static void RestGenerateRandomKey()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             byte[] key = Crypto.GenerateRandomKey(128);
             var options = new ChannelOptions(key);
             var channel = rest.Channels.Get("{{RANDOM_CHANNEL_NAME}}", options);
@@ -408,7 +408,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestHistorySamples()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             var channel = rest.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             await channel.PublishAsync("example", "message data");
             PaginatedResult<Message> resultPage = await channel.HistoryAsync();
@@ -418,7 +418,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestPresenceSamples()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             var channel = rest.Channels.Get("{{RANDOM_CHANNEL_NAME}}");
             PaginatedResult<PresenceMessage> membersPage = await channel.Presence.GetAsync();
             Console.WriteLine($"{membersPage.Items.Count} members in first page");
@@ -440,7 +440,7 @@ namespace IO.Ably.Tests.Samples
 
         public static async Task RestStatsSamples()
         {
-            var rest = new AblyRest("{{API_KEY}}");
+            var rest = new PubSubHttpClient("{{API_KEY}}");
             PaginatedResult<Stats> results = await rest.StatsAsync(new StatsRequestParams { Unit = StatsIntervalGranularity.Hour });
             Stats thisHour = results.Items[0];
             Console.WriteLine($"Published this hour {thisHour.Inbound.All.All.Count}");

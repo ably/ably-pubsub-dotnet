@@ -8,7 +8,7 @@ namespace Assets.Tests.AblySandbox
     public static class AblyRealtimeExtensions
     {
         private const int Timeout = 50;
-        public static Task<TimeSpan> WaitForState(this AblyRealtime realtime, ConnectionState awaitedState)
+        public static Task<TimeSpan> WaitForState(this PubSubRealtimeClient realtime, ConnectionState awaitedState)
         {
             if (realtime.Connection.State == awaitedState)
             {
@@ -19,7 +19,7 @@ namespace Assets.Tests.AblySandbox
             return connectionAwaiter.Wait();
         }
 
-        public static Task WaitForState(this IRealtimeClient realtime, ConnectionState awaitedState = ConnectionState.Connected)
+        public static Task WaitForState(this IPubSubRealtimeClient realtime, ConnectionState awaitedState = ConnectionState.Connected)
         {
             var connectionAwaiter = new ConnectionAwaiter(realtime.Connection, awaitedState);
             return connectionAwaiter.Wait();
@@ -28,7 +28,7 @@ namespace Assets.Tests.AblySandbox
         /// <summary>
         /// This method yields the current thread and waits until the whole command queue is processed.
         /// </summary>
-        public static async Task ProcessCommands(this AblyRealtime client)
+        public static async Task ProcessCommands(this PubSubRealtimeClient client)
         {
             var taskAwaiter = new TaskCompletionAwaiter();
 

@@ -9,18 +9,18 @@ namespace IO.Ably.Tests.Realtime
 {
     public static class AblyRealtimeTestExtensions
     {
-        public static void FakeProtocolMessageReceived(this AblyRealtime client, ProtocolMessage message)
+        public static void FakeProtocolMessageReceived(this PubSubRealtimeClient client, ProtocolMessage message)
         {
             client.Workflow.QueueCommand(ProcessMessageCommand.Create(message));
         }
 
-        public static void FakeMessageReceived(this AblyRealtime client, Message message, string channel = null)
+        public static void FakeMessageReceived(this PubSubRealtimeClient client, Message message, string channel = null)
         {
             client.FakeProtocolMessageReceived(
                 new ProtocolMessage(ProtocolMessage.MessageAction.Message) { Messages = new[] { message }, Channel = channel });
         }
 
-        public static async Task DisconnectWithRetryableError(this AblyRealtime client, bool waitForDisconnectedState = true)
+        public static async Task DisconnectWithRetryableError(this PubSubRealtimeClient client, bool waitForDisconnectedState = true)
         {
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
             {
@@ -33,7 +33,7 @@ namespace IO.Ably.Tests.Realtime
             }
         }
 
-        public static async Task DisconnectWithNonRetryableError(this AblyRealtime client, bool waitForDisconnectedState = true)
+        public static async Task DisconnectWithNonRetryableError(this PubSubRealtimeClient client, bool waitForDisconnectedState = true)
         {
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Disconnected)
             {
@@ -46,7 +46,7 @@ namespace IO.Ably.Tests.Realtime
             }
         }
 
-        public static async Task ConnectClient(this AblyRealtime client)
+        public static async Task ConnectClient(this PubSubRealtimeClient client)
         {
             await client.WaitForState(ConnectionState.Connecting, TimeSpan.FromMilliseconds(10000));
 

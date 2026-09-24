@@ -12,7 +12,7 @@ namespace IO.Ably.Tests.Push
 {
     public static class PushAdminSandboxTests
     {
-        private static LocalDevice GetTestLocalDevice(AblyRest client) =>
+        private static LocalDevice GetTestLocalDevice(PubSubHttpClient client) =>
             PushTestHelpers.GetTestLocalDevice(client, "123");
 
         [Trait("type", "integration")]

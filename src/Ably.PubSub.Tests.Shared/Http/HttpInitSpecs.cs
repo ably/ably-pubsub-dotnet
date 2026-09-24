@@ -6,7 +6,7 @@ using Xunit.Abstractions;
 
 namespace IO.Ably.Tests
 {
-    public class RestInitSpecs : AblySpecs
+    public class HttpInitSpecs : AblySpecs
     {
         private const string NoMeansProvidedToRenewAuthToken = "Library initialized with a token literal without any way to renew the token when it expires (no authUrl, authCallback, or key). See https://help.ably.io/error/40171 for help";
 
@@ -14,7 +14,7 @@ namespace IO.Ably.Tests
         [Trait("spec", "RSA2")]
         public void Init_WithKeyAndNoClientId_SetsAuthMethodToBasic()
         {
-            var client = new AblyRest(ValidKey);
+            var client = new PubSubHttpClient(ValidKey);
             client.AblyAuth.AuthMethod.Should().Be(AuthMethod.Basic);
         }
 
@@ -26,7 +26,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RSA4")]
             public void WithUseTokenAuthSetToTrue_AuthMethodIsAlwaysTokenAuth()
             {
-                var client = new AblyRest(new ClientOptions { Key = ValidKey, UseTokenAuth = true });
+                var client = new PubSubHttpClient(new ClientOptions { Key = ValidKey, UseTokenAuth = true });
                 client.AblyAuth.AuthMethod.Should().Be(AuthMethod.Token);
             }
 
@@ -34,7 +34,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RSA4")]
             public void WithKeyAndClientId_ShouldUseBasicAuth()
             {
-                var client = new AblyRest(new ClientOptions { Key = ValidKey, ClientId = "123" });
+                var client = new PubSubHttpClient(new ClientOptions { Key = ValidKey, ClientId = "123" });
                 client.AblyAuth.AuthMethod.Should().Be(AuthMethod.Basic);
             }
 
@@ -43,7 +43,7 @@ namespace IO.Ably.Tests
             public void WithTokenButNoWayToRenew_ShouldLogErrorMessageWithError()
             {
                 var testLogger = new TestLogger(NoMeansProvidedToRenewAuthToken);
-                _ = new AblyRest(new ClientOptions { Token = "Test", Logger = testLogger });
+                _ = new PubSubHttpClient(new ClientOptions { Token = "Test", Logger = testLogger });
                 testLogger.MessageSeen.Should().BeTrue();
             }
 
@@ -52,7 +52,7 @@ namespace IO.Ably.Tests
             public void WithTokenDetailsButNoWayToRenew_ShouldLogErrorMessageWithError()
             {
                 var testLogger = new TestLogger(NoMeansProvidedToRenewAuthToken);
-                _ = new AblyRest(new ClientOptions { TokenDetails = new TokenDetails("test"), Logger = testLogger });
+                _ = new PubSubHttpClient(new ClientOptions { TokenDetails = new TokenDetails("test"), Logger = testLogger });
                 testLogger.MessageSeen.Should().BeTrue();
             }
 
@@ -60,7 +60,7 @@ namespace IO.Ably.Tests
             public void WithKeyNoClientIdAndAuthToken_ShouldSetCurrentToken()
             {
                 ClientOptions options = new ClientOptions { Key = ValidKey, ClientId = "123", Token = "blah" };
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
 
                 client.AblyAuth.AuthMethod.Should().Be(AuthMethod.Token);
                 client.AblyAuth.CurrentToken.Token.Should().Be("blah");
@@ -69,7 +69,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithoutKey_ShouldUseTokenAuth()
             {
-                var client = new AblyRest(opts =>
+                var client = new PubSubHttpClient(opts =>
                 {
                     opts.Key = "test.best:rest";
                     opts.Token = "blah";
@@ -82,7 +82,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithToken_ShouldUseTokenAuth()
             {
-                var client = new AblyRest(opts =>
+                var client = new PubSubHttpClient(opts =>
                 {
                     opts.Key = "test.best:rest";
                     opts.Token = "blah";
@@ -94,7 +94,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithTokenDetails_ShouldUseTokenAuth()
             {
-                var client = new AblyRest(opts =>
+                var client = new PubSubHttpClient(opts =>
                 {
                     opts.Key = "test.best:rest";
                     opts.TokenDetails = new TokenDetails("123");
@@ -106,7 +106,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithAuthUrl_ShouldUseTokenAuth()
             {
-                var client = new AblyRest(opts =>
+                var client = new PubSubHttpClient(opts =>
                 {
                     opts.Key = "test.best:rest";
                     opts.AuthUrl = new Uri("http://authUrl");
@@ -118,7 +118,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithAuthCallback_ShouldUseTokenAuth()
             {
-                var client = new AblyRest(opts =>
+                var client = new PubSubHttpClient(opts =>
                 {
                     opts.AuthCallback = @params => Task.FromResult<object>(new TokenDetails());
                 });
@@ -129,7 +129,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithTokenOnly_SetsTokenRenewableToFalse()
             {
-                var rest = new AblyRest(new ClientOptions { Token = "token_id" });
+                var rest = new PubSubHttpClient(new ClientOptions { Token = "token_id" });
 
                 rest.AblyAuth.TokenRenewable.Should().BeFalse();
             }
@@ -137,7 +137,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithApiKey_SetsTokenRenewableToTrue()
             {
-                var rest = new AblyRest(new ClientOptions(ValidKey));
+                var rest = new PubSubHttpClient(new ClientOptions(ValidKey));
 
                 rest.AblyAuth.TokenRenewable.Should().BeTrue();
             }
@@ -145,7 +145,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithAuthUrl_SetsTokenRenewableToTrue()
             {
-                var rest = new AblyRest(new ClientOptions { AuthUrl = new Uri("http://boo") });
+                var rest = new PubSubHttpClient(new ClientOptions { AuthUrl = new Uri("http://boo") });
 
                 rest.AblyAuth.TokenRenewable.Should().BeTrue();
             }
@@ -153,7 +153,7 @@ namespace IO.Ably.Tests
             [Fact]
             public void WithAuthCallback_SetsTokenRenewableToTrue()
             {
-                var rest = new AblyRest(new ClientOptions { AuthCallback = token => Task.FromResult<object>(new TokenDetails()) });
+                var rest = new PubSubHttpClient(new ClientOptions { AuthCallback = token => Task.FromResult<object>(new TokenDetails()) });
 
                 rest.AblyAuth.TokenRenewable.Should().BeTrue();
             }
@@ -162,7 +162,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RSC1b")]
             public void WithoutTokenAuthAndNoKey_ShouldThrow()
             {
-                var error = Assert.Throws<AblyException>(() => new AblyRest(new ClientOptions()));
+                var error = Assert.Throws<AblyException>(() => new PubSubHttpClient(new ClientOptions()));
                 error.ErrorInfo.Code.Should().Be(ErrorCodes.UnableToObtainCredentialsFromGivenParameters);
             }
         }
@@ -170,7 +170,7 @@ namespace IO.Ably.Tests
         [Fact]
         public void Init_WithTlsAndSpecificPort_ShouldInitialiseHttpClientWithCorrectPort()
         {
-            var client = new AblyRest(opts =>
+            var client = new PubSubHttpClient(opts =>
             {
                 opts.Tls = true;
                 opts.TlsPort = 111;
@@ -182,7 +182,7 @@ namespace IO.Ably.Tests
         [Fact]
         public void Init_WithTlsFalseAndSpecificPort_ShouldInitialiseHttpClientWithCorrectPort()
         {
-            var client = new AblyRest(opts =>
+            var client = new PubSubHttpClient(opts =>
             {
                 opts.Tls = false;
                 opts.Port = 111;
@@ -191,7 +191,7 @@ namespace IO.Ably.Tests
             client.HttpClient.Options.Port.Should().Be(111);
         }
 
-        public RestInitSpecs(ITestOutputHelper output)
+        public HttpInitSpecs(ITestOutputHelper output)
             : base(output)
         {
         }

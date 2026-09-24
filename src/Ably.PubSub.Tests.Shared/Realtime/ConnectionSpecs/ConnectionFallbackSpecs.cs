@@ -474,7 +474,7 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
 
             async Task MakeRestRequestRequest()
             {
-                await client.RestClient.Channels.Get("boo").PublishAsync("boo", "baa");
+                await client.HttpClient.Channels.Get("boo").PublishAsync("boo", "baa");
             }
         }
 

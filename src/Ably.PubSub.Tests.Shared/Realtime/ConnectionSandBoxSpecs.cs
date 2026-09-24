@@ -266,7 +266,7 @@ namespace IO.Ably.Tests.Realtime
         [Trait("spec", "RTN12d")]
         public async Task WithDisconnectedOrSuspendedConnection_WhenCloseCalled_AbortRetryAndCloseImmediately(Protocol protocol)
         {
-            async Task AssertsClosesAndDoesNotReconnect(AblyRealtime realtime, ConnectionState state)
+            async Task AssertsClosesAndDoesNotReconnect(PubSubRealtimeClient realtime, ConnectionState state)
             {
                 await realtime.WaitForState(state);
 
@@ -434,7 +434,7 @@ namespace IO.Ably.Tests.Realtime
 
             ResetEvent.WaitOne(10000);
 
-            realtimeClient.RestClient.AblyAuth.CurrentToken.Expires.Should()
+            realtimeClient.HttpClient.AblyAuth.CurrentToken.Expires.Should()
                 .BeAfter(TestHelpers.Now(), "The token should be valid and expire in the future.");
             error.Should().BeNull("No error should be raised!");
         }
@@ -871,7 +871,7 @@ namespace IO.Ably.Tests.Realtime
             var settings = await AblySandboxFixture.GetSettings();
             var authUrl = "http://echo.ably.io/?type=text&body=" + token.Token;
 
-            var authUrlClient = new AblyRealtime(new ClientOptions
+            var authUrlClient = new PubSubRealtimeClient(new ClientOptions
             {
                 AuthUrl = new Uri(authUrl),
                 Environment = settings.Environment,
@@ -1266,9 +1266,9 @@ namespace IO.Ably.Tests.Realtime
 
             client.State.Connection.ConnectionStateTtl = TimeSpan.FromSeconds(5);
 
-            var oldExecuteRequest = client.RestClient.ExecuteHttpRequest;
+            var oldExecuteRequest = client.HttpClient.ExecuteHttpRequest;
 
-            client.RestClient.ExecuteHttpRequest = request =>
+            client.HttpClient.ExecuteHttpRequest = request =>
             {
                 // Throw 500
                 if (request.Url.Contains("internet"))
@@ -1303,14 +1303,14 @@ namespace IO.Ably.Tests.Realtime
                 Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout },
             });
 
-            var host = client.RestClient.HttpClient.PreferredHost;
+            var host = client.HttpClient.HttpClient.PreferredHost;
             await client.ProcessCommands();
 
             await client.WaitForState(ConnectionState.Connected);
             stopwatch.Stop();
             stopwatch.Elapsed.Should().BeLessThan(Defaults.DisconnectedRetryTimeout, "If the internet check doesn't work it will wait for the full 15 seconds before it retries");
 
-            var newHost = client.RestClient.HttpClient.PreferredHost;
+            var newHost = client.HttpClient.HttpClient.PreferredHost;
             host.Should().Be(newHost);
         }
 

@@ -83,7 +83,7 @@ namespace IO.Ably.AcceptanceTests
         [Trait("spec", "RSL4d")]
         public class WithTextProtocolWithoutEncryption : MockHttpRestSpecs
         {
-            private readonly AblyRest _client;
+            private readonly PubSubHttpClient _client;
 
             public WithTextProtocolWithoutEncryption(ITestOutputHelper output)
                 : base(output)
@@ -144,7 +144,7 @@ namespace IO.Ably.AcceptanceTests
 
         public class WithTextProtocolWithEncryption : MockHttpRestSpecs
         {
-            private readonly AblyRest _client;
+            private readonly PubSubHttpClient _client;
             private readonly ChannelOptions _options;
 
             public WithTextProtocolWithEncryption(ITestOutputHelper output)
@@ -210,7 +210,7 @@ namespace IO.Ably.AcceptanceTests
         [Trait("spec", "RSL4c")]
         public class WithBinaryProtocolWithoutEncryption : MockHttpRestSpecs
         {
-            private readonly AblyRest _client;
+            private readonly PubSubHttpClient _client;
 
             public WithBinaryProtocolWithoutEncryption(ITestOutputHelper output)
                 : base(output)
@@ -285,7 +285,7 @@ namespace IO.Ably.AcceptanceTests
 
         public class WithBinaryProtocolWithEncryption : MockHttpRestSpecs
         {
-            private readonly AblyRest _client;
+            private readonly PubSubHttpClient _client;
             private readonly ChannelOptions _options;
 
             public WithBinaryProtocolWithEncryption(ITestOutputHelper output)

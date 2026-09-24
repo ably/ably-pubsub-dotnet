@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 
 namespace IO.Ably.Tests
 {
-    public class RestSpecs : MockHttpRestSpecs
+    public class HttpSpecs : MockHttpRestSpecs
     {
         public class WhenInitialisingRestClient
         {
@@ -22,14 +22,14 @@ namespace IO.Ably.Tests
             public void WithInvalidKey_ThrowsAnException()
             {
                 // Needs to have ':' because otherwise it's considered a token
-                Assert.Throws<AblyException>(() => new AblyRest("InvalidKey:boo"));
+                Assert.Throws<AblyException>(() => new PubSubHttpClient("InvalidKey:boo"));
             }
 
             [Fact]
             [Trait("spec", "RSC1")]
             public void WithValidKey_InitialisesTheClient()
             {
-                var client = new AblyRest(ValidKey);
+                var client = new PubSubHttpClient(ValidKey);
                 client.Should().NotBeNull();
             }
 
@@ -37,7 +37,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RSC1")]
             public void WithKeyInOptions_InitialisesTheClient()
             {
-                var client = new AblyRest(new ClientOptions(ValidKey));
+                var client = new PubSubHttpClient(new ClientOptions(ValidKey));
                 client.Should().NotBeNull();
             }
 
@@ -45,7 +45,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RSC1")]
             public void Ctor_WithKeyPassedInOptions_InitializesClient()
             {
-                var client = new AblyRest(opts => opts.Key = ValidKey);
+                var client = new PubSubHttpClient(opts => opts.Key = ValidKey);
                 client.Should().NotBeNull();
             }
 
@@ -53,7 +53,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "RSC1")]
             public void WithTokenAndClientId_InitializesClient()
             {
-                var client = new AblyRest(opts =>
+                var client = new PubSubHttpClient(opts =>
                 {
                     opts.Token = "blah";
                     opts.ClientId = "123";
@@ -70,7 +70,7 @@ namespace IO.Ably.Tests
             [InlineData("boo.Boo:boo", false)] // It determines whether it's a key based on ':'
             public void WithAString_ShouldRecogniseBetweenKeyAndToken(string key, bool isToken)
             {
-                var client = new AblyRest(key);
+                var client = new PubSubHttpClient(key);
 
                 if (isToken)
                 {
@@ -120,7 +120,7 @@ namespace IO.Ably.Tests
             var options = new ClientOptions(ValidKey);
 
             // Act
-            var client = new AblyRest(options);
+            var client = new PubSubHttpClient(options);
 
             // Assert
             var auth = (AblyAuth)client.Auth;
@@ -134,7 +134,7 @@ namespace IO.Ably.Tests
         [InlineData(false)]
         public void ShouldInitialiseAblyHttpClientWithCorrectTlsValue(bool tls)
         {
-            var client = new AblyRest(new ClientOptions(ValidKey) { Tls = tls });
+            var client = new PubSubHttpClient(new ClientOptions(ValidKey) { Tls = tls });
             client.HttpClient.Options.IsSecure.Should().Be(tls);
         }
 
@@ -149,7 +149,7 @@ namespace IO.Ably.Tests
             }
 
 #pragma warning disable 162
-            var client = new AblyRest(ValidKey);
+            var client = new PubSubHttpClient(ValidKey);
             client.Options.UseBinaryProtocol.Should().BeTrue();
             client.Protocol.Should().Be(Defaults.Protocol);
 #pragma warning restore 162
@@ -212,7 +212,7 @@ namespace IO.Ably.Tests
                 await Assert.ThrowsAsync<AblyException>(() => client.StatsAsync());
             }
 
-            private AblyRest GetConfiguredRestClient(int errorCode, TokenDetails tokenDetails, bool useApiKey = true)
+            private PubSubHttpClient GetConfiguredRestClient(int errorCode, TokenDetails tokenDetails, bool useApiKey = true)
             {
                 var client = GetRestClient(
                     request =>
@@ -259,12 +259,12 @@ namespace IO.Ably.Tests
                 _handler = new FakeHttpMessageHandler(response);
             }
 
-            private AblyRest CreateClient(Action<ClientOptions> optionsClient)
+            private PubSubHttpClient CreateClient(Action<ClientOptions> optionsClient)
             {
                 var options = new ClientOptions(ValidKey);
                 optionsClient(options);
                 options.HttpClient = new HttpClient(_handler);
-                return new AblyRest(options);
+                return new PubSubHttpClient(options);
             }
 
             [Fact]
@@ -353,7 +353,7 @@ namespace IO.Ably.Tests
             [Trait("spec", "TO3c")]
             public void WithLogHandler_ShouldUseNewLogHandler()
             {
-                _ = new AblyRest(new ClientOptions(ValidKey) { LogHandler = new TestLogHandler() });
+                _ = new PubSubHttpClient(new ClientOptions(ValidKey) { LogHandler = new TestLogHandler() });
 
                 Logger.LoggerSink.Should().BeOfType<TestLogHandler>();
             }
@@ -368,7 +368,7 @@ namespace IO.Ably.Tests
                 clientOptions.IdempotentRestPublishing.Should().BeTrue();
             }
 
-            private static async Task MakeAnyRequest(AblyRest client)
+            private static async Task MakeAnyRequest(PubSubHttpClient client)
             {
                 await client.Channels.Get("boo").PublishAsync("boo", "baa");
             }
@@ -384,7 +384,7 @@ namespace IO.Ably.Tests
         public void HttpRequestTimeoutShouldComeFromClientOptions()
         {
             var httpRequestTimeout = TimeSpan.FromMinutes(1);
-            var client = new AblyRest(options =>
+            var client = new PubSubHttpClient(options =>
             {
                 options.Key = ValidKey;
                 options.HttpRequestTimeout = httpRequestTimeout;
@@ -399,7 +399,7 @@ namespace IO.Ably.Tests
         public async Task AddAuthHeader_WithBasicAuthentication_AddsCorrectAuthorizationHeader()
         {
             // Arrange
-            var rest = new AblyRest(ValidKey);
+            var rest = new PubSubHttpClient(ValidKey);
             ApiKey key = ApiKey.Parse(ValidKey);
             var request = new AblyRequest("/test", HttpMethod.Get);
             var expectedValue = "Basic " + key.ToString().ToBase64();
@@ -419,7 +419,7 @@ namespace IO.Ably.Tests
         {
             // Arrange
             const string tokenValue = "TokenValue";
-            var rest = new AblyRest(opts => opts.Token = tokenValue);
+            var rest = new PubSubHttpClient(opts => opts.Token = tokenValue);
             var request = new AblyRequest("/test", HttpMethod.Get);
             var expectedValue = "Bearer " + tokenValue.ToBase64();
 
@@ -440,7 +440,7 @@ namespace IO.Ably.Tests
         {
             // Arrange
             const string tokenValue = "TokenValue";
-            var rest = new AblyRest(opts =>
+            var rest = new PubSubHttpClient(opts =>
             {
                 opts.Token = tokenValue;
                 opts.Tls = tls;
@@ -465,12 +465,12 @@ namespace IO.Ably.Tests
                 _handler = new FakeHttpMessageHandler(_response);
             }
 
-            private AblyRest CreateClient(Action<ClientOptions> optionsClient)
+            private PubSubHttpClient CreateClient(Action<ClientOptions> optionsClient)
             {
                 var options = new ClientOptions(ValidKey);
                 optionsClient?.Invoke(options);
                 options.HttpClient = new HttpClient(_handler);
-                return new AblyRest(options);
+                return new PubSubHttpClient(options);
             }
 
             [Fact]
@@ -617,7 +617,7 @@ namespace IO.Ably.Tests
                     "www.example5.com"
                 };
 
-                async Task CheckForAttemptedFallbackHosts(AblyRest client, string primaryHost)
+                async Task CheckForAttemptedFallbackHosts(PubSubHttpClient client, string primaryHost)
                 {
                     var attemptedList = new List<string>();
                     _handler.Requests.Clear();
@@ -694,7 +694,7 @@ namespace IO.Ably.Tests
                 DateTimeOffset now = DateTimeOffset.UtcNow;
                 Func<DateTimeOffset> nowFunc = () => now;
                 var options = new ClientOptions(ValidKey) { HttpMaxRetryDuration = TimeSpan.FromSeconds(21), NowFunc = nowFunc };
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
                 _response.StatusCode = HttpStatusCode.BadGateway;
                 var handler = new FakeHttpMessageHandler(
                     _response,
@@ -718,7 +718,7 @@ namespace IO.Ably.Tests
                 DateTimeOffset now = DateTimeOffset.UtcNow;
                 Func<DateTimeOffset> nowFunc = () => now;
                 var options = new ClientOptions(ValidKey) { FallbackRetryTimeout = TimeSpan.FromSeconds(10), NowFunc = nowFunc };
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
                 var requestCount = 0;
 
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -769,7 +769,7 @@ namespace IO.Ably.Tests
                 DateTimeOffset now = DateTimeOffset.UtcNow;
                 Func<DateTimeOffset> nowFunc = () => now;
                 var options = new ClientOptions(ValidKey) { FallbackRetryTimeout = TimeSpan.FromSeconds(10), NowFunc = nowFunc };
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
                 var requestCount = 0;
 
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -809,7 +809,7 @@ namespace IO.Ably.Tests
                 attemptedHosts[4].Should().Be(Defaults.RestHost);
             }
 
-            private static async Task MakeAnyRequest(AblyRest client)
+            private static async Task MakeAnyRequest(PubSubHttpClient client)
             {
                 await client.Channels.Get("boo").PublishAsync("boo", "baa");
             }
@@ -856,7 +856,7 @@ namespace IO.Ably.Tests
             [Fact]
             public async Task WhenAuthCallbackReturnsAnObjectThatIsNotTokenRequestOrTokenDetails_ThrowsAblyException()
             {
-                string serializedTokenRequest = await new AblyRest("fake.key:fakeid").Auth.CreateTokenRequestAsync();
+                string serializedTokenRequest = await new PubSubHttpClient("fake.key:fakeid").Auth.CreateTokenRequestAsync();
                 // do not throw exceptions for valid values in authCallback
                 var objects = new object[] { new TokenDetails(), new TokenRequest(), serializedTokenRequest };
                 foreach (var obj in objects)
@@ -876,7 +876,7 @@ namespace IO.Ably.Tests
                 }
             }
 
-            private static AblyRest GetClient(Func<TokenParams, Task<object>> authCallback)
+            private static PubSubHttpClient GetClient(Func<TokenParams, Task<object>> authCallback)
             {
                 var options = new ClientOptions
                 {
@@ -884,7 +884,7 @@ namespace IO.Ably.Tests
                     UseBinaryProtocol = false
                 };
 
-                var rest = new AblyRest(options);
+                var rest = new PubSubHttpClient(options);
                 rest.ExecuteHttpRequest = arg => arg.Url.Contains("requestToken") ?
                     JsonHelper.Serialize(new TokenDetails()).ToAblyResponse() :
                     "[{}]".ToAblyResponse();
@@ -903,7 +903,7 @@ namespace IO.Ably.Tests
                 UseBinaryProtocol = false
             };
 
-            var rest = new AblyRest(options);
+            var rest = new PubSubHttpClient(options);
 
             rest.ExecuteHttpRequest = request =>
             {
@@ -944,7 +944,7 @@ namespace IO.Ably.Tests
                 QueryTime = true,
                 NowFunc = TestHelpers.NowFunc()
             };
-            var rest = new AblyRest(options);
+            var rest = new PubSubHttpClient(options);
             rest.ExecuteHttpRequest = request =>
             {
                 if (request.Url == "/time")
@@ -972,7 +972,7 @@ namespace IO.Ably.Tests
                 UseBinaryProtocol = false,
                 NowFunc = TestHelpers.NowFunc()
             };
-            var rest = new AblyRest(options);
+            var rest = new PubSubHttpClient(options);
             var token = new TokenDetails("123") { Expires = DateTimeOffset.UtcNow.AddHours(1) };
             rest.AblyAuth.CurrentToken = token;
 
@@ -1008,7 +1008,7 @@ namespace IO.Ably.Tests
                 options.HttpClient.Should().BeNull();
 
                 // Act
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
 
                 // Assert
                 client.HttpClient.Client.Should().NotBeNull();
@@ -1025,7 +1025,7 @@ namespace IO.Ably.Tests
                 };
 
                 // Act
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
 
                 // Assert
                 client.HttpClient.Client.Should().BeSameAs(externalHttpClient);
@@ -1042,7 +1042,7 @@ namespace IO.Ably.Tests
                 };
 
                 // Act
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
 
                 // Assert
                 client.HttpClient.Client.DefaultRequestHeaders.Contains("X-Ably-Version").Should().BeTrue();
@@ -1066,7 +1066,7 @@ namespace IO.Ably.Tests
                 };
 
                 // Act
-                var client = new AblyRest(options);
+                var client = new PubSubHttpClient(options);
                 var stats = await client.StatsAsync();
 
                 // Assert
@@ -1081,7 +1081,7 @@ namespace IO.Ably.Tests
             }
         }
 
-        public RestSpecs(ITestOutputHelper output)
+        public HttpSpecs(ITestOutputHelper output)
             : base(output)
         {
         }

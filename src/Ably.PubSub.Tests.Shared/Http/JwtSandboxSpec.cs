@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace IO.Ably.Tests.Rest
 {
-    [Collection("AblyRest SandBox Collection")]
+    [Collection("PubSubHttpClient SandBox Collection")]
     [Trait("type", "integration")]
     public class JwtSandboxSpec : SandboxSpecs
     {

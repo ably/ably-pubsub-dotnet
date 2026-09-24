@@ -7,7 +7,7 @@ namespace IO.Ably.Realtime
 {
     internal static class AttemptsHelpers
     {
-        public static async Task<bool> CanFallback(this AblyRest restClient, ErrorInfo error)
+        public static async Task<bool> CanFallback(this PubSubHttpClient restClient, ErrorInfo error)
         {
             return error != null && error.IsRetryableStatusCode() && await restClient.CanConnectToAbly();
         }

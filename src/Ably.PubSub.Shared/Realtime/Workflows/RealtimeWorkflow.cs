@@ -38,9 +38,9 @@ namespace IO.Ably.Realtime.Workflow
         private bool _warnedIdleCheckInactive;
         private bool _disposedValue;
 
-        private AblyRealtime Client { get; }
+        private PubSubRealtimeClient Client { get; }
 
-        private AblyAuth Auth => Client.RestClient.AblyAuth;
+        private AblyAuth Auth => Client.HttpClient.AblyAuth;
 
         public Connection Connection { get; }
 
@@ -67,12 +67,12 @@ namespace IO.Ably.Realtime.Workflow
                 SingleWriter = false
             });
 
-        public RealtimeWorkflow(AblyRealtime client, ILogger logger)
+        public RealtimeWorkflow(PubSubRealtimeClient client, ILogger logger)
         {
             _heartbeatMonitorCancellationTokenSource = new CancellationTokenSource();
 
             Client = client;
-            Client.RestClient.AblyAuth.ExecuteCommand = cmd => QueueCommand(cmd);
+            Client.HttpClient.AblyAuth.ExecuteCommand = cmd => QueueCommand(cmd);
             Connection = client.Connection;
             Channels = client.Channels;
             Logger = logger;
@@ -114,7 +114,7 @@ namespace IO.Ably.Realtime.Workflow
                     {
                         while (true)
                         {
-                            QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("AblyRealtime.HeartbeatMonitor()"));
+                            QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("PubSubRealtimeClient.HeartbeatMonitor()"));
                             await Task.Delay(Client.Options.HeartbeatMonitorDelay, monitorToken);
                         }
                     }
@@ -703,18 +703,18 @@ namespace IO.Ably.Realtime.Workflow
                 return defaultRealtimeHost;
             }
 
-            return await Client.RestClient.CanConnectToAbly() ? candidateHost : defaultRealtimeHost;
+            return await Client.HttpClient.CanConnectToAbly() ? candidateHost : defaultRealtimeHost;
         }
 
         private void SetNewHostInState(string newHost)
         {
             if (IsFallbackHost())
             {
-                Client.RestClient.SetRealtimeFallbackHost(newHost);
+                Client.HttpClient.SetRealtimeFallbackHost(newHost);
             }
             else
             {
-                Client.RestClient.ClearRealtimeFallbackHost();
+                Client.HttpClient.ClearRealtimeFallbackHost();
             }
 
             State.Connection.Host = newHost;

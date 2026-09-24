@@ -1272,7 +1272,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 client.State.Connection.Id.Should().Be("a-different-id");
             }
 
-            private async Task<AblyRealtime> GetClientWithHistory()
+            private async Task<PubSubRealtimeClient> GetClientWithHistory()
             {
                 var client = await GetConnectedClient();
                 var channel = (RealtimeChannel)client.Channels.Get("test");
@@ -1289,7 +1289,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 return client;
             }
 
-            private static async Task MoveTo(AblyRealtime client, ConnectionState state)
+            private static async Task MoveTo(PubSubRealtimeClient client, ConnectionState state)
             {
                 var error = new ErrorInfo("something went wrong", 50000);
 
@@ -1536,7 +1536,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 client.State.Connection.MessageSerial.Should().Be(0);
             }
 
-            private async Task<AblyRealtime> GetClientWithOneUnackedMessage()
+            private async Task<PubSubRealtimeClient> GetClientWithOneUnackedMessage()
             {
                 var client = await GetConnectedClient();
 
@@ -1561,7 +1561,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
             }
 
             private static async Task Reconnect(
-                AblyRealtime client, string connectionId, bool isUpdate = false, ErrorInfo error = null, string connectionKey = "connectionKey")
+                PubSubRealtimeClient client, string connectionId, bool isUpdate = false, ErrorInfo error = null, string connectionKey = "connectionKey")
             {
                 await client.Workflow.ProcessCommand(SetConnectedStateCommand.Create(
                     new ProtocolMessage(ProtocolMessage.MessageAction.Connected)
@@ -1574,14 +1574,14 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 await client.ProcessCommands();
             }
 
-            private IEnumerable<(string Channel, long Serial)> SentFrames(AblyRealtime client) =>
+            private IEnumerable<(string Channel, long Serial)> SentFrames(PubSubRealtimeClient client) =>
                 LastCreatedTransport.SentMessages
                     .Select(x => x.Original)
                     .Where(x => x != null && x.Action == ProtocolMessage.MessageAction.Message)
                     .Select(x => (x.Channel, x.MsgSerial))
                     .ToList();
 
-            private IEnumerable<long> SentSerials(AblyRealtime client) =>
+            private IEnumerable<long> SentSerials(PubSubRealtimeClient client) =>
                 LastCreatedTransport.SentMessages
                     .Select(x => x.Original)
                     .Where(x => x != null && x.Action == ProtocolMessage.MessageAction.Message)
@@ -2095,7 +2095,7 @@ namespace IO.Ably.Tests.NETFramework.Realtime
                 client.State.Connection.Key.Should().Be("connectionKey");
             }
 
-            private async Task<AblyRealtime> GetConnectedClient(
+            private async Task<PubSubRealtimeClient> GetConnectedClient(
                 TimeSpan? maxIdleInterval, TimeSpan? requestTimeout = null)
             {
                 var client = GetClientWithFakeTransport(opts =>

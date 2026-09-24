@@ -13,16 +13,16 @@ namespace IO.Ably.Rest
     /// The Ably Realtime service organises the traffic within any application into named channels.
     /// Channels are the "unit" of message distribution; clients attach to channels to subscribe to messages,
     /// and every message broadcast by the service is associated with a unique channel.
-    /// A channel cannot be instantiated but needs to be created using the AblyRest.Channels.Get("channelname").
+    /// A channel cannot be instantiated but needs to be created using the PubSubHttpClient.Channels.Get("channelname").
     /// </summary>
-    public class RestChannel : IRestChannel, IPresence
+    public class HttpChannel : IHttpChannel, IPresence
     {
-        private readonly AblyRest _ablyRest;
+        private readonly PubSubHttpClient _ablyRest;
         private readonly string _basePath;
         private ChannelOptions _options;
         private readonly PushChannel _pushChannel;
 
-        internal RestChannel(AblyRest ablyRest, string name, ChannelOptions options, IMobileDevice mobileDevice = null)
+        internal HttpChannel(PubSubHttpClient ablyRest, string name, ChannelOptions options, IMobileDevice mobileDevice = null)
         {
             Name = name;
             _ablyRest = ablyRest;

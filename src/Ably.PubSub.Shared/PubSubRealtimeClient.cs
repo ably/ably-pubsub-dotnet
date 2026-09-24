@@ -12,10 +12,10 @@ using Newtonsoft.Json.Linq;
 namespace IO.Ably
 {
     /// <summary>
-    /// AblyRealtime
+    /// PubSubRealtimeClient
     /// The top-level class for the Ably Realtime library.
     /// </summary>
-    public class AblyRealtime : IRealtimeClient, IDisposable
+    public class PubSubRealtimeClient : IPubSubRealtimeClient, IDisposable
     {
         private SynchronizationContext _synchronizationContext;
 
@@ -24,40 +24,40 @@ namespace IO.Ably
         internal RealtimeWorkflow Workflow { get; private set; }
 
         internal volatile bool Disposed;
-        private static readonly Func<ClientOptions, IMobileDevice, AblyRest> CreateRestFunc = (clientOptions, mobileDevice) => new AblyRest(clientOptions, mobileDevice);
+        private static readonly Func<ClientOptions, IMobileDevice, PubSubHttpClient> CreateRestFunc = (clientOptions, mobileDevice) => new PubSubHttpClient(clientOptions, mobileDevice);
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRealtime"/> class with an ably key.
+        /// Initializes a new instance of the <see cref="PubSubRealtimeClient"/> class with an ably key.
         /// Not public: application code obtains a client from <c>PubSubDevice.CreateClient</c> or
         /// <c>PubSubServer.CreateRealtimeClient</c>, which stamp the device/server classification
         /// the platform and MAU-based billing depend on. The door assemblies (and this SDK's own
         /// tests) reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
         /// <param name="key">String key (obtained from application dashboard).</param>
-        internal AblyRealtime(string key)
+        internal PubSubRealtimeClient(string key)
             : this(new ClientOptions(key))
         {
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRealtime"/> class with the given options.
+        /// Initializes a new instance of the <see cref="PubSubRealtimeClient"/> class with the given options.
         /// Not public: application code obtains a client from <c>PubSubDevice.CreateClient</c> or
         /// <c>PubSubServer.CreateRealtimeClient</c>, which stamp the device/server classification
         /// the platform and MAU-based billing depend on. The door assemblies (and this SDK's own
         /// tests) reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
         /// <param name="options"><see cref="ClientOptions"/>.</param>
-        internal AblyRealtime(ClientOptions options)
+        internal PubSubRealtimeClient(ClientOptions options)
             : this(options, CreateRestFunc, IoC.MobileDevice)
         {
         }
 
-        internal AblyRealtime(ClientOptions options, IMobileDevice mobileDevice)
+        internal PubSubRealtimeClient(ClientOptions options, IMobileDevice mobileDevice)
             : this(options, CreateRestFunc, mobileDevice)
         {
         }
 
-        internal AblyRealtime(ClientOptions options, Func<ClientOptions, IMobileDevice, AblyRest> createRestFunc, IMobileDevice mobileDevice = null)
+        internal PubSubRealtimeClient(ClientOptions options, Func<ClientOptions, IMobileDevice, PubSubHttpClient> createRestFunc, IMobileDevice mobileDevice = null)
         {
             if (options.Logger != null)
             {
@@ -72,8 +72,8 @@ namespace IO.Ably
             }
 
             CaptureSynchronizationContext(options);
-            RestClient = createRestFunc != null ? createRestFunc.Invoke(options, mobileDevice) : new AblyRest(options, mobileDevice);
-            Push = new PushRealtime(RestClient, Logger);
+            HttpClient = createRestFunc != null ? createRestFunc.Invoke(options, mobileDevice) : new PubSubHttpClient(options, mobileDevice);
+            Push = new PushRealtime(HttpClient, Logger);
 
             Connection = new Connection(this, options.NowFunc, Logger);
             Connection.Initialise();
@@ -84,7 +84,7 @@ namespace IO.Ably
             }
 
             Channels = new RealtimeChannels(this, Connection, mobileDevice);
-            RestClient.AblyAuth.OnAuthUpdated = ConnectionManager.OnAuthUpdated;
+            HttpClient.AblyAuth.OnAuthUpdated = ConnectionManager.OnAuthUpdated;
 
             State = new RealtimeState(options.GetFallbackHosts()?.Shuffle().ToList(), options.NowFunc);
 
@@ -106,14 +106,14 @@ namespace IO.Ably
         }
 
         /// <summary>
-        /// Gets the initialised RestClient.
+        /// Gets the initialised HttpClient.
         /// </summary>
-        public AblyRest RestClient { get; }
+        public PubSubHttpClient HttpClient { get; }
 
-        internal MessageHandler MessageHandler => RestClient.MessageHandler;
+        internal MessageHandler MessageHandler => HttpClient.MessageHandler;
 
         /// <inheritdoc/>
-        public IAblyAuth Auth => RestClient.AblyAuth;
+        public IAblyAuth Auth => HttpClient.AblyAuth;
 
         /// <inheritdoc/>
         public PushRealtime Push { get; }
@@ -121,7 +121,7 @@ namespace IO.Ably
         /// <inheritdoc/>
         public string ClientId => Auth.ClientId;
 
-        internal ClientOptions Options => RestClient.Options;
+        internal ClientOptions Options => HttpClient.Options;
 
         internal ConnectionManager ConnectionManager => Connection.ConnectionManager;
 
@@ -136,30 +136,30 @@ namespace IO.Ably
         /// <summary>
         /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
         /// </summary>
-        public LocalDevice Device => RestClient.Device;
+        public LocalDevice Device => HttpClient.Device;
 
         /// <inheritdoc/>
         public Task<PaginatedResult<Stats>> StatsAsync()
         {
-            return RestClient.StatsAsync();
+            return HttpClient.StatsAsync();
         }
 
         /// <inheritdoc/>
         public Task<PaginatedResult<Stats>> StatsAsync(StatsRequestParams query)
         {
-            return RestClient.StatsAsync(query);
+            return HttpClient.StatsAsync(query);
         }
 
         /// <inheritdoc/>
         public PaginatedResult<Stats> Stats()
         {
-            return RestClient.Stats();
+            return HttpClient.Stats();
         }
 
         /// <inheritdoc/>
         public PaginatedResult<Stats> Stats(StatsRequestParams query)
         {
-            return RestClient.Stats(query);
+            return HttpClient.Stats(query);
         }
 
         /// <inheritdoc/>
@@ -187,7 +187,7 @@ namespace IO.Ably
         /// <inheritdoc/>
         public Task<DateTimeOffset> TimeAsync()
         {
-            return RestClient.TimeAsync();
+            return HttpClient.TimeAsync();
         }
 
         internal void NotifyExternalClients(Action action)
@@ -255,7 +255,7 @@ namespace IO.Ably
                 }
             }
 
-            Workflow.QueueCommand(DisposeCommand.Create().TriggeredBy($"AblyRealtime.Dispose({disposing}"));
+            Workflow.QueueCommand(DisposeCommand.Create().TriggeredBy($"PubSubRealtimeClient.Dispose({disposing}"));
 
             Disposed = true;
         }

@@ -12,7 +12,7 @@ namespace IO.Ably
 {
     /// <summary>Client for the Ably rest API.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1401:Fields should be private", Justification = "Needed properties to be internal for testing.")]
-    public sealed class AblyRest : IRestClient
+    public sealed class PubSubHttpClient : IPubSubHttpClient
     {
         private readonly object _deviceLock = new object();
 
@@ -20,27 +20,27 @@ namespace IO.Ably
         private LocalDevice _device;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRest"/> class using an api key.
+        /// Initializes a new instance of the <see cref="PubSubHttpClient"/> class using an api key.
         /// Not public: application code obtains a client from <c>PubSubServer.CreateHttpClient</c>,
         /// which stamps the device/server classification the platform and MAU-based billing depend
         /// on. The door assemblies (and this SDK's own tests) reach this constructor via
         /// <c>InternalsVisibleTo</c>.
         /// </summary>
         /// <param name="apiKey">Full api key.</param>
-        internal AblyRest(string apiKey)
+        internal PubSubHttpClient(string apiKey)
             : this(new ClientOptions(apiKey))
         {
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRest"/> class from an
+        /// Initializes a new instance of the <see cref="PubSubHttpClient"/> class from an
         /// Action{ClientOptions}. Not public: application code obtains a client from
         /// <c>PubSubServer.CreateHttpClient</c>, which stamps the device/server classification the
         /// platform and MAU-based billing depend on. The door assemblies (and this SDK's own tests)
         /// reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
         /// <param name="init">Action delegate which receives a empty options object.</param>
-        internal AblyRest(Action<ClientOptions> init)
+        internal PubSubHttpClient(Action<ClientOptions> init)
         {
             Options = new ClientOptions();
             init(Options);
@@ -48,19 +48,19 @@ namespace IO.Ably
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AblyRest"/> class with a custom set of
+        /// Initializes a new instance of the <see cref="PubSubHttpClient"/> class with a custom set of
         /// options. Not public: application code obtains a client from
         /// <c>PubSubServer.CreateHttpClient</c>, which stamps the device/server classification the
         /// platform and MAU-based billing depend on. The door assemblies (and this SDK's own tests)
         /// reach this constructor via <c>InternalsVisibleTo</c>.
         /// </summary>
         /// <param name="clientOptions">instance of clientOptions.</param>
-        internal AblyRest(ClientOptions clientOptions)
+        internal PubSubHttpClient(ClientOptions clientOptions)
             : this(clientOptions, IoC.MobileDevice)
         {
         }
 
-        internal AblyRest(ClientOptions clientOptions, IMobileDevice mobileDevice)
+        internal PubSubHttpClient(ClientOptions clientOptions, IMobileDevice mobileDevice)
         {
             Options = clientOptions;
             InitializeAbly(mobileDevice);
@@ -68,7 +68,7 @@ namespace IO.Ably
 
         internal IMobileDevice MobileDevice { get; private set; }
 
-        internal AblyHttpClient HttpClient { get; private set; }
+        internal AblyHttpRequester HttpClient { get; private set; }
 
         internal MessageHandler MessageHandler { get; private set; }
 
@@ -83,7 +83,7 @@ namespace IO.Ably
         /// <summary>
         /// A collection of Channels associated with an Ably instance.
         /// </summary>
-        public RestChannels Channels { get; private set; }
+        public HttpChannels Channels { get; private set; }
 
         /// <summary>
         /// Authentication methods.
@@ -152,10 +152,10 @@ namespace IO.Ably
 
             MessageHandler = new MessageHandler(Logger, Protocol);
 
-            HttpClient = new AblyHttpClient(new AblyHttpOptions(Options));
+            HttpClient = new AblyHttpRequester(new AblyHttpOptions(Options));
             ExecuteHttpRequest = HttpClient.Execute;
             AblyAuth = new AblyAuth(Options, this);
-            Channels = new RestChannels(this, mobileDevice);
+            Channels = new HttpChannels(this, mobileDevice);
             Push = new PushRest(this, Logger);
             MobileDevice = mobileDevice;
             AblyAuth.OnClientIdChanged = OnAuthClientIdChanged;
@@ -394,7 +394,7 @@ namespace IO.Ably
         /// It is mainly because of the way a PaginatedResource defines its queries. For retrieving Stats with special parameters use <see cref="StatsAsync(StatsRequestParams)"/>.
         /// </summary>
         /// <example>
-        /// var client = new AblyRest("validkey");
+        /// var client = new PubSubHttpClient("validkey");
         /// var stats = client..StatsAsync();
         /// var nextPage = client..StatsAsync(stats.NextQuery);.
         /// </example>

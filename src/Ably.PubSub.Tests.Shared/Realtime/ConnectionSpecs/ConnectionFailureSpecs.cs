@@ -67,7 +67,7 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
 
             await client.ProcessCommands();
             renewTokenCalled.Should().BeTrue();
-            var currentToken = client.RestClient.AblyAuth.CurrentToken;
+            var currentToken = client.HttpClient.AblyAuth.CurrentToken;
             currentToken.Token.Should().Be(_returnedDummyTokenDetails.Token);
             currentToken.ClientId.Should().Be(_returnedDummyTokenDetails.ClientId);
             currentToken.Expires.Should().BeCloseTo(_returnedDummyTokenDetails.Expires, TimeSpan.FromMilliseconds(20));
@@ -319,7 +319,7 @@ namespace IO.Ably.Tests.Realtime.ConnectionSpecs
             }
         }
 
-        private static Task WaitForConnectingOrSuspended(AblyRealtime client)
+        private static Task WaitForConnectingOrSuspended(PubSubRealtimeClient client)
         {
             return new ConnectionAwaiter(client.Connection, ConnectionState.Connecting, ConnectionState.Suspended).Wait();
         }

@@ -8,7 +8,7 @@ namespace IO.Ably
     /// <summary>
     /// Interface for a rest client.
     /// </summary>
-    public interface IRestClient : IStatsCommands
+    public interface IPubSubHttpClient : IStatsCommands
     {
         /// <summary>Authentication methods.</summary>
         IAblyAuth Auth { get; }
@@ -19,7 +19,7 @@ namespace IO.Ably
         // PushRest Push { get; }
 
         /// <summary>Channel methods.</summary>
-        RestChannels Channels { get; }
+        HttpChannels Channels { get; }
 
         /// <summary>Retrieves the ably service time.</summary>
         /// <returns>DateTimeOffset of the server time.</returns>

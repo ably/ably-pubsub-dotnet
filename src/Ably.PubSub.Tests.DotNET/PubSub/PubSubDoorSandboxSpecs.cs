@@ -63,7 +63,7 @@ namespace IO.Ably.Tests.PubSub
             return options;
         }
 
-        private async Task RoundTripAMessage(AblyRealtime client)
+        private async Task RoundTripAMessage(PubSubRealtimeClient client)
         {
             using (client)
             {

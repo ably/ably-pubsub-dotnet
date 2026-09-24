@@ -94,7 +94,7 @@ namespace IO.Ably.Tests.Realtime
             var tokenDetails = await client.Auth.AuthorizeAsync(new TokenParams { ClientId = validClientId1 });
             tokenDetails.ClientId.Should().Be(validClientId1);
             client.Connection.State.Should().Be(ConnectionState.Connected);
-            client.RestClient.AblyAuth.CurrentToken.Should().Be(tokenDetails);
+            client.HttpClient.AblyAuth.CurrentToken.Should().Be(tokenDetails);
             var didUpdate = await awaiter.Task;
 
             client.Connection.State.Should().Be(ConnectionState.Connected);
@@ -158,7 +158,7 @@ namespace IO.Ably.Tests.Realtime
 
             // internally AblyAuth.AuthorizeCompleted is used to indicate when an Authorize call is finished
             // AuthorizeCompleted should timeout if no valid response (CONNECTED or ERROR) is received from Ably
-            var auth = client.RestClient.AblyAuth;
+            var auth = client.HttpClient.AblyAuth;
             try
             {
                 client.BlockActionFromSending(ProtocolMessage.MessageAction.Auth);
@@ -280,7 +280,7 @@ namespace IO.Ably.Tests.Realtime
             stateChange.Error.Code.Should().Be(ErrorCodes.OperationNotPermittedWithCapability);
             stateChange.Error.Message.Should().Contain("Channel denied access");
 
-            async Task DowngradeCapability(AblyRealtime rt)
+            async Task DowngradeCapability(PubSubRealtimeClient rt)
             {
                 var capability = new Capability();
                 capability.AddResource(wrongChannelName).AllowSubscribe();
@@ -294,7 +294,7 @@ namespace IO.Ably.Tests.Realtime
                 newToken.Should().NotBeNull();
             }
 
-            async Task<(AblyRealtime, IRealtimeChannel)> SetupRealtimeClient()
+            async Task<(PubSubRealtimeClient, IRealtimeChannel)> SetupRealtimeClient()
             {
                 var capability = new Capability();
                 capability.AddResource(channelName).AllowAll();

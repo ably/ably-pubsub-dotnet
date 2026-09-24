@@ -10,7 +10,7 @@ namespace Assets.Ably.Examples.Chat
 {
     public class AblyMain : MonoBehaviour, IUiConsole
     {
-        private AblyRealtime _ably;
+        private PubSubRealtimeClient _ably;
         private ClientOptions _clientOptions;
 
         private Text _textContent;

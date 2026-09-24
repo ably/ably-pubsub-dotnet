@@ -7,36 +7,36 @@ using IO.Ably.Push;
 namespace IO.Ably.Rest
 {
     /// <summary>
-    /// Class that manages RestChannels.
+    /// Class that manages HttpChannels.
     /// </summary>
-    public class RestChannels : IChannels<IRestChannel>
+    public class HttpChannels : IChannels<IHttpChannel>
     {
-        private readonly ConcurrentDictionary<string, RestChannel> _channels =
-            new ConcurrentDictionary<string, RestChannel>();
+        private readonly ConcurrentDictionary<string, HttpChannel> _channels =
+            new ConcurrentDictionary<string, HttpChannel>();
 
-        private readonly LockedList<IRestChannel> _orderedChannels = new LockedList<IRestChannel>();
+        private readonly LockedList<IHttpChannel> _orderedChannels = new LockedList<IHttpChannel>();
 
-        private readonly AblyRest _ablyRest;
+        private readonly PubSubHttpClient _ablyRest;
         private readonly IMobileDevice _mobileDevice;
 
-        internal RestChannels(AblyRest restClient, IMobileDevice mobileDevice = null)
+        internal HttpChannels(PubSubHttpClient restClient, IMobileDevice mobileDevice = null)
         {
             _ablyRest = restClient;
             _mobileDevice = mobileDevice;
         }
 
         /// <inheritdoc/>
-        public IRestChannel Get(string name)
+        public IHttpChannel Get(string name)
         {
             return Get(name, null);
         }
 
         /// <inheritdoc/>
-        public IRestChannel Get(string name, ChannelOptions options)
+        public IHttpChannel Get(string name, ChannelOptions options)
         {
             if (!_channels.TryGetValue(name, out var result))
             {
-                var channel = new RestChannel(_ablyRest, name, options, _mobileDevice);
+                var channel = new HttpChannel(_ablyRest, name, options, _mobileDevice);
                 result = _channels.AddOrUpdate(name, channel, (s, realtimeChannel) =>
                 {
                     if (options != null && realtimeChannel != null)
@@ -60,7 +60,7 @@ namespace IO.Ably.Rest
         }
 
         /// <inheritdoc/>
-        public IRestChannel this[string name] => Get(name);
+        public IHttpChannel this[string name] => Get(name);
 
         /// <inheritdoc/>
         public bool Release(string name)
@@ -87,7 +87,7 @@ namespace IO.Ably.Rest
         }
 
         /// <inheritdoc/>
-        IEnumerator<IRestChannel> IEnumerable<IRestChannel>.GetEnumerator() => GetEnumerator();
+        IEnumerator<IHttpChannel> IEnumerable<IHttpChannel>.GetEnumerator() => GetEnumerator();
 
         /// <inheritdoc/>
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -96,7 +96,7 @@ namespace IO.Ably.Rest
         /// Returns an enumerator that iterates through the channels collection.
         /// </summary>
         /// <returns>An enumerator that can be used to iterate through the channels collection.</returns>
-        protected virtual IEnumerator<IRestChannel> GetEnumerator()
+        protected virtual IEnumerator<IHttpChannel> GetEnumerator()
         {
             lock (_orderedChannels)
             {
