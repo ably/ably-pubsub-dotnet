@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Transport.States.Connection;
+using Ably.PubSub.Transport.States.Connection;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     public class CountDownTimerSpecs : AblySpecs
     {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class AblyRequest
     {

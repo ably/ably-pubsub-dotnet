@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// A class that provides access to presence operations and state for the associated Channel.

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>Utility class that implements IDisposable bu calling the provided action.</summary>
     internal class ActionOnDispose : IDisposable

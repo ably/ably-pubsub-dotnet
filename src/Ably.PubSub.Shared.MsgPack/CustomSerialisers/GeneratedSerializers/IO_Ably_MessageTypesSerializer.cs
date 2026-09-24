@@ -8,15 +8,15 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public class IO_Ably_MessageTypesSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.MessageTypes> {
+    public class IO_Ably_MessageTypesSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.MessageTypes> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.MessageCount> _serializer1;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.MessageCount> _serializer1;
         
         public IO_Ably_MessageTypesSerializer(MsgPack.Serialization.SerializationContext context) : 
                 base(context) {
@@ -25,10 +25,10 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer0 = context.GetSerializer<string>(schema0);
             MsgPack.Serialization.PolymorphismSchema schema1 = default(MsgPack.Serialization.PolymorphismSchema);
             schema1 = null;
-            this._serializer1 = context.GetSerializer<IO.Ably.MessageCount>(schema1);
+            this._serializer1 = context.GetSerializer<Ably.PubSub.MessageCount>(schema1);
         }
         
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.MessageTypes objectTree) {
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.MessageTypes objectTree) {
             packer.PackMapHeader(3);
             this._serializer0.PackTo(packer, "all");
             this._serializer1.PackTo(packer, objectTree.All);
@@ -38,17 +38,17 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer1.PackTo(packer, objectTree.Presence);
         }
         
-        protected override IO.Ably.MessageTypes UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.MessageTypes UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.MessageTypes result = default(IO.Ably.MessageTypes);
-            result = new IO.Ably.MessageTypes();
+            Ably.PubSub.MessageTypes result = default(Ably.PubSub.MessageTypes);
+            result = new Ably.PubSub.MessageTypes();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
             {
                 string key = default(string);
                 string nullable2 = default(string);
-                nullable2 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.MessageTypes),
+                nullable2 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.MessageTypes),
                     "MemberName");
                 if (((nullable2 == null)
                      == false))
@@ -61,7 +61,7 @@ namespace IO.Ably.CustomSerialisers {
                 }
                 if ((key == "presence"))
                 {
-                    IO.Ably.MessageCount nullable5 = default(IO.Ably.MessageCount);
+                    Ably.PubSub.MessageCount nullable5 = default(Ably.PubSub.MessageCount);
                     if ((unpacker.Read() == false))
                     {
                         throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -98,7 +98,7 @@ namespace IO.Ably.CustomSerialisers {
                 {
                     if ((key == "messages"))
                     {
-                        IO.Ably.MessageCount nullable4 = default(IO.Ably.MessageCount);
+                        Ably.PubSub.MessageCount nullable4 = default(Ably.PubSub.MessageCount);
                         if ((unpacker.Read() == false))
                         {
                             throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -135,7 +135,7 @@ namespace IO.Ably.CustomSerialisers {
                     {
                         if ((key == "all"))
                         {
-                            IO.Ably.MessageCount nullable3 = default(IO.Ably.MessageCount);
+                            Ably.PubSub.MessageCount nullable3 = default(Ably.PubSub.MessageCount);
                             if ((unpacker.Read() == false))
                             {
                                 throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Apis for managing ChannelSubscriptions.

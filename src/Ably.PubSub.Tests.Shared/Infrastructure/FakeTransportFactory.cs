@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using IO.Ably.Transport;
+using Ably.PubSub.Transport;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     public class FakeTransportFactory : ITransportFactory
     {

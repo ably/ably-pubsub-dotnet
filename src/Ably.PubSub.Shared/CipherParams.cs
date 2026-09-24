@@ -1,6 +1,6 @@
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A class encapsulating the client-specifiable parameters for

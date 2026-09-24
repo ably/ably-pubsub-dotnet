@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Realtime.Workflow
+namespace Ably.PubSub.Realtime.Workflow
 {
     internal abstract class RealtimeCommand
     {

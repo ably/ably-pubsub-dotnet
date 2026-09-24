@@ -1,7 +1,7 @@
-﻿using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
+﻿using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
 
-namespace IO.Ably.Transport.States.Connection
+namespace Ably.PubSub.Transport.States.Connection
 {
     internal class ConnectionFailedState : ConnectionStateBase
     {

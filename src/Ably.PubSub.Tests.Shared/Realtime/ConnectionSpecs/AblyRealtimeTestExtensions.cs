@@ -1,11 +1,11 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     public static class AblyRealtimeTestExtensions
     {

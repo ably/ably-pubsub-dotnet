@@ -5,7 +5,7 @@ using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A type that represents a page of results from a paginated http query.

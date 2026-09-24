@@ -3,7 +3,7 @@
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.Shared
+namespace Ably.PubSub.Tests.Shared
 {
     public class AblyInsecureRequestExceptionTests
     {

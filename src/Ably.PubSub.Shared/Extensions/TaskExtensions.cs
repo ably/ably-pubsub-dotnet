@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Contains Extension methods working with Task objects.

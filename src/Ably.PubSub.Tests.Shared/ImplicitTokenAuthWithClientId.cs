@@ -2,7 +2,7 @@ using System;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class ImplicitTokenAuthWithClientId
     {

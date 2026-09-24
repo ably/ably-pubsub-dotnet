@@ -7,7 +7,7 @@
     <ProjectGuid>{567FEEF7-41AF-42F2-AD34-546A278355B1}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>IO.Ably.Tests</RootNamespace>
+    <RootNamespace>Ably.PubSub.Tests</RootNamespace>
     <AssemblyName>Ably.PubSub.Tests.NETFramework</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>

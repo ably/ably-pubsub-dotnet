@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Realtime;
+using Ably.PubSub;
+using Ably.PubSub.Realtime;
 
 namespace Assets.Tests.AblySandbox
 {

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Device Registrations APIs. For more information visit the Ably Rest Documentation: https://ably.com/docs/rest-api#post-device-registration.

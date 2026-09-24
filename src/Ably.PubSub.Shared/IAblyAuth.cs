@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Token-generation and authentication operations for the Ably API.

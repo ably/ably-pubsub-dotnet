@@ -1,9 +1,9 @@
 ﻿using FluentAssertions;
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class EncryptionSpecs : AblySpecs
     {

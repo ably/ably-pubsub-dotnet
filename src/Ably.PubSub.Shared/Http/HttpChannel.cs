@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Encryption;
-using IO.Ably.Push;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Push;
 
-namespace IO.Ably.Rest
+namespace Ably.PubSub.Http
 {
 #pragma warning disable SA1600
 

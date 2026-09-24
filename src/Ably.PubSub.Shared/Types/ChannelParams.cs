@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Channel params is a "Dictionary&lt;string, string&gt;" used for passing extra parameters when

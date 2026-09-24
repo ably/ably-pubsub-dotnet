@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.MessageEncoders
+﻿namespace Ably.PubSub.MessageEncoders
 {
     internal class Utf8Encoder : MessageEncoder
     {

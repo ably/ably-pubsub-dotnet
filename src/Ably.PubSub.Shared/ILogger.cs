@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "StyleCop.CSharp.DocumentationRules",

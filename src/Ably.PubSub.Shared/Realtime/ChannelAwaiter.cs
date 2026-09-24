@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal class ChannelAwaiter : IDisposable
     {

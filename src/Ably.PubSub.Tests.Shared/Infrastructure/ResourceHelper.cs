@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public static class ResourceHelper
     {

@@ -4,7 +4,7 @@ using System.Net;
 using System.Security.Cryptography;
 using AblyPlatform.Cryptography;
 
-namespace IO.Ably.Encryption
+namespace Ably.PubSub.Encryption
 {
     /// <summary>Specifies the block cipher mode to use for encryption.</summary>
     public enum CipherMode

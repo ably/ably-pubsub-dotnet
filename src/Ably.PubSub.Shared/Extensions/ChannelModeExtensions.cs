@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 
-using IO.Ably.Types;
+using Ably.PubSub.Types;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Helper methods when dealing with Channel Models.

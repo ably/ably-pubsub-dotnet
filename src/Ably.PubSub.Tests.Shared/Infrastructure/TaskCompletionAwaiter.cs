@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Tests.Infrastructure
+namespace Ably.PubSub.Tests.Infrastructure
 {
     public sealed class TaskCompletionAwaiter : IDisposable
     {

@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers
+namespace Ably.PubSub.CustomSerialisers
 {
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
@@ -19,7 +19,7 @@ namespace IO.Ably.CustomSerialisers
 
         private MsgPack.Serialization.MessagePackSerializer<System.DateTimeOffset> _serializer1;
 
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.Capability> _serializer2;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Capability> _serializer2;
 
         private MsgPack.Serialization.MessagePackSerializer<System.Nullable<System.DateTimeOffset>> _serializer3;
 
@@ -32,7 +32,7 @@ namespace IO.Ably.CustomSerialisers
             this._serializer1 = context.GetSerializer<System.DateTimeOffset>(MsgPack.Serialization.DateTimeMessagePackSerializerHelpers.DetermineDateTimeConversionMethod(context, MsgPack.Serialization.DateTimeMemberConversionMethod.Default));
             MsgPack.Serialization.PolymorphismSchema schema1 = default(MsgPack.Serialization.PolymorphismSchema);
             schema1 = null;
-            this._serializer2 = context.GetSerializer<IO.Ably.Capability>(schema1);
+            this._serializer2 = context.GetSerializer<Ably.PubSub.Capability>(schema1);
             MsgPack.Serialization.PolymorphismSchema schema2 = default(MsgPack.Serialization.PolymorphismSchema);
             schema2 = null;
             this._serializer3 = context.GetSerializer<System.Nullable<System.DateTimeOffset>>(schema2);
@@ -125,7 +125,7 @@ namespace IO.Ably.CustomSerialisers
                         }
                         else if ((key == "capability"))
                         {
-                            IO.Ably.Capability nullable8 = default(IO.Ably.Capability);
+                            Ably.PubSub.Capability nullable8 = default(Ably.PubSub.Capability);
                             if ((unpacker.Read() == false))
                             {
                                 throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);

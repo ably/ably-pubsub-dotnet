@@ -2,16 +2,16 @@
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Push;
-using IO.Ably.Realtime;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Tests.Realtime;
-using IO.Ably.Types;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Tests.Realtime;
+using Ably.PubSub.Types;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     public sealed class LocalDeviceTests : MockHttpRestSpecs, IDisposable
     {

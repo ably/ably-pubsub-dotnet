@@ -2,7 +2,7 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace IO.Ably.Shared.Realtime
+namespace Ably.PubSub.Shared.Realtime
 {
     internal class RecoveryKeyContext
     {

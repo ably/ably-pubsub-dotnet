@@ -10,15 +10,15 @@
 
 using System.Linq;
 
-namespace IO.Ably.CustomSerialisers
+namespace Ably.PubSub.CustomSerialisers
 {
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public class IO_Ably_TokenRequestSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.TokenRequest>
+    public class IO_Ably_TokenRequestSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.TokenRequest>
     {
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
 
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.Capability> _serializer1;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Capability> _serializer1;
 
         private MsgPack.Serialization.MessagePackSerializer<System.Nullable<System.DateTimeOffset>> _serializer2;
 
@@ -33,7 +33,7 @@ namespace IO.Ably.CustomSerialisers
             this._serializer0 = context.GetSerializer<string>(schema0);
             MsgPack.Serialization.PolymorphismSchema schema1 = default(MsgPack.Serialization.PolymorphismSchema);
             schema1 = null;
-            this._serializer1 = context.GetSerializer<IO.Ably.Capability>(schema1);
+            this._serializer1 = context.GetSerializer<Ably.PubSub.Capability>(schema1);
             MsgPack.Serialization.PolymorphismSchema schema2 = default(MsgPack.Serialization.PolymorphismSchema);
             schema2 = null;
             this._serializer2 = context.GetSerializer<System.Nullable<System.DateTimeOffset>>(schema2);
@@ -43,7 +43,7 @@ namespace IO.Ably.CustomSerialisers
             this._serializer4 = context.GetSerializer<long>(null);
         }
 
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.TokenRequest objectTree)
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.TokenRequest objectTree)
         {
             var nonNullFields = new bool[]
             {
@@ -94,17 +94,17 @@ namespace IO.Ably.CustomSerialisers
             }
         }
 
-        protected override IO.Ably.TokenRequest UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.TokenRequest UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.TokenRequest result = default(IO.Ably.TokenRequest);
-            result = new IO.Ably.TokenRequest();
+            Ably.PubSub.TokenRequest result = default(Ably.PubSub.TokenRequest);
+            result = new Ably.PubSub.TokenRequest();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
             {
                 string key = default(string);
                 string nullable6 = default(string);
-                nullable6 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.TokenRequest),
+                nullable6 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.TokenRequest),
                     "MemberName");
                 if (((nullable6 == null)
                      == false))
@@ -192,7 +192,7 @@ namespace IO.Ably.CustomSerialisers
                         {
                             string nullable11 = default(string);
                             nullable11 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                typeof(IO.Ably.TokenRequest), "System.String Nonce");
+                                typeof(Ably.PubSub.TokenRequest), "System.String Nonce");
                             if (((nullable11 == null)
                                  == false))
                             {
@@ -205,7 +205,7 @@ namespace IO.Ably.CustomSerialisers
                             {
                                 string nullable10 = default(string);
                                 nullable10 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                    typeof(IO.Ably.TokenRequest), "System.String Mac");
+                                    typeof(Ably.PubSub.TokenRequest), "System.String Mac");
                                 if (((nullable10 == null)
                                      == false))
                                 {
@@ -218,7 +218,7 @@ namespace IO.Ably.CustomSerialisers
                                 {
                                     string nullable9 = default(string);
                                     nullable9 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                        typeof(IO.Ably.TokenRequest), "System.String KeyName");
+                                        typeof(Ably.PubSub.TokenRequest), "System.String KeyName");
                                     if (((nullable9 == null)
                                          == false))
                                     {
@@ -231,7 +231,7 @@ namespace IO.Ably.CustomSerialisers
                                     {
                                         string nullable8 = default(string);
                                         nullable8 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                            typeof(IO.Ably.TokenRequest), "System.String ClientId");
+                                            typeof(Ably.PubSub.TokenRequest), "System.String ClientId");
                                         if (((nullable8 == null)
                                              == false))
                                         {
@@ -242,7 +242,7 @@ namespace IO.Ably.CustomSerialisers
                                     {
                                         if ((key == "capability"))
                                         {
-                                            IO.Ably.Capability nullable7 = default(IO.Ably.Capability);
+                                            Ably.PubSub.Capability nullable7 = default(Ably.PubSub.Capability);
                                             if ((unpacker.Read() == false))
                                             {
                                                 throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);

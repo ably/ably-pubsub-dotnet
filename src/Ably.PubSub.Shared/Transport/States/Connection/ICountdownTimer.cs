@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Threading;
 
-namespace IO.Ably.Transport.States.Connection
+namespace Ably.PubSub.Transport.States.Connection
 {
     /// <summary>
     /// Internal interface used for countdown timer.

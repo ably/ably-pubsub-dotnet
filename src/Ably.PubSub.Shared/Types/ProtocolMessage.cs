@@ -5,7 +5,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace IO.Ably.Types
+namespace Ably.PubSub.Types
 {
     /// <summary>
     ///  A message sent and received over the Realtime protocol.
@@ -195,7 +195,7 @@ namespace IO.Ably.Types
         public PresenceMessage[] Presence { get; set; }
 
         /// <summary>
-        /// Connection details received. <see cref="IO.Ably.ConnectionDetails"/>.
+        /// Connection details received. <see cref="Ably.PubSub.ConnectionDetails"/>.
         /// </summary>
         [JsonProperty("connectionDetails")]
         public ConnectionDetails ConnectionDetails { get; set; }

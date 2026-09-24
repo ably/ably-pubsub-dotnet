@@ -30,7 +30,7 @@ Find out more:
 > ```
 >
 > ```csharp
-> using IO.Ably.PubSub.Server;
+> using Ably.PubSub.Server;
 >
 > var realtime = PubSubServer.CreateRealtimeClient("<API_KEY>");
 > var http = PubSubServer.CreateHttpClient("<API_KEY>");
@@ -41,22 +41,20 @@ Find out more:
 > ```
 >
 > ```csharp
-> using IO.Ably.PubSub.Device;
+> using Ably.PubSub.Device;
 >
 > var realtime = PubSubDevice.CreateClient("<API_KEY>");
 > ```
 >
-> Each factory also takes a `ClientOptions` or an `Action<ClientOptions>`. The returned clients are the ordinary `PubSubRealtimeClient` and `PubSubHttpClient` (the classes formerly named `AblyRealtime` and `AblyRest`), so the whole of the `IO.Ably` API remains available — including device-side connectionless operations such as message history, presence reads and token requests, which is why the device package has one door and no separate HTTP factory.
+> Each factory also takes a `ClientOptions` or an `Action<ClientOptions>`. The returned clients are the ordinary `PubSubRealtimeClient` and `PubSubHttpClient` (the classes formerly named `AblyRealtime` and `AblyRest`), so the whole of the `Ably.PubSub` API remains available — including device-side connectionless operations such as message history, presence reads and token requests, which is why the device package has one door and no separate HTTP factory.
 >
 > All three packages are released together, always, at one version, and each door package declares an **exact** dependency on `[<that version>]` of `Ably.PubSub.Core`. There is no supported combination of different versions of them: NuGet will refuse to resolve a `Ably.PubSub.Device` and a `Ably.PubSub.Server` that were not built from the same release, which is deliberate — it is what guarantees that a project cannot end up running two copies of the core, and that the door you installed is the door that was tested against the core it gets. When you upgrade, upgrade all the `Ably.PubSub.*` packages you reference to the same version. This applies to prereleases too: a `2.0.0-beta.1` door pins exactly `[2.0.0-beta.1]` of the core, so keep every `Ably.PubSub.*` reference on the same full prerelease version.
 >
-> The compiled assembly is now `Ably.PubSub.Core.dll`. The code namespace is unchanged: `using IO.Ably;` and every public type name stay as they are for now.
+> The compiled assembly is now `Ably.PubSub.Core.dll`, and the root code namespace is **`Ably.PubSub`** — namespace, assembly name and package id all agree. 1.x code migrates its directives from `using IO.Ably;` to `using Ably.PubSub;` (sub-namespaces map one-to-one, e.g. `IO.Ably.Realtime` → `Ably.PubSub.Realtime`).
 >
 > Today's [`ably.io`](https://www.nuget.org/packages/ably.io) 1.x package is unaffected and continues from a 1.x maintenance branch for a year after 2.0 becomes generally available; it is never published from this branch again. The same applies to `ably.io.push.android` and `ably.io.push.ios`, whose Xamarin-era projects are not part of the 2.0 set (see [PushNotifications.md](./PushNotifications.md)).
 >
-> Never reference `ably.io` and `Ably.PubSub.*` from the same project: they share the `IO.Ably` namespace, so mixing them is a compile error by design.
->
-> This also applies **transitively**. NuGet dedupes only by package ID, so a graph that pulls both `ably.io` 1.x (often via a library dependency) and any `Ably.PubSub.*` package loads *both* assemblies, and every `IO.Ably.*` type then exists twice: you get compile error CS0433 where your own code names those types, and runtime type-identity failures (`InvalidCastException`-class) where a library exposes `IO.Ably` types across its API. There is no type-forwarding between the packages. Detect it with `dotnet nuget why <project> ably.io`; if a dependency genuinely forces both, isolate them with an [`extern alias`](https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/extern-alias) — note `<Aliases>` applies only to a **direct** `PackageReference`, so first promote `ably.io` to a direct reference of the affected project, then add `<Aliases>ablyLegacy</Aliases>` to it and `extern alias ablyLegacy;` in the consuming file — otherwise treat a both-packages graph as unsupported and migrate the transitive dependency off `ably.io`.
+> Because v1 keeps the `IO.Ably.*` namespace and v2 lives under `Ably.PubSub.*`, the two packages' types **no longer collide**: a graph that resolves both `ably.io` 1.x (often via a library dependency that has not migrated yet) and the `Ably.PubSub.*` packages compiles side-by-side, with `IO.Ably.*` types uniquely from v1 and `Ably.PubSub.*` types uniquely from v2 — no CS0433, no `extern alias` gymnastics, and a library's v1 types are cleanly distinct from your v2 types at the boundary. Still migrate the whole graph off `ably.io` rather than settling in: two SDKs in one process means two realtime connections and two token flows, and v1 clients carry no device/server classification, so they get the 1.x billing treatment. Use `dotnet nuget why <project> ably.io` to find the stragglers.
 
 ---
 
@@ -121,8 +119,8 @@ The following code connects to Ably's realtime messaging service, subscribes to 
 
 ```csharp
 // Initialize an Ably Realtime client through the server-side door
-using IO.Ably;
-using IO.Ably.PubSub.Server;
+using Ably.PubSub;
+using Ably.PubSub.Server;
 
 var realtime = PubSubServer.CreateRealtimeClient("your-ably-api-key");
 // Device-side applications use: PubSubDevice.CreateClient("your-ably-api-key");

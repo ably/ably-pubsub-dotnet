@@ -11,12 +11,12 @@
 using System.Linq;
 using MsgPack;
 
-namespace IO.Ably.CustomSerialisers
+namespace Ably.PubSub.CustomSerialisers
 {
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
-    public class IO_Ably_MessageSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.Message>
+    public class IO_Ably_MessageSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Message>
     {
 
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
@@ -39,7 +39,7 @@ namespace IO.Ably.CustomSerialisers
             this._serializer2 = context.GetSerializer<System.Nullable<System.DateTimeOffset>>(schema2);
         }
 
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.Message objectTree)
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.Message objectTree)
         {
             var nonNullFields = new bool[]
             {
@@ -90,17 +90,17 @@ namespace IO.Ably.CustomSerialisers
             }
         }
 
-        protected override IO.Ably.Message UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.Message UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.Message result = default(IO.Ably.Message);
-            result = new IO.Ably.Message();
+            Ably.PubSub.Message result = default(Ably.PubSub.Message);
+            result = new Ably.PubSub.Message();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
             {
                 string key = default(string);
                 string nullable7 = default(string);
-                nullable7 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.Message),
+                nullable7 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.Message),
                     "MemberName");
                 if (((nullable7 == null)
                      == false))
@@ -151,7 +151,7 @@ namespace IO.Ably.CustomSerialisers
                     {
                         string nullable14 = default(string);
                         nullable14 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                            typeof(IO.Ably.Message), "System.String name");
+                            typeof(Ably.PubSub.Message), "System.String name");
                         if (((nullable14 == null)
                              == false))
                         {
@@ -164,7 +164,7 @@ namespace IO.Ably.CustomSerialisers
                         {
                             string nullable13 = default(string);
                             nullable13 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                typeof(IO.Ably.Message), "System.String id");
+                                typeof(Ably.PubSub.Message), "System.String id");
                             if (((nullable13 == null)
                                  == false))
                             {
@@ -177,7 +177,7 @@ namespace IO.Ably.CustomSerialisers
                             {
                                 string nullable12 = default(string);
                                 nullable12 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                    typeof(IO.Ably.Message), "System.String encoding");
+                                    typeof(Ably.PubSub.Message), "System.String encoding");
                                 if (((nullable12 == null)
                                      == false))
                                 {
@@ -243,7 +243,7 @@ namespace IO.Ably.CustomSerialisers
                                     {
                                         string nullable9 = default(string);
                                         nullable9 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                            typeof(IO.Ably.Message), "System.String connectionId");
+                                            typeof(Ably.PubSub.Message), "System.String connectionId");
                                         if (((nullable9 == null)
                                              == false))
                                         {
@@ -256,7 +256,7 @@ namespace IO.Ably.CustomSerialisers
                                         {
                                             string nullable8 = default(string);
                                             nullable8 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                                typeof(IO.Ably.Message), "System.String clientId");
+                                                typeof(Ably.PubSub.Message), "System.String clientId");
                                             if (((nullable8 == null)
                                                  == false))
                                             {

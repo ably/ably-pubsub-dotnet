@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Class representing a Device registered for Ably push notifications.

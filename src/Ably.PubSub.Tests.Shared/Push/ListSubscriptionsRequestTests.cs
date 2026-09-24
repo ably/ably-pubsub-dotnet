@@ -1,8 +1,8 @@
 using FluentAssertions;
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 using Xunit;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     public class ListSubscriptionsRequestTests
     {

@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Globalization;
 
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class TokenRequestPopulateTests
     {

@@ -1,7 +1,7 @@
 using System;
-using IO.Ably.Types;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Class that encapsulates data sent over Ably Websocket Transport.

@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// String utility functions.

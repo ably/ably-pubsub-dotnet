@@ -1,15 +1,15 @@
 using System;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.PubSub.Device;
-using IO.Ably.PubSub.Server;
-using IO.Ably.Realtime;
-using IO.Ably.Tests;
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Device;
+using Ably.PubSub.Server;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests;
+using Ably.PubSub.Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.PubSub
+namespace Ably.PubSub.Tests.PubSub
 {
     /// <summary>
     /// Dual-construction-mode conformance: a client built through each door must actually work

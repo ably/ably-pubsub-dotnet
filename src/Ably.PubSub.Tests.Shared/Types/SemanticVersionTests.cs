@@ -2,7 +2,7 @@ using System;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Types
+namespace Ably.PubSub.Types
 {
     public class SemanticVersionTests
     {

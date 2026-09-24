@@ -5,9 +5,9 @@ using System.Net;
 using System.Net.Http;
 using Assets.Tests.AblySandbox;
 using Cysharp.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Realtime;
-using IO.Ably.Unity;
+using Ably.PubSub;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Unity;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 

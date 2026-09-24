@@ -1,7 +1,7 @@
 using System;
 using IO.Ably.DeltaCodec;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     internal class VcDiffEncoder : MessageEncoder
     {

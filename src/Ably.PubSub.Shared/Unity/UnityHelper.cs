@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Unity
+namespace Ably.PubSub.Unity
 {
     /// <summary>
     /// Unity platform detection and identification.

@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.Realtime
+﻿namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Channel properties.

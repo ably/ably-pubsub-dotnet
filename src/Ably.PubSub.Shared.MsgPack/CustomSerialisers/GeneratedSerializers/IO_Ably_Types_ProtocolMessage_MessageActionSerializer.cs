@@ -8,12 +8,12 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
     [System.Diagnostics.DebuggerNonUserCodeAttribute()]
-    public class IO_Ably_Types_ProtocolMessage_MessageActionSerializer : MsgPack.Serialization.EnumMessagePackSerializer<IO.Ably.Types.ProtocolMessage.MessageAction> {
+    public class IO_Ably_Types_ProtocolMessage_MessageActionSerializer : MsgPack.Serialization.EnumMessagePackSerializer<Ably.PubSub.Types.ProtocolMessage.MessageAction> {
         
         public IO_Ably_Types_ProtocolMessage_MessageActionSerializer(MsgPack.Serialization.SerializationContext context) : 
                 this(context, MsgPack.Serialization.EnumSerializationMethod.ByUnderlyingValue) {
@@ -23,12 +23,12 @@ namespace IO.Ably.CustomSerialisers {
                 base(context, enumSerializationMethod) {
         }
         
-        protected override void PackUnderlyingValueTo(MsgPack.Packer packer, IO.Ably.Types.ProtocolMessage.MessageAction enumValue) {
+        protected override void PackUnderlyingValueTo(MsgPack.Packer packer, Ably.PubSub.Types.ProtocolMessage.MessageAction enumValue) {
             packer.Pack(((int)(enumValue)));
         }
         
-        protected override IO.Ably.Types.ProtocolMessage.MessageAction UnpackFromUnderlyingValue(MsgPack.MessagePackObject messagePackObject) {
-            return ((IO.Ably.Types.ProtocolMessage.MessageAction)(messagePackObject.AsInt32()));
+        protected override Ably.PubSub.Types.ProtocolMessage.MessageAction UnpackFromUnderlyingValue(MsgPack.MessagePackObject messagePackObject) {
+            return ((Ably.PubSub.Types.ProtocolMessage.MessageAction)(messagePackObject.AsInt32()));
         }
         
         private static T @__Conditional<T>(bool condition, T whenTrue, T whenFalse)

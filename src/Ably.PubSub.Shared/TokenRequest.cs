@@ -1,9 +1,9 @@
 using System;
 using System.Globalization;
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A class providing parameters of a token request.

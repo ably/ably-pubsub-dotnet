@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A unit type is a type that allows only one value (and thus can hold no information)

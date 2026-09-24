@@ -3,16 +3,16 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-using IO.Ably.Encryption;
-using IO.Ably.Rest;
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Http;
+using Ably.PubSub.Tests.Infrastructure;
 
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Rest
+namespace Ably.PubSub.Tests.Http
 {
     [Collection("PubSubHttpClient SandBox Collection")]
     [Trait("type", "integration")]

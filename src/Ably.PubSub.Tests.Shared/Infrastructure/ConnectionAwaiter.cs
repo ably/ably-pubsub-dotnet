@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Realtime;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably.Tests.Infrastructure
+namespace Ably.PubSub.Tests.Infrastructure
 {
     internal class ConnectionAwaiter
     {

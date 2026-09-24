@@ -5,16 +5,16 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Push;
-using IO.Ably.Rest;
-using IO.Ably.Shared.Utils;
-using IO.Ably.Transport;
-using IO.Ably.Types;
-using IO.Ably.Utils;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Push;
+using Ably.PubSub.Http;
+using Ably.PubSub.Shared.Utils;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
+using Ably.PubSub.Utils;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     [DebuggerDisplay("{Name}. State = {_state}. Error = {ErrorReason} ")]
     internal class RealtimeChannel : EventEmitter<ChannelEvent, ChannelStateChange>, IRealtimeChannel

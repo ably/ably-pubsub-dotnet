@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.Realtime
+﻿namespace Ably.PubSub.Realtime
 {
     /*
      The values assigned to each enum should correspond with those assigned in ChannelEvent.

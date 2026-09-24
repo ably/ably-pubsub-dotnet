@@ -1,9 +1,9 @@
-﻿using IO.Ably.Transport;
+﻿using Ably.PubSub.Transport;
 using System.Net.NetworkInformation;
-using IO.Ably.Push;
-using IO.Ably.Realtime;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class Platform : IPlatform
     {

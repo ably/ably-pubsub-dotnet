@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.Push
+﻿namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Class used to hold registration tokens.

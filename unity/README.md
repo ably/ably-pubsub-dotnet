@@ -17,9 +17,9 @@
 ```dotnet
 using System;
 using System.Threading;
-using IO.Ably;
-using IO.Ably.PubSub.Device;
-using IO.Ably.Realtime;
+using Ably.PubSub;
+using Ably.PubSub.Device;
+using Ably.PubSub.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
 

@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     // No need to document an internal interface.
 #pragma warning disable SA1600 // Elements should be documented

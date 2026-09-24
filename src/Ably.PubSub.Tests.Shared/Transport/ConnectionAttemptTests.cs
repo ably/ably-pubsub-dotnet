@@ -1,12 +1,12 @@
 using System;
 
-using IO.Ably.Transport;
+using Ably.PubSub.Transport;
 
 using FluentAssertions;
-using IO.Ably.Realtime;
+using Ably.PubSub.Realtime;
 using Xunit;
 
-namespace IO.Ably.Tests.Transport
+namespace Ably.PubSub.Tests.Transport
 {
     public class ConnectionAttemptTests
     {

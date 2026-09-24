@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace IO.Ably.Rest
+namespace Ably.PubSub.Http
 {
 #pragma warning disable SA1307
 #pragma warning disable SA1600

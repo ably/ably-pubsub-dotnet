@@ -8,12 +8,12 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
     
     
     [System.CodeDom.Compiler.GeneratedCodeAttribute("MsgPack.Serialization.CodeDomSerializers.CodeDomSerializerBuilder", "0.6.0.0")]
     [System.Diagnostics.DebuggerNonUserCodeAttribute()]
-    public class IO_Ably_CapabilityResourceSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.CapabilityResource> {
+    public class IO_Ably_CapabilityResourceSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.CapabilityResource> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
@@ -29,7 +29,7 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer1 = context.GetSerializer<System.Collections.Generic.List<string>>(schema1);
         }
         
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.CapabilityResource objectTree) {
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.CapabilityResource objectTree) {
             packer.PackMapHeader(2);
             this._serializer0.PackTo(packer, "AllowedOperations");
             this._serializer1.PackTo(packer, objectTree.AllowedOperations);
@@ -37,9 +37,9 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer0.PackTo(packer, objectTree.Name);
         }
         
-        protected override IO.Ably.CapabilityResource UnpackFromCore(MsgPack.Unpacker unpacker) {
-            IO.Ably.CapabilityResource result = default(IO.Ably.CapabilityResource);
-            result = new IO.Ably.CapabilityResource();
+        protected override Ably.PubSub.CapabilityResource UnpackFromCore(MsgPack.Unpacker unpacker) {
+            Ably.PubSub.CapabilityResource result = default(Ably.PubSub.CapabilityResource);
+            result = new Ably.PubSub.CapabilityResource();
             if (unpacker.IsArrayHeader) {
                 int unpacked = default(int);
                 int itemsCount = default(int);
@@ -74,7 +74,7 @@ namespace IO.Ably.CustomSerialisers {
                 unpacked = (unpacked + 1);
                 string nullable0 = default(string);
                 if ((unpacked < itemsCount)) {
-                    nullable0 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.CapabilityResource), "System.String Name");
+                    nullable0 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.CapabilityResource), "System.String Name");
                 }
                 if (((nullable0 == null) 
                             == false)) {
@@ -88,7 +88,7 @@ namespace IO.Ably.CustomSerialisers {
                 for (int i = 0; (i < itemsCount0); i = (i + 1)) {
                     string key = default(string);
                     string nullable1 = default(string);
-                    nullable1 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.CapabilityResource), "MemberName");
+                    nullable1 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.CapabilityResource), "MemberName");
                     if (((nullable1 == null) 
                                 == false)) {
                         key = nullable1;
@@ -98,7 +98,7 @@ namespace IO.Ably.CustomSerialisers {
                     }
                     if ((key == "Name")) {
                         string nullable3 = default(string);
-                        nullable3 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.CapabilityResource), "System.String Name");
+                        nullable3 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.CapabilityResource), "System.String Name");
                         if (((nullable3 == null) 
                                     == false)) {
                             result.Name = nullable3;

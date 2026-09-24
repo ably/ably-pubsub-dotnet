@@ -2,9 +2,9 @@
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using IO.Ably.Transport;
+using Ably.PubSub.Transport;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class Defaults
     {
@@ -84,10 +84,10 @@ namespace IO.Ably
         }
 
 #if MSGPACK
-        internal const Protocol DefaultProtocol = IO.Ably.Protocol.MsgPack;
+        internal const Protocol DefaultProtocol = Ably.PubSub.Protocol.MsgPack;
         internal const bool MsgPackEnabled = true;
 #else
-        internal const Protocol Protocol = IO.Ably.Protocol.Json;
+        internal const Protocol Protocol = Ably.PubSub.Protocol.Json;
         internal const bool MsgPackEnabled = false;
 
 #endif

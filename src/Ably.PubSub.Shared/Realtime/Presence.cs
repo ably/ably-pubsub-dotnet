@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using IO.Ably.Transport;
-using IO.Ably.Types;
-using IO.Ably.Utils;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
+using Ably.PubSub.Utils;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// A class that provides access to presence operations and state for the associated Channel.

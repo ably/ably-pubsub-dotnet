@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using IO.Ably.Encryption;
-using IO.Ably.Realtime;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably.Tests.Samples
+namespace Ably.PubSub.Tests.Samples
 {
     // ReSharper disable All
 

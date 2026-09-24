@@ -8,11 +8,11 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public class IO_Ably_MessageCountSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.MessageCount> {
+    public class IO_Ably_MessageCountSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.MessageCount> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
@@ -28,7 +28,7 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer1 = context.GetSerializer<long>(schema1);
         }
         
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.MessageCount objectTree) {
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.MessageCount objectTree) {
             packer.PackMapHeader(2);
             this._serializer0.PackTo(packer, "count");
             this._serializer1.PackTo(packer, objectTree.Count);
@@ -36,17 +36,17 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer1.PackTo(packer, objectTree.Data);
         }
         
-        protected override IO.Ably.MessageCount UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.MessageCount UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.MessageCount result = default(IO.Ably.MessageCount);
-            result = new IO.Ably.MessageCount();
+            Ably.PubSub.MessageCount result = default(Ably.PubSub.MessageCount);
+            result = new Ably.PubSub.MessageCount();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
             {
                 string key = default(string);
                 string nullable1 = default(string);
-                nullable1 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.MessageCount),
+                nullable1 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.MessageCount),
                     "MemberName");
                 if (((nullable1 == null)
                      == false))
@@ -61,7 +61,7 @@ namespace IO.Ably.CustomSerialisers {
                 {
                     System.Nullable<long> nullable3 = default(System.Nullable<long>);
                     nullable3 = MsgPack.Serialization.UnpackHelpers.UnpackNullableInt64Value(unpacker,
-                        typeof(IO.Ably.MessageCount), "Double Data");
+                        typeof(Ably.PubSub.MessageCount), "Double Data");
                     if (nullable3.HasValue)
                     {
                         result.Data = nullable3.Value;
@@ -73,7 +73,7 @@ namespace IO.Ably.CustomSerialisers {
                     {
                         System.Nullable<long> nullable2 = default(System.Nullable<long>);
                         nullable2 = MsgPack.Serialization.UnpackHelpers.UnpackNullableInt64Value(unpacker,
-                            typeof(IO.Ably.MessageCount), "Double Count");
+                            typeof(Ably.PubSub.MessageCount), "Double Count");
                         if (nullable2.HasValue)
                         {
                             result.Count = nullable2.Value;

@@ -1,7 +1,7 @@
 using System;
-using IO.Ably.PubSub.Internal;
+using Ably.PubSub.Internal;
 
-namespace IO.Ably.PubSub.Device
+namespace Ably.PubSub.Device
 {
     /// <summary>
     /// Entry point for Ably Pub/Sub applications that run on an end-user device - a mobile or
@@ -14,7 +14,7 @@ namespace IO.Ably.PubSub.Device
     /// </para>
     /// <para>
     /// There is one door by design, and it returns the ordinary <see cref="PubSubRealtimeClient"/>, so
-    /// the whole of the <c>IO.Ably</c> API remains available. Device-side connectionless
+    /// the whole of the <c>Ably.PubSub</c> API remains available. Device-side connectionless
     /// operations - message history, presence reads, token requests and
     /// <c>Request</c>/<c>RequestV2</c> - are available on that client through its
     /// <see cref="PubSubRealtimeClient.HttpClient"/> and channel APIs, so per PDR-091 there is

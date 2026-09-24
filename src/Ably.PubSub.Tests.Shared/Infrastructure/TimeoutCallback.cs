@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
 
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Tests.Infrastructure;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     internal sealed class TimeoutCallback<T> : IDisposable
     {

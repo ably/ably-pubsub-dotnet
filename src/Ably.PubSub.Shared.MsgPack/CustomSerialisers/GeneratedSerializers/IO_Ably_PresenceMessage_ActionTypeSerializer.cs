@@ -8,12 +8,12 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
     [System.Diagnostics.DebuggerNonUserCodeAttribute()]
-    public class IO_Ably_PresenceMessage_ActionTypeSerializer : MsgPack.Serialization.EnumMessagePackSerializer<IO.Ably.PresenceAction> {
+    public class IO_Ably_PresenceMessage_ActionTypeSerializer : MsgPack.Serialization.EnumMessagePackSerializer<Ably.PubSub.PresenceAction> {
         
         public IO_Ably_PresenceMessage_ActionTypeSerializer(MsgPack.Serialization.SerializationContext context) : 
                 this(context, MsgPack.Serialization.EnumSerializationMethod.ByUnderlyingValue) {
@@ -23,12 +23,12 @@ namespace IO.Ably.CustomSerialisers {
                 base(context, enumSerializationMethod) {
         }
         
-        protected override void PackUnderlyingValueTo(MsgPack.Packer packer, IO.Ably.PresenceAction enumValue) {
+        protected override void PackUnderlyingValueTo(MsgPack.Packer packer, Ably.PubSub.PresenceAction enumValue) {
             packer.Pack(((int)(enumValue)));
         }
         
-        protected override IO.Ably.PresenceAction UnpackFromUnderlyingValue(MsgPack.MessagePackObject messagePackObject) {
-            return ((IO.Ably.PresenceAction)(messagePackObject.AsInt32()));
+        protected override Ably.PubSub.PresenceAction UnpackFromUnderlyingValue(MsgPack.MessagePackObject messagePackObject) {
+            return ((Ably.PubSub.PresenceAction)(messagePackObject.AsInt32()));
         }
         
         private static T @__Conditional<T>(bool condition, T whenTrue, T whenFalse)

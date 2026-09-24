@@ -1,7 +1,7 @@
 using System;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public abstract class AblySpecs
     {

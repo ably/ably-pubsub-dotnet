@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     internal class ConnectionHeartbeatHandler
     {

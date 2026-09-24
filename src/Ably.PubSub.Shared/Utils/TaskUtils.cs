@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal static class TaskUtils
     {

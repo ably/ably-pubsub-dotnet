@@ -4,12 +4,12 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Realtime;
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     [Collection("SandBox Collection")]
     [Trait("type", "integration")]

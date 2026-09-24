@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Extends the public 'ILogger' interface with additional internal capabilities.

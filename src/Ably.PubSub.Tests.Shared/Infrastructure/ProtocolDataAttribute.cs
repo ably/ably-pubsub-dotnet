@@ -2,7 +2,7 @@
 using System.Reflection;
 using Xunit.Sdk;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class ProtocolDataAttribute : DataAttribute
     {

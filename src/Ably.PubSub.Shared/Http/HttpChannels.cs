@@ -2,9 +2,9 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 
-namespace IO.Ably.Rest
+namespace Ably.PubSub.Http
 {
     /// <summary>
     /// Class that manages HttpChannels.

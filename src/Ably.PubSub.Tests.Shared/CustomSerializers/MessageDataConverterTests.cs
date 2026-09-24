@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Shared.CustomSerializers
+namespace Ably.PubSub.Tests.Shared.CustomSerializers
 {
     public class MessageDataConverterTests
     {

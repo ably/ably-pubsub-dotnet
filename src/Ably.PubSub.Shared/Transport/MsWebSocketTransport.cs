@@ -2,9 +2,9 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-using IO.Ably.Realtime;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     /// <summary>
     /// Class encapsulating additional parameters for the websocket connection.

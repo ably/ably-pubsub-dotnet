@@ -2,13 +2,13 @@ using System;
 using System.Net;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Types;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     [Trait("spec", "RTN13")]
     public class ConnectionPingSpecs : AblyRealtimeSpecs

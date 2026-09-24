@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace IO.Ably.PubSub.Internal
+namespace Ably.PubSub.Internal
 {
     /// <summary>
     /// Private helper shared by Ably.PubSub.Device and Ably.PubSub.Server. It is compiled into

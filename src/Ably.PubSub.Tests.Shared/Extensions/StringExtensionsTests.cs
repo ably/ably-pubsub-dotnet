@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.Extensions
+namespace Ably.PubSub.Tests.Extensions
 {
     public class StringExtensionsTests
     {

@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Push;
-using IO.Ably.Rest;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Push;
+using Ably.PubSub.Http;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>Client for the Ably rest API.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1401:Fields should be private", Justification = "Needed properties to be internal for testing.")]

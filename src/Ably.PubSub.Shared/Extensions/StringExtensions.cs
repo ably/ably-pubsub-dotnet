@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal static class StringExtensions
     {

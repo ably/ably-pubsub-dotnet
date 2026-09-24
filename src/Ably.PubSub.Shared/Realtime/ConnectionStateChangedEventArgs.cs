@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Whenever the connection state changes, a ConnectionStateChange Event is emitted on the Connection object

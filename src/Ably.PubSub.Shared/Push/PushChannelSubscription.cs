@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Represents a push channel subscription.

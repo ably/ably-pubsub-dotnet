@@ -2,7 +2,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A class providing details of a token and its associated metadata.

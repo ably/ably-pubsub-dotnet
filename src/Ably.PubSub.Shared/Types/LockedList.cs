@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     [SuppressMessage("ReSharper", "InconsistentlySynchronizedField", Justification = "Double-check locking pattern used.")]
     internal sealed class LockedList<T> : IEnumerable<T>

@@ -1,7 +1,7 @@
 ﻿#if MSGPACK
 using FluentAssertions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class GenerateMsgPackSerializers
     {
@@ -12,8 +12,8 @@ namespace IO.Ably.Tests
             SerializerGenerator.GenerateCode(
                 new SerializerCodeGenerationConfiguration
                 {
-                    Namespace = "IO.Ably.CustomSerialisers",
-                    OutputDirectory = "../../../IO.Ably/CustomSerialisers/GeneratedSerializers",
+                    Namespace = "Ably.PubSub.CustomSerialisers",
+                    OutputDirectory = "../../../Ably.PubSub/CustomSerialisers/GeneratedSerializers",
                     EnumSerializationMethod = EnumSerializationMethod.ByName, // You can tweak it to use ByUnderlyingValue as you like.
                 IsRecursive = true, // Set dependent serializers are also generated.
                 PreferReflectionBasedSerializer = false, // Set true if you want to use reflection based collection serializer, false if you want to get generated collection serializers.

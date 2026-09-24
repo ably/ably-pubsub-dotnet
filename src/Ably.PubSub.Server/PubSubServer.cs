@@ -1,7 +1,7 @@
 using System;
-using IO.Ably.PubSub.Internal;
+using Ably.PubSub.Internal;
 
-namespace IO.Ably.PubSub.Server
+namespace Ably.PubSub.Server
 {
     /// <summary>
     /// Entry point for Ably Pub/Sub applications that run on a server - an ASP.NET or Azure host,
@@ -14,7 +14,7 @@ namespace IO.Ably.PubSub.Server
     /// </para>
     /// <para>
     /// The returned clients are the ordinary <see cref="PubSubRealtimeClient"/> and
-    /// <see cref="PubSubHttpClient"/>, so the whole of the <c>IO.Ably</c> API remains available;
+    /// <see cref="PubSubHttpClient"/>, so the whole of the <c>Ably.PubSub</c> API remains available;
     /// installing this package rather than Ably.PubSub.Device states where the code runs. What
     /// the doors add is an agent entry declaring the server side, and per PDR-091 that entry is
     /// what earns the monthly-active-user exemption on API-key authentication.

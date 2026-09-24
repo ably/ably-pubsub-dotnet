@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using FluentAssertions;
-using IO.Ably.Encryption;
-using IO.Ably.MessageEncoders;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.MessageEncoders;
 using Xunit;
 
-namespace IO.Ably.Tests.MessageEncodes
+namespace Ably.PubSub.Tests.MessageEncodes
 {
     public class CipherEncoderTests
     {

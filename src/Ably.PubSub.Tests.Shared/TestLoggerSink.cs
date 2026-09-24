@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace IO.Ably.AcceptanceTests
+namespace Ably.PubSub.AcceptanceTests
 {
     internal sealed class TestLoggerSink : ILoggerSink
     {

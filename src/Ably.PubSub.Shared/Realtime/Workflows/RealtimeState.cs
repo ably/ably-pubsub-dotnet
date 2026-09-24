@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using IO.Ably.Shared.Utils;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
-using IO.Ably.Types;
+using Ably.PubSub.Shared.Utils;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Realtime.Workflow
+namespace Ably.PubSub.Realtime.Workflow
 {
     internal class RealtimeState
     {

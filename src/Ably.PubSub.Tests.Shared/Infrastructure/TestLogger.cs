@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     /// <summary>
     /// A test logger to check if a message has been logged.

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Utils
+namespace Ably.PubSub.Utils
 {
     internal static class ActionUtils
     {

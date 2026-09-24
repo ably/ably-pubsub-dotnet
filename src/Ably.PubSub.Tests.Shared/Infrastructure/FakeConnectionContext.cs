@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     internal class FakeConnectionContext : IConnectionContext
     {

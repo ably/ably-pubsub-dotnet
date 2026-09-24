@@ -1,4 +1,4 @@
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Direction of the query.

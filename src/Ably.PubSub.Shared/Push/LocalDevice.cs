@@ -1,9 +1,9 @@
 ﻿using System;
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// LocalDevice represents the current state of the device in respect of it being a target for push notifications.

@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace IO.Ably.Unity
+namespace Ably.PubSub.Unity
 {
     /// <summary>
     /// Reflection-based Unity adapter with static methods.

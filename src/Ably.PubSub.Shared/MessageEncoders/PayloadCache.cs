@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     internal class PayloadCache : IEquatable<PayloadCache>

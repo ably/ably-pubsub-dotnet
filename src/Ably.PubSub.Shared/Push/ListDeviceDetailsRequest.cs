@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Encapsulates the List DeviceDetails filter and it prevents invalid states.

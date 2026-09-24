@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace IO.Ably.Types
+namespace Ably.PubSub.Types
 {
     internal static class OperatingSystem
     {

@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.Push
+﻿namespace Ably.PubSub.Push
 {
     internal partial class ActivationStateMachine
     {

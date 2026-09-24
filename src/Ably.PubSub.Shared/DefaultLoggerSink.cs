@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>The default logger implementation, that writes to debug output.</summary>
     internal class DefaultLoggerSink : ILoggerSink

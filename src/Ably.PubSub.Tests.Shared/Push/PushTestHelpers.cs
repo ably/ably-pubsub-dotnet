@@ -1,7 +1,7 @@
-﻿using IO.Ably.Push;
+﻿using Ably.PubSub.Push;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     public static class PushTestHelpers
     {

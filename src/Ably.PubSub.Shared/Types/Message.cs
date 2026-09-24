@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Shared.CustomSerialisers;
-using IO.Ably.Types;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Shared.CustomSerialisers;
+using Ably.PubSub.Types;
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>A class representing an individual message to be sent or received via the Ably realtime service.</summary>
     [DebuggerDisplay("{ToString()}")]

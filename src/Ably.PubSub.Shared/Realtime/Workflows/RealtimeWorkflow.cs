@@ -6,12 +6,12 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
-using IO.Ably.Types;
-using IO.Ably.Utils;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
+using Ably.PubSub.Utils;
 
-namespace IO.Ably.Realtime.Workflow
+namespace Ably.PubSub.Realtime.Workflow
 {
     /// <summary>
     /// Realtime workflow has 2 roles

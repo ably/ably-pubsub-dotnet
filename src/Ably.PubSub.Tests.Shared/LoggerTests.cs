@@ -2,7 +2,7 @@
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.AcceptanceTests
+namespace Ably.PubSub.AcceptanceTests
 {
     public sealed class LoggerTests : IDisposable
     {

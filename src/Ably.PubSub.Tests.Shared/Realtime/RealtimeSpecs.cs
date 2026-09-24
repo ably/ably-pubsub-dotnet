@@ -1,12 +1,12 @@
 ﻿using System.Threading.Tasks;
 
-using IO.Ably.Realtime;
+using Ably.PubSub.Realtime;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class RealtimeSpecs : AblySpecs
     {

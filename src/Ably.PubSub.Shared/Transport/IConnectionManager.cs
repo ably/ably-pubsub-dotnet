@@ -1,8 +1,8 @@
 ﻿using System;
-using IO.Ably.Realtime;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented", Justification = "No need to document internal interfaces.")]
     internal interface IConnectionManager

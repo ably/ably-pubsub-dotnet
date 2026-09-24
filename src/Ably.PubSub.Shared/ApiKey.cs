@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Internal class used to parse ApiKeys. The api key has the following parts {keyName}:{KeySecret}

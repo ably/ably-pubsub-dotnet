@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A class encapsulating a Stats datapoint.

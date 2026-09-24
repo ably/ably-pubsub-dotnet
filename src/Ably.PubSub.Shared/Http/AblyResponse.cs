@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal enum ResponseType
     {

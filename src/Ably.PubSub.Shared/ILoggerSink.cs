@@ -1,4 +1,4 @@
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>An interface that actually logs that messages somewhere.</summary>
     public interface ILoggerSink

@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Utils
+namespace Ably.PubSub.Utils
 {
     /// <summary>
     /// Utility type to defining various error policies.

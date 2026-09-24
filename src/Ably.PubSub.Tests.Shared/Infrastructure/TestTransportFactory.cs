@@ -1,8 +1,8 @@
 ﻿using System;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Tests.Infrastructure
+namespace Ably.PubSub.Tests.Infrastructure
 {
     /// <summary>
     /// This class is used for controlling wrapped TestTranport externally.

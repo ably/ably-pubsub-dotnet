@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Ably exception if an action cannot be performed over http.

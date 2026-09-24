@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     public class ListDeviceDetailsRequestTests
     {

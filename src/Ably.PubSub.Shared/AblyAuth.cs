@@ -4,11 +4,11 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using IO.Ably.Realtime.Workflow;
+using Ably.PubSub.Realtime.Workflow;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class AblyAuth : IAblyAuth
     {

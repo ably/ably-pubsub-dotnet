@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Interface representing a Realtime channel.
