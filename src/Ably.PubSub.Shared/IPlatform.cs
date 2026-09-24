@@ -1,7 +1,7 @@
-﻿using IO.Ably.Push;
-using IO.Ably.Transport;
+﻿using Ably.PubSub.Push;
+using Ably.PubSub.Transport;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// This interface is implemented for each platform .NETFramework, NetStandard,

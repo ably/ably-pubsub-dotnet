@@ -5,13 +5,13 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-using IO.Ably.AcceptanceTests;
+using Ably.PubSub.AcceptanceTests;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class HttpSpecs : MockHttpRestSpecs
     {

@@ -4,18 +4,18 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Tests.Realtime;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Tests.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.NETFramework.Realtime
+namespace Ably.PubSub.Tests.NETFramework.Realtime
 {
     public class RealtimeWorkflowSpecs : AblyRealtimeSpecs
     {

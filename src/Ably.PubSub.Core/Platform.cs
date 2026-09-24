@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
-using IO.Ably.Push;
-using IO.Ably.Realtime;
-using IO.Ably.Transport;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class Platform : IPlatform
     {

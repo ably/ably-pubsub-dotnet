@@ -1,10 +1,10 @@
 ﻿using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     public class PushRealtimeTests : AblyRealtimeSpecs
     {

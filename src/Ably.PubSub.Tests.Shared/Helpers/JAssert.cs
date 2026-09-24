@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Shared.Helpers
+namespace Ably.PubSub.Tests.Shared.Helpers
 {
     internal static class JAssert
     {

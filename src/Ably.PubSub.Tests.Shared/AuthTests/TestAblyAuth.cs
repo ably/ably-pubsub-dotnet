@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Tests.AuthTests
+namespace Ably.PubSub.Tests.AuthTests
 {
     internal class TestAblyAuth : AblyAuth
     {

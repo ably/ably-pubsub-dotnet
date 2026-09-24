@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     // https://github.com/StephenCleary/AsyncEx/blob/edb2c6b66d41471008a56e4098f9670b5143617e/src/Nito.AsyncEx.Tasks/TaskConstants.cs
 

@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using IO.Ably.Realtime;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     internal class MessageHandler
     {

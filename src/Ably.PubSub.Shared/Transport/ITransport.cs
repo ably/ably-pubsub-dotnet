@@ -1,7 +1,7 @@
 ﻿using System;
-using IO.Ably.Realtime;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     /// <summary>
     /// Current state of the websocket transport.

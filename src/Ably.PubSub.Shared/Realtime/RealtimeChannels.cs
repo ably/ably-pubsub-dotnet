@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using IO.Ably.Push;
-using IO.Ably.Realtime.Workflow;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime.Workflow;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Manages Realtime channels.

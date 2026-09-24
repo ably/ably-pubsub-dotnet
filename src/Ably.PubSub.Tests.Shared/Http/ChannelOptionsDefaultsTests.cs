@@ -2,7 +2,7 @@ using System;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.NETFramework.Rest
+namespace Ably.PubSub.Tests.NETFramework.Http
 {
     public class ChannelOptionsDefaultsTests
     {

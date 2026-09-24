@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Text;
 using FluentAssertions;
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 using Xunit;
 
-namespace IO.Ably.Tests.Rest
+namespace Ably.PubSub.Tests.Http
 {
     [Trait("spec", "TM3")]
     public class TM3Spec

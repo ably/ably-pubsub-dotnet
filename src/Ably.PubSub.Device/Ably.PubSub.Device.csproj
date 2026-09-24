@@ -10,7 +10,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Ably.PubSub.Device</AssemblyName>
-    <RootNamespace>IO.Ably.PubSub.Device</RootNamespace>
+    <RootNamespace>Ably.PubSub.Device</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildRuntimeType)'=='Mono'">

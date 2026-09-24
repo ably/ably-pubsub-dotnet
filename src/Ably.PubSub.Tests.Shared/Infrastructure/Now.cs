@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     internal class Now
     {

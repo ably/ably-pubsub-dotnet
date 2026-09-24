@@ -4,14 +4,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using IO.Ably.Realtime;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Types;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     public class ChannelsSpecs : AblyRealtimeSpecs
     {

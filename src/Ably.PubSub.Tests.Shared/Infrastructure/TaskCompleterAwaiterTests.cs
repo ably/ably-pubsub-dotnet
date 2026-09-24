@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.Infrastructure
+namespace Ably.PubSub.Tests.Infrastructure
 {
     public class TaskCompleterAwaiterTests
     {

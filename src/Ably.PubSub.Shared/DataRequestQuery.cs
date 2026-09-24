@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Stats Granularity enum.

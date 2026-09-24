@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-using IO.Ably.Types;
+using Ably.PubSub.Types;
 
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class JsonMessageSerializerTests
     {

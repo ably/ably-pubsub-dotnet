@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Types
+namespace Ably.PubSub.Types
 {
     public class OperatingSystemTests
     {

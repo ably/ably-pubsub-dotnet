@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Realtime;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public sealed class FakeTransport : ITransport
     {

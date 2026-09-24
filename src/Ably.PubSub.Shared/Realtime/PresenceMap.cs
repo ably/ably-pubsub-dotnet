@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal class PresenceMap
     {

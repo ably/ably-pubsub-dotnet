@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Extension methods working with dates.

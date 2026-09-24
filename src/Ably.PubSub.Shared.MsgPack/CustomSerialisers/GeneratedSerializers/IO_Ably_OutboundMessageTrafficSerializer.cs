@@ -8,15 +8,15 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public class IO_Ably_OutboundMessageTrafficSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.OutboundMessageTraffic> {
+    public class IO_Ably_OutboundMessageTrafficSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.OutboundMessageTraffic> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.MessageTypes> _serializer1;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.MessageTypes> _serializer1;
         
         public IO_Ably_OutboundMessageTrafficSerializer(MsgPack.Serialization.SerializationContext context) : 
                 base(context) {
@@ -25,10 +25,10 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer0 = context.GetSerializer<string>(schema0);
             MsgPack.Serialization.PolymorphismSchema schema1 = default(MsgPack.Serialization.PolymorphismSchema);
             schema1 = null;
-            this._serializer1 = context.GetSerializer<IO.Ably.MessageTypes>(schema1);
+            this._serializer1 = context.GetSerializer<Ably.PubSub.MessageTypes>(schema1);
         }
         
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.OutboundMessageTraffic objectTree) {
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.OutboundMessageTraffic objectTree) {
             packer.PackMapHeader(4);
             this._serializer0.PackTo(packer, "all");
             this._serializer1.PackTo(packer, objectTree.All);
@@ -40,10 +40,10 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer1.PackTo(packer, objectTree.Rest);
         }
         
-        protected override IO.Ably.OutboundMessageTraffic UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.OutboundMessageTraffic UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.OutboundMessageTraffic result = default(IO.Ably.OutboundMessageTraffic);
-            result = new IO.Ably.OutboundMessageTraffic();
+            Ably.PubSub.OutboundMessageTraffic result = default(Ably.PubSub.OutboundMessageTraffic);
+            result = new Ably.PubSub.OutboundMessageTraffic();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
@@ -51,7 +51,7 @@ namespace IO.Ably.CustomSerialisers {
                 string key = default(string);
                 string nullable4 = default(string);
                 nullable4 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                    typeof(IO.Ably.OutboundMessageTraffic), "MemberName");
+                    typeof(Ably.PubSub.OutboundMessageTraffic), "MemberName");
                 if (((nullable4 == null)
                      == false))
                 {
@@ -63,7 +63,7 @@ namespace IO.Ably.CustomSerialisers {
                 }
                 if ((key == "rest"))
                 {
-                    IO.Ably.MessageTypes nullable9 = default(IO.Ably.MessageTypes);
+                    Ably.PubSub.MessageTypes nullable9 = default(Ably.PubSub.MessageTypes);
                     if ((unpacker.Read() == false))
                     {
                         throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -100,7 +100,7 @@ namespace IO.Ably.CustomSerialisers {
                 {
                     if ((key == "realtime"))
                     {
-                        IO.Ably.MessageTypes nullable8 = default(IO.Ably.MessageTypes);
+                        Ably.PubSub.MessageTypes nullable8 = default(Ably.PubSub.MessageTypes);
                         if ((unpacker.Read() == false))
                         {
                             throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -137,7 +137,7 @@ namespace IO.Ably.CustomSerialisers {
                     {
                         if ((key == "webhook"))
                         {
-                            IO.Ably.MessageTypes nullable7 = default(IO.Ably.MessageTypes);
+                            Ably.PubSub.MessageTypes nullable7 = default(Ably.PubSub.MessageTypes);
                             if ((unpacker.Read() == false))
                             {
                                 throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -174,7 +174,7 @@ namespace IO.Ably.CustomSerialisers {
                         {
                             if ((key == "all"))
                             {
-                                IO.Ably.MessageTypes nullable5 = default(IO.Ably.MessageTypes);
+                                Ably.PubSub.MessageTypes nullable5 = default(Ably.PubSub.MessageTypes);
                                 if ((unpacker.Read() == false))
                                 {
                                     throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);

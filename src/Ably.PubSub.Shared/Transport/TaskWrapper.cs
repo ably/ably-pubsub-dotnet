@@ -2,7 +2,7 @@
 using System.Reflection;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     /// <summary>This trivial class wraps legacy callback-style API into a Task API.</summary>
     internal class TaskWrapper

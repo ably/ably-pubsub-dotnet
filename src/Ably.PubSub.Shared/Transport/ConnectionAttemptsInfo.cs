@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using IO.Ably.Realtime;
-using IO.Ably.Transport.States.Connection;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport.States.Connection;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     internal class ConnectionAttemptsInfo
     {

@@ -10,45 +10,45 @@
 
 using System.Linq;
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public class IO_Ably_Types_ProtocolMessageSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.Types.ProtocolMessage> {
+    public class IO_Ably_Types_ProtocolMessageSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Types.ProtocolMessage> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.Types.ProtocolMessage.MessageAction> _serializer1;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Types.ProtocolMessage.MessageAction> _serializer1;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.ConnectionDetails> _serializer2;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.ConnectionDetails> _serializer2;
         
         private MsgPack.Serialization.MessagePackSerializer<System.Nullable<long>> _serializer3;
         
         private MsgPack.Serialization.MessagePackSerializer<System.Nullable<int>> _serializer4;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.ErrorInfo> _serializer5;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.ErrorInfo> _serializer5;
         
         private MsgPack.Serialization.MessagePackSerializer<System.Nullable<int>> _serializer6;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.Message[]> _serializer7;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Message[]> _serializer7;
         
         private MsgPack.Serialization.MessagePackSerializer<long> _serializer8;
         
-        private MsgPack.Serialization.MessagePackSerializer<IO.Ably.PresenceMessage[]> _serializer9;
+        private MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.PresenceMessage[]> _serializer9;
         
         private MsgPack.Serialization.MessagePackSerializer<System.Nullable<System.DateTimeOffset>> _serializer10;
         
-        private MsgPack.Serialization.MessagePackSerializer<System.Nullable<IO.Ably.Types.ProtocolMessage.MessageAction>> _serializer11;
+        private MsgPack.Serialization.MessagePackSerializer<System.Nullable<Ably.PubSub.Types.ProtocolMessage.MessageAction>> _serializer11;
         
         public IO_Ably_Types_ProtocolMessageSerializer(MsgPack.Serialization.SerializationContext context) : 
                 base(context) {
             MsgPack.Serialization.PolymorphismSchema schema0 = default(MsgPack.Serialization.PolymorphismSchema);
             schema0 = null;
             this._serializer0 = context.GetSerializer<string>(schema0);
-            this._serializer1 = context.GetSerializer<IO.Ably.Types.ProtocolMessage.MessageAction>(MsgPack.Serialization.EnumMessagePackSerializerHelpers.DetermineEnumSerializationMethod(context, typeof(IO.Ably.Types.ProtocolMessage.MessageAction), MsgPack.Serialization.EnumMemberSerializationMethod.ByUnderlyingValue));
+            this._serializer1 = context.GetSerializer<Ably.PubSub.Types.ProtocolMessage.MessageAction>(MsgPack.Serialization.EnumMessagePackSerializerHelpers.DetermineEnumSerializationMethod(context, typeof(Ably.PubSub.Types.ProtocolMessage.MessageAction), MsgPack.Serialization.EnumMemberSerializationMethod.ByUnderlyingValue));
             MsgPack.Serialization.PolymorphismSchema schema1 = default(MsgPack.Serialization.PolymorphismSchema);
             schema1 = null;
-            this._serializer2 = context.GetSerializer<IO.Ably.ConnectionDetails>(schema1);
+            this._serializer2 = context.GetSerializer<Ably.PubSub.ConnectionDetails>(schema1);
             MsgPack.Serialization.PolymorphismSchema schema2 = default(MsgPack.Serialization.PolymorphismSchema);
             schema2 = null;
             this._serializer3 = context.GetSerializer<System.Nullable<long>>(schema2);
@@ -57,28 +57,28 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer4 = context.GetSerializer<System.Nullable<int>>(schema3);
             MsgPack.Serialization.PolymorphismSchema schema4 = default(MsgPack.Serialization.PolymorphismSchema);
             schema4 = null;
-            this._serializer5 = context.GetSerializer<IO.Ably.ErrorInfo>(schema4);
+            this._serializer5 = context.GetSerializer<Ably.PubSub.ErrorInfo>(schema4);
             MsgPack.Serialization.PolymorphismSchema schema5 = default(MsgPack.Serialization.PolymorphismSchema);
             schema5 = null;
             this._serializer6 = context.GetSerializer<System.Nullable<int>>(schema5);
             MsgPack.Serialization.PolymorphismSchema schema6 = default(MsgPack.Serialization.PolymorphismSchema);
             schema6 = null;
-            this._serializer7 = context.GetSerializer<IO.Ably.Message[]>(schema6);
+            this._serializer7 = context.GetSerializer<Ably.PubSub.Message[]>(schema6);
             MsgPack.Serialization.PolymorphismSchema schema7 = default(MsgPack.Serialization.PolymorphismSchema);
             schema7 = null;
             this._serializer8 = context.GetSerializer<long>(schema7);
             MsgPack.Serialization.PolymorphismSchema schema8 = default(MsgPack.Serialization.PolymorphismSchema);
             schema8 = null;
-            this._serializer9 = context.GetSerializer<IO.Ably.PresenceMessage[]>(schema8);
+            this._serializer9 = context.GetSerializer<Ably.PubSub.PresenceMessage[]>(schema8);
             MsgPack.Serialization.PolymorphismSchema schema9 = default(MsgPack.Serialization.PolymorphismSchema);
             schema9 = null;
             this._serializer10 = context.GetSerializer<System.Nullable<System.DateTimeOffset>>(schema9);
             MsgPack.Serialization.PolymorphismSchema schema10 = default(MsgPack.Serialization.PolymorphismSchema);
             schema10 = null;
-            this._serializer11 = context.GetSerializer<System.Nullable<IO.Ably.Types.ProtocolMessage.MessageAction>>(schema10);
+            this._serializer11 = context.GetSerializer<System.Nullable<Ably.PubSub.Types.ProtocolMessage.MessageAction>>(schema10);
         }
         
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.Types.ProtocolMessage objectTree)
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.Types.ProtocolMessage objectTree)
         {
             var nonNullFields = new bool []
             {
@@ -163,10 +163,10 @@ namespace IO.Ably.CustomSerialisers {
             }
         }
         
-        protected override IO.Ably.Types.ProtocolMessage UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.Types.ProtocolMessage UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.Types.ProtocolMessage result = default(IO.Ably.Types.ProtocolMessage);
-            result = new IO.Ably.Types.ProtocolMessage();
+            Ably.PubSub.Types.ProtocolMessage result = default(Ably.PubSub.Types.ProtocolMessage);
+            result = new Ably.PubSub.Types.ProtocolMessage();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
@@ -174,7 +174,7 @@ namespace IO.Ably.CustomSerialisers {
                 string key = default(string);
                 string nullable14 = default(string);
                 nullable14 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                    typeof(IO.Ably.Types.ProtocolMessage), "MemberName");
+                    typeof(Ably.PubSub.Types.ProtocolMessage), "MemberName");
                 if (((nullable14 == null)
                      == false))
                 {
@@ -222,7 +222,7 @@ namespace IO.Ably.CustomSerialisers {
                 {
                     if ((key == "presence"))
                     {
-                        IO.Ably.PresenceMessage[] nullable28 = default(IO.Ably.PresenceMessage[]);
+                        Ably.PubSub.PresenceMessage[] nullable28 = default(Ably.PubSub.PresenceMessage[]);
                         if ((unpacker.Read() == false))
                         {
                             throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -261,7 +261,7 @@ namespace IO.Ably.CustomSerialisers {
                         {
                             System.Nullable<long> nullable27 = default(System.Nullable<long>);
                             nullable27 = MsgPack.Serialization.UnpackHelpers.UnpackNullableInt64Value(unpacker,
-                                typeof(IO.Ably.Types.ProtocolMessage), "Int64 msgSerial");
+                                typeof(Ably.PubSub.Types.ProtocolMessage), "Int64 msgSerial");
                             if (nullable27.HasValue)
                             {
                                 result.MsgSerial = nullable27.Value;
@@ -271,7 +271,7 @@ namespace IO.Ably.CustomSerialisers {
                         {
                             if ((key == "messages"))
                             {
-                                IO.Ably.Message[] nullable26 = default(IO.Ably.Message[]);
+                                Ably.PubSub.Message[] nullable26 = default(Ably.PubSub.Message[]);
                                 if ((unpacker.Read() == false))
                                 {
                                     throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -310,7 +310,7 @@ namespace IO.Ably.CustomSerialisers {
                                 {
                                     string nullable25 = default(string);
                                     nullable25 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                                        typeof(IO.Ably.Types.ProtocolMessage), "System.String id");
+                                        typeof(Ably.PubSub.Types.ProtocolMessage), "System.String id");
                                     if (((nullable25 == null)
                                          == false))
                                     {
@@ -358,7 +358,7 @@ namespace IO.Ably.CustomSerialisers {
                                     {
                                         if ((key == "error"))
                                         {
-                                            IO.Ably.ErrorInfo nullable23 = default(IO.Ably.ErrorInfo);
+                                            Ably.PubSub.ErrorInfo nullable23 = default(Ably.PubSub.ErrorInfo);
                                             if ((unpacker.Read() == false))
                                             {
                                                 throw MsgPack.Serialization.SerializationExceptions.NewMissingItem(i);
@@ -398,7 +398,7 @@ namespace IO.Ably.CustomSerialisers {
                                                 System.Nullable<int> nullable22 = default(System.Nullable<int>);
                                                 nullable22 =
                                                     MsgPack.Serialization.UnpackHelpers.UnpackNullableInt32Value(
-                                                        unpacker, typeof(IO.Ably.Types.ProtocolMessage),
+                                                        unpacker, typeof(Ably.PubSub.Types.ProtocolMessage),
                                                         "System.Nullable`1[System.Int32] count");
                                                 if (nullable22.HasValue)
                                                 {
@@ -412,7 +412,7 @@ namespace IO.Ably.CustomSerialisers {
                                                     System.Nullable<long> nullable21 = default(System.Nullable<long>);
                                                     nullable21 =
                                                         MsgPack.Serialization.UnpackHelpers.UnpackNullableInt64Value(
-                                                            unpacker, typeof(IO.Ably.Types.ProtocolMessage),
+                                                            unpacker, typeof(Ably.PubSub.Types.ProtocolMessage),
                                                             "System.Nullable`1[System.Int64] connectionSerial");
                                                     if (nullable21.HasValue)
                                                     {
@@ -426,7 +426,7 @@ namespace IO.Ably.CustomSerialisers {
                                                         string nullable19 = default(string);
                                                         nullable19 =
                                                             MsgPack.Serialization.UnpackHelpers.UnpackStringValue(
-                                                                unpacker, typeof(IO.Ably.Types.ProtocolMessage),
+                                                                unpacker, typeof(Ably.PubSub.Types.ProtocolMessage),
                                                                 "System.String connectionId");
                                                         if (((nullable19 == null)
                                                                 == false))
@@ -438,8 +438,8 @@ namespace IO.Ably.CustomSerialisers {
                                                     {
                                                         if ((key == "connectionDetails"))
                                                         {
-                                                            IO.Ably.ConnectionDetails nullable18 =
-                                                                default(IO.Ably.ConnectionDetails);
+                                                            Ably.PubSub.ConnectionDetails nullable18 =
+                                                                default(Ably.PubSub.ConnectionDetails);
                                                             if ((unpacker.Read() == false))
                                                             {
                                                                 throw MsgPack.Serialization.SerializationExceptions
@@ -483,7 +483,7 @@ namespace IO.Ably.CustomSerialisers {
                                                                 nullable17 =
                                                                     MsgPack.Serialization.UnpackHelpers
                                                                         .UnpackStringValue(unpacker,
-                                                                            typeof(IO.Ably.Types.ProtocolMessage),
+                                                                            typeof(Ably.PubSub.Types.ProtocolMessage),
                                                                             "System.String channelSerial");
                                                                 if (((nullable17 == null)
                                                                         == false))
@@ -499,7 +499,7 @@ namespace IO.Ably.CustomSerialisers {
                                                                     nullable16 =
                                                                         MsgPack.Serialization.UnpackHelpers
                                                                             .UnpackStringValue(unpacker,
-                                                                                typeof(IO.Ably.Types.ProtocolMessage
+                                                                                typeof(Ably.PubSub.Types.ProtocolMessage
                                                                                     ), "System.String channel");
                                                                     if (((nullable16 == null)
                                                                             == false))
@@ -513,12 +513,12 @@ namespace IO.Ably.CustomSerialisers {
                                                                     {
                                                                         System.Nullable
                                                                             <
-                                                                                IO.Ably.Types.ProtocolMessage.
+                                                                                Ably.PubSub.Types.ProtocolMessage.
                                                                                     MessageAction> nullable15 =
                                                                                         default(
                                                                                             System.Nullable
                                                                                                 <
-                                                                                                    IO.Ably.Types.
+                                                                                                    Ably.PubSub.Types.
                                                                                                         ProtocolMessage
                                                                                                         .
                                                                                                         MessageAction

@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using IO.Ably;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Realtime;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
 namespace Assets.Tests.AblySandbox
 {

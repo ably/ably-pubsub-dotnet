@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using IO.Ably.Shared.Realtime;
+using Ably.PubSub.Shared.Realtime;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     /// <summary>
     /// Parameters passed when creating a new Websocket transport.

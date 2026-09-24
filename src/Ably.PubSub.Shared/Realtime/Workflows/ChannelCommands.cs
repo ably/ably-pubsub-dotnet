@@ -1,4 +1,4 @@
-namespace IO.Ably.Realtime.Workflow
+namespace Ably.PubSub.Realtime.Workflow
 {
     internal class ChannelCommand : RealtimeCommand
     {

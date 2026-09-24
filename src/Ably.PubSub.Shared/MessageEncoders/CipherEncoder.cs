@@ -1,7 +1,7 @@
 using System;
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     internal class CipherEncoder : MessageEncoder
     {

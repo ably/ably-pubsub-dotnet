@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Wraps any Ably HTTP response that supports paging and provides methods to iterate through the pages

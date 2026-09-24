@@ -9,7 +9,7 @@ using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.AuthTests
+namespace Ably.PubSub.Tests.AuthTests
 {
     [Collection("UnitTests")]
     public class RequestTokenSpecs : AuthorizationTests

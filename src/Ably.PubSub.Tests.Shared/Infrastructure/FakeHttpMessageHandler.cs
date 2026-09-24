@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class FakeHttpMessageHandler : HttpMessageHandler
     {

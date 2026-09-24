@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal static class MessageHandlerAction
     {

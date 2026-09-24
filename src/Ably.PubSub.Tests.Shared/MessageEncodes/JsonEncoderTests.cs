@@ -1,9 +1,9 @@
 using FluentAssertions;
-using IO.Ably.MessageEncoders;
+using Ably.PubSub.MessageEncoders;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace IO.Ably.Tests.MessageEncodes
+namespace Ably.PubSub.Tests.MessageEncodes
 {
     public class JsonEncoderTests
     {

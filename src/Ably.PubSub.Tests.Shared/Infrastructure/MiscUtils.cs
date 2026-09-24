@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     internal static class MiscUtils
     {

@@ -1,14 +1,14 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
 
-using IO.Ably.Encryption;
-using IO.Ably.Realtime;
-using IO.Ably.Rest;
-using IO.Ably.Transport;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Http;
+using Ably.PubSub.Transport;
 
 using Xunit;
 
-namespace IO.Ably.Tests.GithubSamples
+namespace Ably.PubSub.Tests.GithubSamples
 {
     // ReSharper disable all
 

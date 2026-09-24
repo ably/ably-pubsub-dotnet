@@ -1,9 +1,9 @@
 ﻿using System;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Shared.Utils;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Shared.Utils;
 
-namespace IO.Ably.Transport.States.Connection
+namespace Ably.PubSub.Transport.States.Connection
 {
     internal class ConnectionDisconnectedState : ConnectionStateBase
     {

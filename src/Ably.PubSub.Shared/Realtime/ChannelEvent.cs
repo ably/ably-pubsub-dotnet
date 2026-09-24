@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.Realtime
+﻿namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Events defined for a channel. ChannelEvents are equal to <see cref="ChannelState"/> with the addition of the Update event.

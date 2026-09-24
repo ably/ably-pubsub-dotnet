@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.Shared.Utils
+namespace Ably.PubSub.Shared.Utils
 {
     // RTB1
     internal class ReconnectionStrategy

@@ -4,7 +4,7 @@ using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     [Collection("PubSubHttpClient SandBox Collection")]
     [Trait("type", "integration")]

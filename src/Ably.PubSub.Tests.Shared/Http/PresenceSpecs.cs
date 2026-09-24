@@ -4,13 +4,13 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-using IO.Ably.Rest;
+using Ably.PubSub.Http;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class PresenceSpecs : MockHttpRestSpecs
     {

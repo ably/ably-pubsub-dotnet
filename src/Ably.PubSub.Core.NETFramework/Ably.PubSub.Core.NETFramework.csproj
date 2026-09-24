@@ -8,7 +8,7 @@
     <ProjectGuid>{2D265650-B1EC-4F8D-B043-A2E3DCC23FD8}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>IO.Ably</RootNamespace>
+    <RootNamespace>Ably.PubSub</RootNamespace>
     <AssemblyName>Ably.PubSub.Core</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>

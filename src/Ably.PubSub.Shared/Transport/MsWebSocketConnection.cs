@@ -5,10 +5,10 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using IO.Ably.Realtime;
-using IO.Ably.Utils;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Utils;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     /// <summary>
     /// Wrapper around Websocket which handles state changes.

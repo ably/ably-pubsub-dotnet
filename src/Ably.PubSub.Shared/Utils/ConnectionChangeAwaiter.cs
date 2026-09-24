@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
-using IO.Ably.Realtime;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably.Utils
+namespace Ably.PubSub.Utils
 {
     internal class ConnectionChangeAwaiter
     {

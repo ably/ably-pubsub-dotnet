@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Capability class that wraps the Ably capability string and provides a fluent interface in defining

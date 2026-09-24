@@ -1,6 +1,6 @@
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Channel options used for initialising channels.
@@ -18,7 +18,7 @@ namespace IO.Ably
         public bool Encrypted { get; }
 
         /// <summary>
-        /// If Encrypted it provides the <see cref="IO.Ably.CipherParams"/>.
+        /// If Encrypted it provides the <see cref="Ably.PubSub.CipherParams"/>.
         /// </summary>
         public CipherParams CipherParams { get; }
 
@@ -46,7 +46,7 @@ namespace IO.Ably
         /// <summary>
         /// Initializes a new instance of the <see cref="ChannelOptions"/> class.
         /// </summary>
-        /// <param name="params"><see cref="IO.Ably.CipherParams"/>.</param>
+        /// <param name="params"><see cref="Ably.PubSub.CipherParams"/>.</param>
         public ChannelOptions(CipherParams @params)
             : this(DefaultLogger.LoggerInstance, true, @params) { }
 

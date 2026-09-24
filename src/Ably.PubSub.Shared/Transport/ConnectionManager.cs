@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Net;
 using System.Threading.Tasks;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Shared.Realtime;
-using IO.Ably.Transport.States.Connection;
-using IO.Ably.Types;
-using IO.Ably.Utils;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Shared.Realtime;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
+using Ably.PubSub.Utils;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     internal class ConnectionManager : IConnectionManager, ITransportListener, IConnectionContext
     {

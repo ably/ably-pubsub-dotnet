@@ -3,7 +3,7 @@ using System.Reflection;
 using Newtonsoft.Json.Linq;
 using Xunit.Sdk;
 
-namespace IO.Ably.Tests.Infrastructure
+namespace Ably.PubSub.Tests.Infrastructure
 {
     public class InteroperabilityMessagePayloadDataAttribute : DataAttribute
     {

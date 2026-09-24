@@ -5,7 +5,7 @@ using System.Net.Http;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     [Collection("UnitTests")]
     [Trait("spec", "RSA8e")]

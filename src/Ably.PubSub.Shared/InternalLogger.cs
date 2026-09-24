@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Text;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class InternalLogger : IInternalLogger
     {

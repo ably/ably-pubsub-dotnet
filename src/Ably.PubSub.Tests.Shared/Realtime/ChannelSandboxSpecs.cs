@@ -7,16 +7,16 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Encryption;
-using IO.Ably.Realtime;
-using IO.Ably.Tests.Extensions;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Types;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests.Extensions;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Types;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     [Collection("Channel SandBox")]
     [Trait("type", "integration")]

@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Realtime.Workflow;
+using Ably.PubSub.Realtime.Workflow;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal static class AttemptsHelpers
     {

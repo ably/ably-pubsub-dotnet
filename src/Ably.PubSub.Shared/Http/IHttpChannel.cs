@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 
-namespace IO.Ably.Rest
+namespace Ably.PubSub.Http
 {
     /// <summary>
     /// The Ably Realtime service organises the traffic within any application into named channels.

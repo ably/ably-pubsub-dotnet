@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     internal abstract class MessageEncoder
     {

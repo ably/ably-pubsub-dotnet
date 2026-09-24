@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>Level of a log message.</summary>
     public enum LogLevel : byte

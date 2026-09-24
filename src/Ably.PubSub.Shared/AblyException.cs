@@ -1,10 +1,10 @@
 using System;
 using System.Net;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
-    /// Ably exception wrapper class. It includes error information <see cref="Ably.ErrorInfo"/> used by ably.
+    /// Ably exception wrapper class. It includes error information <see cref="ErrorInfo"/> used by ably.
     /// All inner exceptions are wrapped in this class. Always check the inner exception property of the caught exception.
     /// </summary>
     public class AblyException : Exception

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using IO.Ably.Utils;
+using Ably.PubSub.Utils;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     internal partial class ActivationStateMachine : IDisposable
     {

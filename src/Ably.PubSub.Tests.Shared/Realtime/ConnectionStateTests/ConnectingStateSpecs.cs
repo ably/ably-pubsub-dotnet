@@ -1,13 +1,13 @@
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class ConnectingStateSpecs : AblySpecs
     {
@@ -26,7 +26,7 @@ namespace IO.Ably.Tests
         [Fact]
         public void HasCorrectState()
         {
-            _state.State.Should().Be(Ably.Realtime.ConnectionState.Connecting);
+            _state.State.Should().Be(Ably.PubSub.Realtime.ConnectionState.Connecting);
         }
 
         [Theory]

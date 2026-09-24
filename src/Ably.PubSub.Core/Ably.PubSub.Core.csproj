@@ -6,7 +6,7 @@
     <Configurations>Debug;Release;package</Configurations>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AssemblyName>Ably.PubSub.Core</AssemblyName>
-    <RootNamespace>IO.Ably</RootNamespace>
+    <RootNamespace>Ably.PubSub</RootNamespace>
   </PropertyGroup>
 	
   <PropertyGroup Condition="'$(MSBuildRuntimeType)'=='Mono'">

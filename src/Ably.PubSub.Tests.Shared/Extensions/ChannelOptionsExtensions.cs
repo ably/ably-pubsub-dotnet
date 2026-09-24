@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Tests.Extensions
+namespace Ably.PubSub.Tests.Extensions
 {
     /// <summary>
     /// Helper methods to make adding channel options easier.

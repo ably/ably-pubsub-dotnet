@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Kvp = System.Collections.Generic.KeyValuePair<string, string>;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
 #pragma warning disable CS1591 // Only used internally
     /// <summary>

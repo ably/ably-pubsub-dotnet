@@ -7,7 +7,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class AblyHttpRequester : IAblyHttpRequester
     {

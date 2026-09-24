@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal class TokenResponse
     {

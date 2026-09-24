@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     internal class JsonEncoder : MessageEncoder
     {

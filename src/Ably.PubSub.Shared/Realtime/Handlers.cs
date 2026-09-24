@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal class Handlers<T> : IDisposable
         where T : IMessage

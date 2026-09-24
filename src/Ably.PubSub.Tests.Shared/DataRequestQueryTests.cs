@@ -1,7 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class DataRequestQueryTests
     {

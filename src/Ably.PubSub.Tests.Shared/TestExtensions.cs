@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Types;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public static class TestExtensions
     {

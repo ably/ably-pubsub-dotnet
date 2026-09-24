@@ -4,14 +4,14 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-using IO.Ably.Encryption;
-using IO.Ably.Rest;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Http;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Rest
+namespace Ably.PubSub.Tests.Http
 {
     public class ChannelSpecs : MockHttpRestSpecs
     {

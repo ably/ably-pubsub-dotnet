@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     internal sealed class ConnectionAttempt
     {

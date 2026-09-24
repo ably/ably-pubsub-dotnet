@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Linq;
 using FluentAssertions;
-using IO.Ably.Shared.Utils;
+using Ably.PubSub.Shared.Utils;
 using Xunit;
 
-namespace IO.Ably.Tests.Shared.Utils
+namespace Ably.PubSub.Tests.Shared.Utils
 {
     public class ReconnectionStrategyTest
     {

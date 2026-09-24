@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Push;
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Push;
+using Ably.PubSub.Tests.Infrastructure;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     public static class PushChannelTests
     {

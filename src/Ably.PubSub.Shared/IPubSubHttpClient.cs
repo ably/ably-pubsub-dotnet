@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using IO.Ably.Push;
-using IO.Ably.Rest;
+using Ably.PubSub.Push;
+using Ably.PubSub.Http;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Interface for the HTTP (REST API) client.
@@ -43,21 +43,21 @@ namespace IO.Ably
     public interface IStatsCommands
     {
         /// <summary>Retrieves the stats for the application. Passed default <see cref="StatsRequestParams"/> for the request.</summary>
-        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="IO.Ably.Stats"/>.</returns>
+        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="Ably.PubSub.Stats"/>.</returns>
         Task<PaginatedResult<Stats>> StatsAsync();
 
         /// <summary>Retrieves the stats for the application using a more specific stats query. Check <see cref="StatsRequestParams"/> for more information.</summary>
         /// <param name="query">stats query.</param>
-        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="IO.Ably.Stats"/>.</returns>
+        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="Ably.PubSub.Stats"/>.</returns>
         Task<PaginatedResult<Stats>> StatsAsync(StatsRequestParams query);
 
         /// <summary>Retrieves the stats for the application. Passed default <see cref="StatsRequestParams"/> for the request.</summary>
-        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="IO.Ably.Stats"/>.</returns>
+        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="Ably.PubSub.Stats"/>.</returns>
         PaginatedResult<Stats> Stats();
 
         /// <summary>Retrieves the stats for the application. Passed default <see cref="StatsRequestParams"/> for the request.</summary>
         /// <param name="query">stats query.</param>
-        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="IO.Ably.Stats"/>.</returns>
+        /// <returns><see cref="PaginatedResult{T}"/> of <see cref="Ably.PubSub.Stats"/>.</returns>
         PaginatedResult<Stats> Stats(StatsRequestParams query);
     }
 }

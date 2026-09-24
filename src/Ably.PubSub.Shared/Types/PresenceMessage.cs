@@ -1,7 +1,7 @@
 ﻿using System;
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Presence Action: the event signified by a PresenceMessage.

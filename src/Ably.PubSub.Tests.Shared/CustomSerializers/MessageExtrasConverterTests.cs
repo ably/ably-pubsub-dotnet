@@ -1,12 +1,12 @@
 using FluentAssertions;
-using IO.Ably.Tests.Shared.Helpers;
-using IO.Ably.Types;
+using Ably.PubSub.Tests.Shared.Helpers;
+using Ably.PubSub.Types;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.CustomSerializers
+namespace Ably.PubSub.Tests.CustomSerializers
 {
     public class MessageExtrasConverterTests
     {

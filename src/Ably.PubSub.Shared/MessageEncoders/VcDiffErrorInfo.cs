@@ -1,7 +1,7 @@
 using System;
 using System.Net;
 
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     /// <summary>
     /// Specific error class that is used to distinguish a critical VcDiff error

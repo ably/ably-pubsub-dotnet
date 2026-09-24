@@ -7,7 +7,7 @@ using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     [Trait("spec", "RTN2")]
     public class ConnectionParameterSpecs : AblyRealtimeSpecs

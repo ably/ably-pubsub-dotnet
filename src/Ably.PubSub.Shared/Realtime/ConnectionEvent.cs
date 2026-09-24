@@ -1,4 +1,4 @@
-﻿namespace IO.Ably.Realtime
+﻿namespace Ably.PubSub.Realtime
 {
     /// <summary>A series of connection states.</summary>
     public enum ConnectionEvent

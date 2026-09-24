@@ -11,7 +11,7 @@ using RichardSzalay.MockHttp;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     [Trait("type", "integration")]
     [Trait("spec", "RSC19")]

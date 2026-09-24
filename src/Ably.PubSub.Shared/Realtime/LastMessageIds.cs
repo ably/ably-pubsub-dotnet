@@ -1,7 +1,7 @@
 using System.Linq;
-using IO.Ably.Types;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal class LastMessageIds
     {

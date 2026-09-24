@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Authentication options.
@@ -11,8 +11,8 @@ namespace IO.Ably
     public class AuthOptions
     {
         /// <summary>
-        /// The callback used to get a new <see cref="IO.Ably.TokenDetails"/> or <see cref="IO.Ably.TokenRequest"/>.
-        /// AuthCallback is used by internally by <see cref="IO.Ably.AblyAuth"/>.RequestTokenAsync.
+        /// The callback used to get a new <see cref="Ably.PubSub.TokenDetails"/> or <see cref="Ably.PubSub.TokenRequest"/>.
+        /// AuthCallback is used by internally by <see cref="Ably.PubSub.AblyAuth"/>.RequestTokenAsync.
         /// <para>
         /// The callback is bounded by <see cref="ClientOptions.RealtimeRequestTimeout"/> per RSA4c,
         /// but cannot be cancelled: one that overruns is abandoned and keeps running, so a later auth

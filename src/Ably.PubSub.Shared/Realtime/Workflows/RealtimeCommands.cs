@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Realtime.Workflow
+namespace Ably.PubSub.Realtime.Workflow
 {
     internal class PingCommand : RealtimeCommand
     {

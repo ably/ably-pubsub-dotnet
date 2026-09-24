@@ -1,9 +1,9 @@
 ﻿using System.Threading.Tasks;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Transport.States.Connection
+namespace Ably.PubSub.Transport.States.Connection
 {
     internal class ConnectionConnectedState : ConnectionStateBase
     {

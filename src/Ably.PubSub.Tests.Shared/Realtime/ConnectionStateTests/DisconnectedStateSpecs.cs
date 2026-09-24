@@ -1,15 +1,15 @@
 using System;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class DisconnectedStateSpecs : AblySpecs
     {

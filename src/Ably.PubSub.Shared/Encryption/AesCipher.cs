@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
-using IO.Ably;
-using IO.Ably.Encryption;
-using CipherMode = IO.Ably.Encryption.CipherMode;
+using Ably.PubSub;
+using Ably.PubSub.Encryption;
+using CipherMode = Ably.PubSub.Encryption.CipherMode;
 
 namespace AblyPlatform.Cryptography
 {

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Realtime channel modes.

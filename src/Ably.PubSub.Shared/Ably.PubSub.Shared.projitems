@@ -6,7 +6,7 @@
     <SharedGUID>3553e1b2-8f1f-4e83-9524-08e702c14fcf</SharedGUID>
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
-    <Import_RootNamespace>IO.Ably</Import_RootNamespace>
+    <Import_RootNamespace>Ably.PubSub</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)AblyAuth.cs" />

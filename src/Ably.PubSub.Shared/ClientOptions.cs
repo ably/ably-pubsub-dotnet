@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
-using IO.Ably.Transport;
+using Ably.PubSub.Transport;
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Options: Ably library options for REST and Realtime APIs.

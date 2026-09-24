@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// PushChannel is a convenience class that facilitates push related actions,

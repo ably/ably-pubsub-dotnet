@@ -7,7 +7,7 @@ using System.Xml.Linq;
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.PubSub
+namespace Ably.PubSub.Tests.PubSub
 {
     /// <summary>
     /// The lockstep packaging contract, asserted from the nuspec files themselves.

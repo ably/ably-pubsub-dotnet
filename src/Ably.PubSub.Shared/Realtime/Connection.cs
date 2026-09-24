@@ -3,12 +3,12 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Shared.Realtime;
-using IO.Ably.Transport;
-using IO.Ably.Transport.States.Connection;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Shared.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// Represents the OS network state.

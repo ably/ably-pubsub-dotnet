@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 #if NETSTANDARD2_0_OR_GREATER && UNITY_PACKAGE
-using IO.Ably.Unity;
+using Ably.PubSub.Unity;
 #endif
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     internal static class Agent
     {

@@ -4,12 +4,12 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Push;
+using Ably.PubSub.Push;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Push
+namespace Ably.PubSub.Tests.Push
 {
     [Trait("spec", "RSH1")]
     public static class PushAdminTests

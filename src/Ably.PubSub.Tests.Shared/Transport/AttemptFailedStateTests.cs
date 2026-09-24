@@ -1,10 +1,10 @@
-using IO.Ably.Realtime;
-using IO.Ably.Transport;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport;
 
 using FluentAssertions;
 using Xunit;
 
-namespace IO.Ably.Tests.Transport
+namespace Ably.PubSub.Tests.Transport
 {
     public class AttemptFailedStateTests
     {

@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     ///     Data request query used for querying stats and history

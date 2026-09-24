@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Tests.Infrastructure;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     internal static class TestHelpers
     {

@@ -2,7 +2,7 @@
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Tests.Shared
+namespace Ably.PubSub.Tests.Shared
 {
     public static class JDiff
     {

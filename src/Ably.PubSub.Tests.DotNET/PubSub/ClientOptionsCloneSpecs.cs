@@ -7,11 +7,11 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Transport;
-using IO.Ably.Tests.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Tests.Realtime;
 using Xunit;
 
-namespace IO.Ably.Tests.PubSub
+namespace Ably.PubSub.Tests.PubSub
 {
     /// <summary>
     /// A rot-guard for the hand-maintained public <see cref="ClientOptions.Clone"/>. Clone() is a

@@ -1,9 +1,9 @@
 using System;
 using FluentAssertions;
-using IO.Ably.Utils;
+using Ably.PubSub.Utils;
 using Xunit;
 
-namespace IO.Ably.Tests.Utils
+namespace Ably.PubSub.Tests.Utils
 {
     public class ErrorPolicyTests
     {

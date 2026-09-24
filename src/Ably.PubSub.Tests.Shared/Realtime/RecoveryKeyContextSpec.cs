@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
-using IO.Ably.Shared.Realtime;
+using Ably.PubSub.Shared.Realtime;
 using Xunit;
 
-namespace IO.Ably.Tests.Shared.Realtime
+namespace Ably.PubSub.Tests.Shared.Realtime
 {
     public class RecoveryKeyContextSpec
     {

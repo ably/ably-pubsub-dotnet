@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using IO.Ably.Push;
-using IO.Ably.Realtime;
-using IO.Ably.Tests.Infrastructure;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public abstract class SandboxSpecs : IClassFixture<AblySandboxFixture>, IDisposable
     {

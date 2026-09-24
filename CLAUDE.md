@@ -4,7 +4,7 @@ Guidance for Claude Code when working in ably-pubsub-dotnet.
 
 ## What this is
 
-The Ably Pub/Sub SDK for .NET. It is structured as an internal `Ably.PubSub.Core` engine, consumed transitively, plus the `Ably.PubSub.Device` and `Ably.PubSub.Server` door packages. The public code namespace is `IO.Ably`.
+The Ably Pub/Sub SDK for .NET. It is structured as an internal `Ably.PubSub.Core` engine, consumed transitively, plus the `Ably.PubSub.Device` and `Ably.PubSub.Server` door packages. The public code namespace is `Ably.PubSub`.
 
 ## Build and test — use the Cake build, not bare `dotnet`
 

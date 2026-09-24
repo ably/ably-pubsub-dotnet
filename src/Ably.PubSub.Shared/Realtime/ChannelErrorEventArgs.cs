@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     /// <summary>
     /// EventArgs class used when a Channel error gets raised.

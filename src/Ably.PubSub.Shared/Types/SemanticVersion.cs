@@ -1,6 +1,6 @@
 using System;
 
-namespace IO.Ably.Types
+namespace Ably.PubSub.Types
 {
     /// <summary>
     /// SemanticVersion is a simple representation of a semantic version as defined by https://semver.org/ .

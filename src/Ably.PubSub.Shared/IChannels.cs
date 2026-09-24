@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using IO.Ably.Rest;
+using Ably.PubSub.Http;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// Interface for managing channel objects.

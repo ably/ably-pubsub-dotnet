@@ -4,7 +4,7 @@ using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class TokenDetailsTests
     {

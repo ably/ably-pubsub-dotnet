@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Encryption;
+using Ably.PubSub;
+using Ably.PubSub.Encryption;
 using Newtonsoft.Json.Linq;
 
 namespace Assets.Tests.AblySandbox

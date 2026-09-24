@@ -1,17 +1,17 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
-using IO.Ably.Push;
-using IO.Ably.Transport;
+using Ably.PubSub.Push;
+using Ably.PubSub.Transport;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>This class initializes dynamically-injected platform dependencies.</summary>
     internal static class IoC
     {
         private static readonly IPlatform Platform;
 
-        /// <summary>Instantiate the IO.Ably.Platform type contributed by the platform head.</summary>
+        /// <summary>Instantiate the Ably.PubSub.Platform type contributed by the platform head.</summary>
         static IoC()
         {
             try
@@ -20,9 +20,9 @@ namespace IO.Ably
                 // Ably.PubSub.Core.NETFramework) and is compiled into the same assembly as this
                 // shared code, so look it up in this assembly rather than loading one by name.
                 // Loading by name silently degraded every platform service to its fallback the
-                // moment the assembly was renamed from IO.Ably to Ably.PubSub.Core.
+                // moment the assembly was renamed from Ably.PubSub to Ably.PubSub.Core.
                 var asm = typeof(IoC).GetTypeInfo().Assembly;
-                var type = asm.GetType("IO.Ably.Platform");
+                var type = asm.GetType("Ably.PubSub.Platform");
                 if (type != null)
                 {
                     var obj = Activator.CreateInstance(type);

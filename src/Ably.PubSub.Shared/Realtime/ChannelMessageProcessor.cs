@@ -1,10 +1,10 @@
 using System.Linq;
 using System.Threading.Tasks;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Types;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Realtime
+namespace Ably.PubSub.Realtime
 {
     internal class ChannelMessageProcessor
     {

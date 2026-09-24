@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// A class providing parameters of a token request.

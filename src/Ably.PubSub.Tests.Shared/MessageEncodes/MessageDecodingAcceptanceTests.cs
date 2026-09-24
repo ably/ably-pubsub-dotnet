@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using FluentAssertions;
-using IO.Ably.Encryption;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Tests;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Tests;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.AcceptanceTests
+namespace Ably.PubSub.AcceptanceTests
 {
     public class MessageDecodingAcceptanceTests : AblySpecs
     {

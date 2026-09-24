@@ -1,4 +1,4 @@
-namespace IO.Ably.MessageEncoders
+namespace Ably.PubSub.MessageEncoders
 {
     /// <summary>
     /// Class used to provide context between different encoders.

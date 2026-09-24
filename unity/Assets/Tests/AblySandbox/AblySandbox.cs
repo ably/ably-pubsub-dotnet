@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Push;
-using IO.Ably.Realtime;
+using Ably.PubSub;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
 using UnityEngine.TestTools;
 
 namespace Assets.Tests.AblySandbox

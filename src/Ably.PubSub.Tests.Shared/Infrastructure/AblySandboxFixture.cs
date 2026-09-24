@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-using IO.Ably.Encryption;
+using Ably.PubSub.Encryption;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class AblySandboxFixture
     {

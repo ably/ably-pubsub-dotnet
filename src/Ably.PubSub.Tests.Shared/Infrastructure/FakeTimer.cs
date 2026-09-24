@@ -1,7 +1,7 @@
 using System;
-using IO.Ably.Transport.States.Connection;
+using Ably.PubSub.Transport.States.Connection;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     internal class FakeTimer : ICountdownTimer
     {

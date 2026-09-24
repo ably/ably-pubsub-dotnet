@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using IO.Ably.Push;
-using IO.Ably.Realtime;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// The top-level interface for the Ably Realtime library.

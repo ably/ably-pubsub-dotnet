@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using IO.Ably.MessageEncoders;
-using IO.Ably.Realtime;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Tests.Infrastructure
+namespace Ably.PubSub.Tests.Infrastructure
 {
     internal class TestTransportWrapper : ITransport
     {

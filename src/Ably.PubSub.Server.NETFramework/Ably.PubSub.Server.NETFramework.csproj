@@ -18,7 +18,7 @@
     <ProjectGuid>{7B3C1F42-9D5E-4A87-B1C6-2E4F8A9D0B31}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>IO.Ably.PubSub.Server</RootNamespace>
+    <RootNamespace>Ably.PubSub.Server</RootNamespace>
     <AssemblyName>Ably.PubSub.Server</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>

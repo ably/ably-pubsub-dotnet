@@ -6,15 +6,15 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.PubSub.Device;
-using IO.Ably.PubSub.Server;
-using IO.Ably.Tests;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Tests.Realtime;
+using Ably.PubSub.Device;
+using Ably.PubSub.Server;
+using Ably.PubSub.Tests;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Tests.Realtime;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.PubSub
+namespace Ably.PubSub.Tests.PubSub
 {
     /// <summary>
     /// The agent contract of the two door packages. These assertions are what Ably's billing

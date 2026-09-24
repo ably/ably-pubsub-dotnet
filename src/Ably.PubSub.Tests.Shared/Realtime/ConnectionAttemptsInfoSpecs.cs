@@ -2,13 +2,13 @@
 using System.Net;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Transport;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Transport;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     public class ConnectionAttemptsInfoSpecs : MockHttpRealtimeSpecs
     {

@@ -4,7 +4,7 @@ using Xunit;
 using Xunit.Abstractions;
 using static Xunit.Assert;
 
-namespace IO.Ably.Tests
+namespace Ably.PubSub.Tests
 {
     public class StatsSpecs : MockHttpRestSpecs
     {

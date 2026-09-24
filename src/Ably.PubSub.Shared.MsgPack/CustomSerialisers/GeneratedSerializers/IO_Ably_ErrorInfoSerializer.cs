@@ -8,12 +8,12 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
     [System.Diagnostics.DebuggerNonUserCodeAttribute()]
-    public class IO_Ably_ErrorInfoSerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.ErrorInfo> {
+    public class IO_Ably_ErrorInfoSerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.ErrorInfo> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
@@ -34,7 +34,7 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer2 = context.GetSerializer<System.Nullable<System.Net.HttpStatusCode>>(schema2);
         }
         
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.ErrorInfo objectTree) {
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.ErrorInfo objectTree) {
             packer.PackMapHeader(3);
             this._serializer0.PackTo(packer, "code");
             this._serializer1.PackTo(packer, objectTree.Code);
@@ -44,17 +44,17 @@ namespace IO.Ably.CustomSerialisers {
             this._serializer2.PackTo(packer, objectTree.StatusCode);
         }
         
-        protected override IO.Ably.ErrorInfo UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.ErrorInfo UnpackFromCore(MsgPack.Unpacker unpacker)
         {
-            IO.Ably.ErrorInfo result = default(IO.Ably.ErrorInfo);
-            result = new IO.Ably.ErrorInfo();
+            Ably.PubSub.ErrorInfo result = default(Ably.PubSub.ErrorInfo);
+            result = new Ably.PubSub.ErrorInfo();
             int itemsCount0 = default(int);
             itemsCount0 = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
             for (int i = 0; (i < itemsCount0); i = (i + 1))
             {
                 string key = default(string);
                 string nullable3 = default(string);
-                nullable3 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(IO.Ably.ErrorInfo),
+                nullable3 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker, typeof(Ably.PubSub.ErrorInfo),
                     "MemberName");
                 if (((nullable3 == null)
                      == false))
@@ -106,7 +106,7 @@ namespace IO.Ably.CustomSerialisers {
                     {
                         string nullable5 = default(string);
                         nullable5 = MsgPack.Serialization.UnpackHelpers.UnpackStringValue(unpacker,
-                            typeof(IO.Ably.ErrorInfo), "System.String message");
+                            typeof(Ably.PubSub.ErrorInfo), "System.String message");
                         if (((nullable5 == null)
                              == false))
                         {
@@ -119,7 +119,7 @@ namespace IO.Ably.CustomSerialisers {
                         {
                             System.Nullable<int> nullable4 = default(System.Nullable<int>);
                             nullable4 = MsgPack.Serialization.UnpackHelpers.UnpackNullableInt32Value(unpacker,
-                                typeof(IO.Ably.ErrorInfo), "Int32 code");
+                                typeof(Ably.PubSub.ErrorInfo), "Int32 code");
                             if (nullable4.HasValue)
                             {
                                 result.Code = nullable4.Value;

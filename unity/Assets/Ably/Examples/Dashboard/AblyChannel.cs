@@ -1,5 +1,5 @@
 ﻿using System.Linq;
-using IO.Ably;
+using Ably.PubSub;
 using UnityEngine;
 using UnityEngine.UI;
 

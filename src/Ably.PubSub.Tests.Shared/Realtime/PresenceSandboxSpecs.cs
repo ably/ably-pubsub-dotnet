@@ -4,19 +4,19 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Rest;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Http;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
 using FluentAssertions;
 using FluentAssertions.Execution;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     [Collection("Presence Sandbox")]
     [Trait("type", "integration")]

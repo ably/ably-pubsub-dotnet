@@ -1,8 +1,8 @@
-using IO.Ably.CustomSerialisers;
+using Ably.PubSub.CustomSerialisers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IO.Ably.Types
+namespace Ably.PubSub.Types
 {
     /// <summary>
     /// Extra properties on the Message.

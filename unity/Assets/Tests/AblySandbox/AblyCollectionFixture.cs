@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using IO.Ably;
+using Ably.PubSub;
 
 namespace Assets.Tests.AblySandbox
 {

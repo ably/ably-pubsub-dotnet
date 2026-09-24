@@ -8,7 +8,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Ably.PubSub.Server</AssemblyName>
-    <RootNamespace>IO.Ably.PubSub.Server</RootNamespace>
+    <RootNamespace>Ably.PubSub.Server</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildRuntimeType)'=='Mono'">

@@ -1,7 +1,7 @@
 using System;
-using IO.Ably.Types;
+using Ably.PubSub.Types;
 
-namespace IO.Ably.Transport
+namespace Ably.PubSub.Transport
 {
     internal class MessageAndCallback
     {

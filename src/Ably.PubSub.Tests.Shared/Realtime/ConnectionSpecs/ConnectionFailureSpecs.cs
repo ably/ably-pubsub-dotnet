@@ -5,16 +5,16 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IO.Ably.Realtime;
-using IO.Ably.Realtime.Workflow;
-using IO.Ably.Tests.Infrastructure;
-using IO.Ably.Tests.Shared.Utils;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Tests.Shared.Utils;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime.ConnectionSpecs
+namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
 {
     public class ConnectionFailureSpecs : AblyRealtimeSpecs
     {

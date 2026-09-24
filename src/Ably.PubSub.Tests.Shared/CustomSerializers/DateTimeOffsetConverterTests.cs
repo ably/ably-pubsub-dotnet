@@ -3,7 +3,7 @@ using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace IO.Ably.Tests.Shared.CustomSerializers
+namespace Ably.PubSub.Tests.Shared.CustomSerializers
 {
     public class DateTimeOffsetConverterTests
     {

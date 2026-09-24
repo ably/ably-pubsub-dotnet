@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IO.Ably.Push
+namespace Ably.PubSub.Push
 {
     /// <summary>
     /// Interface for communicating with a mobile device supporting pushing notifications.

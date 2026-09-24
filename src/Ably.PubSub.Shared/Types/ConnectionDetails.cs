@@ -1,7 +1,7 @@
 ﻿using System;
 using Newtonsoft.Json;
 
-namespace IO.Ably
+namespace Ably.PubSub
 {
     /// <summary>
     /// provides details on the constraints or defaults for the connection such as max message size, client ID or connection state TTL.

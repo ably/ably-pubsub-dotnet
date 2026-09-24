@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Linq;
 
-using IO.Ably.Types;
+using Ably.PubSub.Types;
 
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace IO.Ably.Tests.Shared.Realtime
+namespace Ably.PubSub.Tests.Shared.Realtime
 {
     public class ProtocolMessageTests
     {

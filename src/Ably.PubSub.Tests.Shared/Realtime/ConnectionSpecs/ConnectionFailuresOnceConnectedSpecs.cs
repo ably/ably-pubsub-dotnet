@@ -7,15 +7,15 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
-using IO.Ably.Realtime;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
 using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace IO.Ably.Tests.Realtime
+namespace Ably.PubSub.Tests.Realtime
 {
     [Trait("spec", "RTN15")]
     public class ConnectionFailuresOnceConnectedSpecs : AblyRealtimeSpecs

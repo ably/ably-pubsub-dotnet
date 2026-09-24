@@ -8,11 +8,11 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace IO.Ably.CustomSerialisers {
+namespace Ably.PubSub.CustomSerialisers {
 
 #pragma warning disable SA1600 // Elements should be documented
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-    public class IO_Ably_CapabilitySerializer : MsgPack.Serialization.MessagePackSerializer<IO.Ably.Capability> {
+    public class IO_Ably_CapabilitySerializer : MsgPack.Serialization.MessagePackSerializer<Ably.PubSub.Capability> {
         
         private MsgPack.Serialization.MessagePackSerializer<string> _serializer0;
         
@@ -26,12 +26,12 @@ namespace IO.Ably.CustomSerialisers {
         
         
 
-        protected override void PackToCore(MsgPack.Packer packer, IO.Ably.Capability objectTree)
+        protected override void PackToCore(MsgPack.Packer packer, Ably.PubSub.Capability objectTree)
         {
             packer.PackString(objectTree.ToJson());
         }
         
-        protected override IO.Ably.Capability UnpackFromCore(MsgPack.Unpacker unpacker)
+        protected override Ably.PubSub.Capability UnpackFromCore(MsgPack.Unpacker unpacker)
         {
             var itemsCount = MsgPack.Serialization.UnpackHelpers.GetItemsCount(unpacker);
 
