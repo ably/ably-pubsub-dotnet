@@ -459,6 +459,21 @@ namespace IO.Ably.Realtime
             }
         }
 
+        /// <summary>
+        /// RTL5k - the server sent ATTACHED for a channel that is DETACHING or DETACHED. The channel
+        /// state is left as it is and a new DETACH is sent, provided the connection can send it.
+        /// </summary>
+        internal void SendDetachForUnexpectedAttached()
+        {
+            if (ConnectionState != ConnectionState.Connected)
+            {
+                return;
+            }
+
+            Logger.Debug($"Received ATTACHED for channel {Name} in {State} state; sending DETACH");
+            SendMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Detach, Name));
+        }
+
         public async Task<Result> DetachAsync()
         {
             return await TaskWrapper.Wrap(Detach);

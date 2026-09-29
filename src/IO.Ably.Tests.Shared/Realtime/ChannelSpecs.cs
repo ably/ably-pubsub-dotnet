@@ -837,6 +837,29 @@ namespace IO.Ably.Tests.Realtime
                 channel.State.Should().Be(ChannelState.Detached);
             }
 
+            [Theory]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachingOrDetached_ShouldSendDetachAndKeepState(ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, state);
+                var sentBefore = LastCreatedTransport.SentMessages.Count;
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                LastCreatedTransport.SentMessages.Count.Should().Be(sentBefore + 1);
+                LastCreatedTransport.LastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Detach);
+                LastCreatedTransport.LastMessageSend.Channel.Should().Be(channel.Name);
+                channel.State.Should().Be(state);
+            }
+
             [Fact]
             [Trait("spec", "RTL5f")]
             public async Task ShouldReturnToPreviousStateIfDetachedMessageWasNotReceivedWithinDefaultTimeout()

@@ -56,6 +56,14 @@ namespace IO.Ably.Realtime
                     channel.SetChannelState(ChannelState.Failed, protocolMessage);
                     break;
                 case ProtocolMessage.MessageAction.Attached:
+                    // RTL5k - an ATTACHED received while the channel is DETACHING or DETACHED must not
+                    // re-attach a channel the application has detached. Send a new DETACH instead.
+                    if (channel.State == ChannelState.Detaching || channel.State == ChannelState.Detached)
+                    {
+                        channel.SendDetachForUnexpectedAttached();
+                        break;
+                    }
+
                     channel.Properties.AttachSerial = protocolMessage.ChannelSerial; // RTL15a
 
                     if (protocolMessage.Flags.HasValue)
