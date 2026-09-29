@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>net6.0;net7.0</TargetFrameworks>
-    <CodeAnalysisRuleSet>..\IO.Ably.Tests.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\Ably.PubSub.Tests.ruleset</CodeAnalysisRuleSet>
     <LangVersion>8</LangVersion>
   </PropertyGroup>
 

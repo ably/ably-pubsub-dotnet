@@ -8,10 +8,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".Solution Items", ".Solutio
 		..\CHANGELOG.md = ..\CHANGELOG.md
 		CommonAssemblyInfo.cs = CommonAssemblyInfo.cs
 		..\nuget\ably.pubsub.core.nuspec = ..\nuget\ably.pubsub.core.nuspec
-		IO.Ably.ruleset = IO.Ably.ruleset
+		Ably.PubSub.ruleset = Ably.PubSub.ruleset
 		..\README.md = ..\README.md
 		stylecop.json = stylecop.json
-		IO.Ably.Tests.ruleset = IO.Ably.Tests.ruleset
+		Ably.PubSub.Tests.ruleset = Ably.PubSub.Tests.ruleset
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Ably", "Ably", "{8A0F718E-2168-4CC7-8F7B-A65508B52B0F}"

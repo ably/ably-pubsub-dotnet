@@ -65,7 +65,7 @@ public class ILRepackHelper
             // dependencies like Newtonsoft.Json that are referenced in custom attributes or type signatures.
             .Append($"/lib:\"{binDir.FullPath}\"")
             .Append($"/attr:\"{primaryDll.FullPath}\"")
-            .Append($"/keyfile:\"{rootDir.CombineWithFilePath("IO.Ably.snk").FullPath}\"")
+            .Append($"/keyfile:\"{rootDir.CombineWithFilePath("Ably.PubSub.snk").FullPath}\"")
             .Append("/parallel")
             .Append($"/out:\"{outputDll.FullPath}\"");
 
