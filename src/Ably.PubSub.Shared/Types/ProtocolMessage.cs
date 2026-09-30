@@ -44,6 +44,36 @@ namespace Ably.PubSub.Types
             Auth = 17,
 #pragma warning restore SA1602 // Enumeration items should be documented
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
+
+            /// <summary>
+            /// ACTIVATE action, wire value 18 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// </summary>
+            Activate = 18,
+
+            /// <summary>
+            /// OBJECT action, wire value 19 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// </summary>
+            Object = 19,
+
+            /// <summary>
+            /// OBJECT_SYNC action, wire value 20 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// </summary>
+            ObjectSync = 20,
+
+            /// <summary>
+            /// ANNOTATION action, wire value 21 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// </summary>
+            Annotation = 21,
+
+            /// <summary>
+            /// PING action, wire value 22 per TR2. Answered with a <see cref="Pong"/> on the same transport (RTN23c1).
+            /// </summary>
+            Ping = 22,
+
+            /// <summary>
+            /// PONG action, wire value 23 per TR2. Sent in reply to a <see cref="Ping"/> (RTN23c1).
+            /// </summary>
+            Pong = 23,
         }
 
         /// <summary>
