@@ -1,3 +1,5 @@
+using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
@@ -174,6 +176,90 @@ namespace Ably.PubSub.Tests
             await ExecuteStatsQuery(query);
 
             LastRequest.AssertContainsParameter("by", statsGranularity.GetValueOrDefault(StatsIntervalGranularity.Minute).ToString().ToLower());
+        }
+
+        [Fact]
+        [Trait("spec", "RSC6a")]
+        public async Task WithNoParams_ShouldSendOnlyDefaultQueryParameters()
+        {
+            var rest = GetRestClient();
+
+            await rest.StatsAsync();
+
+            Equal(HttpMethod.Get, LastRequest.Method);
+            Equal("/stats", LastRequest.Url);
+
+            // Only the documented defaults are sent; no start/end or other parameters leak in.
+            Equal(
+                new[] { "by", "direction", "limit" },
+                LastRequest.QueryParameters.Keys.OrderBy(k => k).ToArray());
+            LastRequest.AssertContainsParameter("direction", "backwards");
+            LastRequest.AssertContainsParameter("limit", "100");
+            LastRequest.AssertContainsParameter("by", "minute");
+        }
+
+        [Fact]
+        [Trait("spec", "RSC6a")]
+        public async Task WithEmptyResponseBody_ShouldReturnEmptyPage()
+        {
+            var rest = GetRestClient(request => new AblyResponse { TextResponse = "[]" }.ToTask());
+
+            var result = await rest.StatsAsync();
+
+            NotNull(result);
+            Empty(result.Items);
+        }
+
+        [Fact]
+        [Trait("spec", "RSC6a")]
+        public async Task WhenServerReturnsError_ShouldPropagateAblyExceptionWithParsedErrorInfo()
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(
+                    "{\"error\":{\"code\":40000,\"statusCode\":400,\"message\":\"Invalid stats query\"}}",
+                    System.Text.Encoding.UTF8,
+                    "application/json"),
+            };
+            var options = new ClientOptions(ValidKey) { UseBinaryProtocol = false, HttpClient = new HttpClient(new FakeHttpMessageHandler(response)) };
+            var rest = new PubSubHttpClient(options);
+
+            var ex = await ThrowsAsync<AblyException>(() => rest.StatsAsync());
+
+            Equal(40000, ex.ErrorInfo.Code);
+            Equal(HttpStatusCode.BadRequest, ex.ErrorInfo.StatusCode);
+            Contains("Invalid stats query", ex.ErrorInfo.Message);
+        }
+
+        [Fact]
+        [Trait("spec", "RSC7e")]
+        public async Task ShouldPinRequestToProtocolVersion2()
+        {
+            var rest = GetRestClient();
+
+            await rest.StatsAsync();
+
+            Equal("2", LastRequest.Headers["X-Ably-Version"]);
+        }
+
+        [Fact]
+        [Trait("spec", "RSC7e")]
+        public async Task PinnedVersionShouldOverrideClientDefaultOnTheWire_WhileOtherRequestsKeepDefault()
+        {
+            var handler = new FakeHttpMessageHandler(request => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(request.RequestUri.AbsolutePath == "/time" ? "[1234]" : "[]", System.Text.Encoding.UTF8, "application/json"),
+            });
+            var options = new ClientOptions(ValidKey) { UseBinaryProtocol = false, HttpClient = new HttpClient(handler) };
+            var rest = new PubSubHttpClient(options);
+
+            await rest.StatsAsync();
+            await rest.TimeAsync();
+
+            var statsVersions = handler.Requests.First(r => r.RequestUri.AbsolutePath == "/stats").Headers.GetValues("X-Ably-Version").ToArray();
+            Equal(new[] { "2" }, statsVersions);
+            var otherVersions = handler.Requests.First(r => r.RequestUri.AbsolutePath == "/time").Headers.GetValues("X-Ably-Version").ToArray();
+            Equal(new[] { Defaults.ProtocolVersion }, otherVersions);
         }
 
         public StatsSpecs(ITestOutputHelper output)
