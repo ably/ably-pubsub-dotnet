@@ -51,6 +51,25 @@ namespace Ably.PubSub.Tests
         }
 
         [Fact]
+        [Trait("spec", "RSC7e")]
+        public async Task WhenRequestSetsVersionHeader_RequestLevelValueOverridesClientDefault()
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("Success") };
+            var handler = new FakeHttpMessageHandler(response);
+            var client = new AblyHttpRequester(new AblyHttpOptions { HttpClient = new HttpClient(handler) });
+            const string sentinelVersion = "99"; // deliberately differs from Defaults.ProtocolVersion
+            sentinelVersion.Should().NotBe(Defaults.ProtocolVersion);
+            var pinnedRequest = new AblyRequest("/stats", HttpMethod.Get);
+            pinnedRequest.Headers["X-Ably-Version"] = sentinelVersion;
+
+            await client.Execute(pinnedRequest);
+            await client.Execute(new AblyRequest("/time", HttpMethod.Get));
+
+            handler.Requests[0].Headers.GetValues("X-Ably-Version").Should().Equal(sentinelVersion);
+            handler.Requests[1].Headers.GetValues("X-Ably-Version").Should().Equal(Defaults.ProtocolVersion);
+        }
+
+        [Fact]
         [Trait("spec", "RSC7c")]
         public async Task WhenCallingUrl_AddsRequestIdIfSetTrue()
         {

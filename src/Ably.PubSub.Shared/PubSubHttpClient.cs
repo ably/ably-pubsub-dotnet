@@ -14,6 +14,11 @@ namespace Ably.PubSub
     [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1401:Fields should be private", Justification = "Needed properties to be internal for testing.")]
     public sealed class PubSubHttpClient : IPubSubHttpClient
     {
+        private const string AblyVersionHeader = "X-Ably-Version";
+
+        // Protocol version the /stats endpoint is pinned to; deliberately independent of Defaults.ProtocolVersion.
+        private const string LegacyStatsProtocolVersion = "2";
+
         private readonly object _deviceLock = new object();
 
         internal Func<AblyRequest, Task<AblyResponse>> ExecuteHttpRequest;
@@ -372,6 +377,7 @@ namespace Ably.PubSub
 
         /// <summary>
         /// Retrieves the stats for the application. Passed default <see cref="StatsRequestParams"/> for the request.
+        /// The stats endpoint is pinned to protocol version 2, so the response uses the v2 (typed) stats schema.
         /// </summary>
         /// <returns>returns PaginatedResult of Stats.</returns>
         public Task<PaginatedResult<Stats>> StatsAsync()
@@ -381,6 +387,7 @@ namespace Ably.PubSub
 
         /// <summary>
         /// Retrieves the stats for the application using a more specific stats query. Check <see cref="StatsRequestParams"/> for more information.
+        /// The stats endpoint is pinned to protocol version 2, so the response uses the v2 (typed) stats schema.
         /// </summary>
         /// <param name="query">stats query.</param>
         /// <returns>returns a PaginatedResult of Stats.</returns>
@@ -392,6 +399,7 @@ namespace Ably.PubSub
         /// <summary>
         /// Retrieves the stats for the application based on a custom query. It should be used with <see cref="PaginatedRequestParams"/>.
         /// It is mainly because of the way a PaginatedResource defines its queries. For retrieving Stats with special parameters use <see cref="StatsAsync(StatsRequestParams)"/>.
+        /// The stats endpoint is pinned to protocol version 2, so the response uses the v2 (typed) stats schema.
         /// </summary>
         /// <example>
         /// var client = new PubSubHttpClient("validkey");
@@ -405,6 +413,10 @@ namespace Ably.PubSub
             query.Validate();
 
             var request = CreateGetRequest("/stats");
+
+            // Stats API uses the protocol v2 format for now (family precedent: ably-pubsub-java AblyBase.stats).
+            // A request-level header takes precedence over the HttpClient default X-Ably-Version header (RSC7e).
+            request.Headers[AblyVersionHeader] = LegacyStatsProtocolVersion;
 
             request.AddQueryParameters(query.GetParameters());
 
@@ -459,7 +471,7 @@ namespace Ably.PubSub
         }
 
         /// <summary>
-        /// Sync version of StatsAsync.
+        /// Sync version of StatsAsync. The stats endpoint is pinned to protocol version 2, so the response uses the v2 (typed) stats schema.
         /// </summary>
         /// <returns>returns PaginatedResult of Stats.</returns>
         public PaginatedResult<Stats> Stats()
@@ -468,7 +480,7 @@ namespace Ably.PubSub
         }
 
         /// <summary>
-        /// Sync version of StatsAsync.
+        /// Sync version of StatsAsync. The stats endpoint is pinned to protocol version 2, so the response uses the v2 (typed) stats schema.
         /// </summary>
         /// <param name="query">stats <see cref="StatsRequestParams"/>.</param>
         /// <returns>returns PaginatedResult of Stats.</returns>
