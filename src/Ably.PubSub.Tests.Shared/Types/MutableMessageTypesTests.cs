@@ -105,6 +105,23 @@ namespace Ably.PubSub.Tests.Types
         }
 
         [Fact]
+        [Trait("spec", "RSL15b")]
+        [Trait("spec", "RTL32b")]
+        public void CreateEdit_ShouldSerializeTheVersionAsAnObject()
+        {
+            var withOperation = Message.CreateEdit(new Message { Serial = "s1", Data = "x" }, new MessageOperation { ClientId = "op", Description = "d" }, MessageAction.MessageUpdate);
+            var callerVersion = Message.CreateEdit(new Message { Serial = "s1", Data = "x", Version = new MessageVersion { ClientId = "caller" } }, null, MessageAction.MessageUpdate);
+
+            var fromOperation = Newtonsoft.Json.Linq.JObject.Parse(JsonHelper.Serialize(withOperation));
+            var fromCaller = Newtonsoft.Json.Linq.JObject.Parse(JsonHelper.Serialize(callerVersion));
+
+            fromOperation["version"].Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Object);
+            fromOperation["version"]["clientId"].ToString().Should().Be("op");
+            fromCaller["version"].Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Object);
+            fromCaller["version"]["clientId"].ToString().Should().Be("caller");
+        }
+
+        [Fact]
         [Trait("spec", "RSL15b7")]
         [Trait("spec", "RTL32b2")]
         public void CreateEdit_WithOperation_ShouldSetTheVersionFromTheOperation()
