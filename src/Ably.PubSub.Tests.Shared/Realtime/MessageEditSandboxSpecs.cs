@@ -13,10 +13,6 @@ namespace Ably.PubSub.Tests.Realtime
     [Trait("type", "integration")]
     public class MessageEditSandboxSpecs : SandboxSpecs
     {
-        private const string SkipReason =
-            "Requires protocol v5: this library still declares protocol v2, for which the service does not return publish serials or version serials. " +
-            "Enable once the declared protocol version is raised.";
-
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 
         public MessageEditSandboxSpecs(AblySandboxFixture fixture, ITestOutputHelper output)
@@ -24,7 +20,7 @@ namespace Ably.PubSub.Tests.Realtime
         {
         }
 
-        [Fact(Skip = SkipReason)]
+        [Fact]
         [Trait("requires", "protocol-v5")]
         [Trait("spec", "RSL15")]
         [Trait("spec", "RTL32")]

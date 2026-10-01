@@ -10,16 +10,12 @@ namespace Ably.PubSub.Tests.Realtime
     [Trait("type", "integration")]
     public class PublishResultSandboxSpecs : SandboxSpecs
     {
-        private const string SkipReason =
-            "Requires protocol v5: this library still declares protocol v2, for which the service does not return publish serials. " +
-            "Enable once the declared protocol version is raised.";
-
         public PublishResultSandboxSpecs(AblySandboxFixture fixture, ITestOutputHelper output)
             : base(fixture, output)
         {
         }
 
-        [Fact(Skip = SkipReason)]
+        [Fact]
         [Trait("requires", "protocol-v5")]
         [Trait("spec", "RSL1n")]
         public async Task RestPublish_ShouldReturnTheSerialsOfThePublishedMessages()
@@ -38,7 +34,7 @@ namespace Ably.PubSub.Tests.Realtime
             channel.Publish("sync", "data").Serials.Should().HaveCount(1);
         }
 
-        [Fact(Skip = SkipReason)]
+        [Fact]
         [Trait("requires", "protocol-v5")]
         [Trait("spec", "RTL6j")]
         public async Task RealtimePublish_ShouldReturnTheSerialsOfThePublishedMessages()

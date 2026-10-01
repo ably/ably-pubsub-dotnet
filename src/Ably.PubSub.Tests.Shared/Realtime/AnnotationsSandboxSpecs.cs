@@ -14,10 +14,6 @@ namespace Ably.PubSub.Tests.Realtime
     [Trait("type", "integration")]
     public class AnnotationsSandboxSpecs : SandboxSpecs
     {
-        private const string SkipReason =
-            "Requires protocol v4: this library still declares protocol v2, for which the service does not populate message serials. " +
-            "Enable once the declared protocol version is raised.";
-
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 
         public AnnotationsSandboxSpecs(AblySandboxFixture fixture, ITestOutputHelper output)
@@ -35,7 +31,7 @@ namespace Ably.PubSub.Tests.Realtime
             return await task;
         }
 
-        [Fact(Skip = SkipReason)]
+        [Fact]
         [Trait("requires", "protocol-v4")]
         [Trait("spec", "RTAN1")]
         [Trait("spec", "RTAN2")]
@@ -91,7 +87,7 @@ namespace Ably.PubSub.Tests.Realtime
             (await channel.Annotations.DeleteAsync(message.Serial, new Annotation { Type = "reaction:distinct.v1", Name = "like" })).IsSuccess.Should().BeTrue();
         }
 
-        [Fact(Skip = SkipReason)]
+        [Fact]
         [Trait("requires", "protocol-v4")]
         [Trait("spec", "RSL11")]
         [Trait("spec", "RSL14")]
