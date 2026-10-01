@@ -88,6 +88,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AnnotationsSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AnnotationsSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\MessageEditSandboxSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\MessageEditSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\PublishResultSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\PublishResultSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSpecs.cs" />

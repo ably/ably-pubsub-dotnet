@@ -572,6 +572,21 @@ namespace Ably.PubSub.Realtime
             return await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult);
         }
 
+        public Task<Result<UpdateDeleteResult>> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
+        {
+            return EditMessageAsync(message, operation, parameters, MessageAction.MessageUpdate);
+        }
+
+        public Task<Result<UpdateDeleteResult>> DeleteMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
+        {
+            return EditMessageAsync(message, operation, parameters, MessageAction.MessageDelete);
+        }
+
+        public Task<Result<UpdateDeleteResult>> AppendMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
+        {
+            return EditMessageAsync(message, operation, parameters, MessageAction.MessageAppend);
+        }
+
         public Task<PaginatedResult<Message>> HistoryAsync()
         {
             var query = new PaginatedRequestParams();
@@ -659,6 +674,46 @@ namespace Ably.PubSub.Realtime
             };
 
             SendMessage(msg, callback);
+        }
+
+        // RTL32a - an empty serial throws a 40003 error, as publishing in a state which refuses it throws (RTL32 mirrors RTL6c).
+        private async Task<Result<UpdateDeleteResult>> EditMessageAsync(Message message, MessageOperation operation, IDictionary<string, string> parameters, MessageAction action)
+        {
+            // RTL32b, RTL32b1, RTL32b2, RTL32c
+            var edit = Message.CreateEdit(message, operation, action);
+
+            // The refusal is not wrapped, so the error code of the refusal is preserved (as for annotations).
+            EnsureCanPublish();
+
+            var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Message, Name)
+            {
+                Messages = new[] { edit },
+            };
+
+            // RTL32e
+            if (parameters != null)
+            {
+                msg.Params = new ChannelParams();
+                foreach (var parameter in parameters)
+                {
+                    msg.Params[parameter.Key] = parameter.Value;
+                }
+            }
+
+            var tw = new PublishTaskWrapper();
+            SendMessage(msg, tw.Callback);
+
+            var failResult = Result.Fail<PublishResult>(new ErrorInfo("Message edit timeout expired. The edit was not confirmed by the server"));
+            var published = await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult);
+            if (published.IsFailure)
+            {
+                return Result.Fail<UpdateDeleteResult>(published.Error);
+            }
+
+            // RTL32d - the version serial is the first serial of the ACK's res. No result, or no serial, means the
+            // edit was superseded before it was published (UDR2a).
+            var serials = published.Value?.Serials;
+            return Result.Ok(new UpdateDeleteResult(serials != null && serials.Count > 0 ? serials[0] : null));
         }
 
         // RTAN1b - the connection and channel state conditions are those of publishing a message (RTL6c).

@@ -194,6 +194,42 @@ namespace Ably.PubSub.Realtime
         Task<Result<PublishResult>> PublishAsync(IEnumerable<Message> messages);
 
         /// <summary>
+        /// Updates an existing message (RTL32). The serial of <paramref name="message"/> identifies the message to update and is
+        /// required (RTL32a); an empty serial throws an <see cref="AblyException"/> with code 40003. The message passed in is not
+        /// modified (RTL32c). The same connection and channel state conditions apply as for publishing a message.
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the fields to apply.</param>
+        /// <param name="operation">optional description of the update, sent as the version of the message (RTL32b2).</param>
+        /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
+        /// <returns>
+        /// A task of <see cref="Result{T}"/> which completes on the ACK or NACK. Failure (including a NACK or the confirmation
+        /// timing out) is reported as a failed result rather than thrown. On success <c>Value</c> holds the version serial of the
+        /// edit (RTL32d); its <see cref="UpdateDeleteResult.VersionSerial"/> is null if the message was superseded, or if the
+        /// server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<UpdateDeleteResult>> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Marks a message as deleted (RTL32). The message is not removed from the history of the channel.
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments and the result.
+        /// </summary>
+        /// <param name="message">a message with a populated serial.</param>
+        /// <param name="operation">optional description of the delete, sent as the version of the message (RTL32b2).</param>
+        /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
+        /// <returns>A task of <see cref="Result{T}"/> holding the version serial of the delete (RTL32d).</returns>
+        Task<Result<UpdateDeleteResult>> DeleteMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Appends the data of the given message to the data of an existing message (RTL32).
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments and the result.
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the data to append.</param>
+        /// <param name="operation">optional description of the append, sent as the version of the message (RTL32b2).</param>
+        /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
+        /// <returns>A task of <see cref="Result{T}"/> holding the version serial of the append (RTL32d).</returns>
+        Task<Result<UpdateDeleteResult>> AppendMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
         /// Returns past message of this channel.
         /// </summary>
         /// <returns><see cref="PaginatedResult{T}"/> of past Messages.</returns>
