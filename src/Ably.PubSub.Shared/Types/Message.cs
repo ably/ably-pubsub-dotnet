@@ -201,9 +201,12 @@ namespace Ably.PubSub
         /// by the caller is never mutated (RSL15c, RTL32c).
         /// </summary>
         /// <remarks>
-        /// RSL15b and RTL32b ask for "whatever fields were in the user-supplied Message". The fields a publisher may
-        /// supply are carried over: id, clientId, name, data, encoding and extras. The remaining fields are assigned by
-        /// Ably (connectionId, connectionKey, timestamp, annotations) or are set here (serial, version, action).
+        /// RSL15b and RTL32b ask for "whatever fields were in the user-supplied Message", so every field of the
+        /// caller's message is carried over (id, clientId, connectionId, connectionKey, name, timestamp, data, encoding,
+        /// extras, serial, annotations and version), as cocoa does. The java SDK sends only name, data and extras; that is
+        /// a known divergence. The action is then set, and the version is replaced with a fresh one built from
+        /// <paramref name="operation"/> when an operation is given. Without an operation the caller's version is carried as is.
+        /// The copy is shallow: nested extras and annotations are shared with the original, which is never written to.
         /// </remarks>
         /// <param name="message">the message supplied by the caller. It must have a populated serial.</param>
         /// <param name="operation">optional description of the operation, sent as the version (RSL15b7, RTL32b2).</param>
@@ -226,11 +229,16 @@ namespace Ably.PubSub
             {
                 Id = message.Id,
                 ClientId = message.ClientId,
+                ConnectionId = message.ConnectionId,
+                ConnectionKey = message.ConnectionKey,
                 Name = message.Name,
+                Timestamp = message.Timestamp,
                 Data = message.Data,
                 Encoding = message.Encoding,
                 Extras = message.Extras,
                 Serial = message.Serial,
+                Version = message.Version,
+                Annotations = message.Annotations,
                 Action = action,
             };
 

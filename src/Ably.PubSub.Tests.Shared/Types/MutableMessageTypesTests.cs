@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Ably.PubSub.Types;
 using FluentAssertions;
@@ -68,6 +69,39 @@ namespace Ably.PubSub.Tests.Types
 
             original.Action.Should().BeNull();
             original.Version.Should().BeNull();
+        }
+
+        [Fact]
+        [Trait("spec", "RSL15b")]
+        [Trait("spec", "RTL32b")]
+        public void CreateEdit_ShouldCarryEveryFieldOfTheUserSuppliedMessage()
+        {
+            var version = new MessageVersion { ClientId = "caller-version" };
+            var annotations = new MessageAnnotations();
+            var original = new Message("name", "data", "client", new MessageExtras())
+            {
+                Id = "id1",
+                ConnectionId = "conn",
+                ConnectionKey = "ck",
+                Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(1700000000000),
+                Encoding = "json",
+                Serial = "s1",
+                Version = version,
+                Annotations = annotations,
+            };
+
+            var edit = Message.CreateEdit(original, null, MessageAction.MessageUpdate);
+
+            edit.ConnectionId.Should().Be("conn");
+            edit.ConnectionKey.Should().Be("ck");
+            edit.Timestamp.Should().Be(original.Timestamp);
+            edit.Encoding.Should().Be("json");
+            edit.Annotations.Should().BeSameAs(annotations);
+            edit.Version.Should().BeSameAs(version);
+
+            var withOperation = Message.CreateEdit(original, new MessageOperation { ClientId = "op" }, MessageAction.MessageUpdate);
+            withOperation.Version.ClientId.Should().Be("op");
+            original.Version.Should().BeSameAs(version);
         }
 
         [Fact]
