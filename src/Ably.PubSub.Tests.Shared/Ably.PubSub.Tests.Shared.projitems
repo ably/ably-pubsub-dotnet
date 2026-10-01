@@ -153,6 +153,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)TokenRequestPopulateTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Transport\ConnectionAttemptTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Transport\AttemptFailedStateTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageTm2Specs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystemTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersionTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ErrorPolicyTests.cs" />
