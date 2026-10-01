@@ -4,7 +4,6 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Ably.PubSub.Types
 {
@@ -16,6 +15,12 @@ namespace Ably.PubSub.Types
     ///  See the Ably client library developer documentation for further
     ///  details on the members of a ProtocolMessage.
     /// </summary>
+    /// <remarks>
+    ///  OBJECT and OBJECT_SYNC protocol messages carry a <c>state</c> array of object messages (TR4r). This library
+    ///  has no objects support, so that payload is deliberately not modelled: the unknown field is ignored on
+    ///  deserialization, as in the other Ably Pub/Sub SDKs when no objects plugin is present. A future objects
+    ///  extension would add the property and consume it.
+    /// </remarks>
     public class ProtocolMessage
     {
         /// <summary>
@@ -243,15 +248,6 @@ namespace Ably.PubSub.Types
         /// </summary>
         [JsonProperty("res")]
         public PublishResult[] Res { get; set; }
-
-        /// <summary>
-        /// Opaque pass-through of the <c>state</c> array carried by OBJECT and OBJECT_SYNC protocol messages (TR4r).
-        /// Each element is the raw, unparsed form of an object message; this library does not model or interpret it.
-        /// Objects traffic is tolerated and ignored by this library. Stored so that a future extension could
-        /// consume it; nothing in this library reads it.
-        /// </summary>
-        [JsonProperty("state")]
-        internal JToken[] State { get; set; }
 
         /// <summary>
         /// Connection details received. <see cref="Ably.PubSub.ConnectionDetails"/>.

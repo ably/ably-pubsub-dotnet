@@ -92,14 +92,5 @@ namespace Ably.PubSub.Tests.Types
                 ((ProtocolMessage.Flag)pair.Value).FromFlag().Should().BeEquivalentTo(new[] { pair.Key });
             }
         }
-
-        [Fact]
-        [Trait("spec", "TR4r")]
-        public void ProtocolMessage_ShouldKeepTheStateArrayOpaque()
-        {
-            var message = JsonHelper.Deserialize<ProtocolMessage>("{\"action\":19,\"state\":[{\"a\":1},{\"b\":[2]}]}");
-
-            message.State.Should().HaveCount(2);
-        }
     }
 }
