@@ -39,7 +39,8 @@ namespace Ably.PubSub.Tests.Realtime
         [Trait("spec", "RTAN4")]
         public async Task PublishedAnnotations_ShouldBeDeliveredToSubscribersAndRetrievable()
         {
-            var client = await GetRealtimeClient(Protocol.Json);
+            // reaction:distinct.v1 annotations are only accepted from identified clients.
+            var client = await GetRealtimeClient(Protocol.Json, (options, _) => options.ClientId = Guid.NewGuid().ToString());
             var channel = client.Channels.Get(
                 MutableChannelName("annotations"),
                 new ChannelOptions(modes: new ChannelModes(
@@ -95,7 +96,8 @@ namespace Ably.PubSub.Tests.Realtime
         [Trait("spec", "RSAN3")]
         public async Task RestChannel_ShouldRetrieveAPublishedMessageItsVersionsAndAnnotations()
         {
-            var rest = await GetRestClient(Protocol.Json);
+            // reaction:distinct.v1 annotations are only accepted from identified clients.
+            var rest = await GetRestClient(Protocol.Json, options => options.ClientId = Guid.NewGuid().ToString());
             var channel = rest.Channels.Get(MutableChannelName("retrieval"));
 
             await channel.PublishAsync("greeting", "hello");
@@ -117,9 +119,21 @@ namespace Ably.PubSub.Tests.Realtime
             message.Data.Should().Be("hello");
             message.Version.Serial.Should().Be(serial);
 
-            var versions = await channel.GetMessageVersionsAsync(serial);
-            versions.Items.Should().HaveCount(1);
-            versions.Items[0].Serial.Should().Be(serial);
+            // The service only records version history once a message has been edited, and does so asynchronously.
+            var updateResult = await channel.UpdateMessageAsync(new Message("greeting", "hello world") { Serial = serial });
+            updateResult.VersionSerial.Should().NotBeNullOrEmpty();
+            await AssertEventually(
+                async () =>
+                {
+                    var versions = await channel.GetMessageVersionsAsync(serial);
+                    versions.Items.Should().HaveCount(2);
+                    versions.Items.Should().OnlyContain(x => x.Serial == serial);
+                    versions.Items[0].Data.Should().Be("hello");
+                    versions.Items[1].Data.Should().Be("hello world");
+                    versions.Items[1].Version.Serial.Should().Be(updateResult.VersionSerial);
+                },
+                Timeout,
+                TimeSpan.FromMilliseconds(500));
 
             await channel.Annotations.PublishAsync(serial, new Annotation { Type = "reaction:distinct.v1", Name = "like" });
             await AssertMultipleTimes(

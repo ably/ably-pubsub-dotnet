@@ -57,21 +57,52 @@ namespace Ably.PubSub.Tests.Realtime
             updateResult.VersionSerial.Should().NotBeNullOrEmpty();
             (await Within(updated.Task, "update")).Version.Description.Should().Be("edited");
 
-            var latest = await restChannel.GetMessageAsync(serial);
-            latest.Data.Should().Be("hello world");
-            latest.Action.Should().Be(MessageAction.MessageUpdate);
+            // The latest-version view is updated asynchronously after the update is acknowledged, so poll until it appears.
+            await AssertEventually(
+                async () =>
+                {
+                    var latest = await restChannel.GetMessageAsync(serial);
+                    latest.Data.Should().Be("hello world");
+                    latest.Action.Should().Be(MessageAction.MessageUpdate);
+                },
+                Timeout,
+                TimeSpan.FromMilliseconds(500));
 
             var appendResult = await channel.AppendMessageAsync(new Message { Serial = serial, Data = "!" });
             appendResult.IsSuccess.Should().BeTrue();
             appendResult.Value.VersionSerial.Should().NotBeNullOrEmpty();
             (await Within(appended.Task, "append")).Serial.Should().Be(serial);
 
+            await AssertEventually(
+                async () => (await restChannel.GetMessageAsync(serial)).Data.Should().Be("hello world!"),
+                Timeout,
+                TimeSpan.FromMilliseconds(500));
+
             var deleteResult = await channel.DeleteMessageAsync(new Message { Serial = serial }, new MessageOperation { Description = "removed" });
             deleteResult.IsSuccess.Should().BeTrue();
             (await Within(deleted.Task, "delete")).Serial.Should().Be(serial);
 
-            var versions = await restChannel.GetMessageVersionsAsync(serial);
-            versions.Items.Count.Should().BeGreaterOrEqualTo(4);
+            // The version history is populated asynchronously: wait for the create, update and delete versions to
+            // appear in order, with the delete last.
+            await AssertEventually(
+                async () =>
+                {
+                    var actions = (await restChannel.GetMessageVersionsAsync(serial)).Items.Select(x => x.Action).ToList();
+                    actions.Should().NotBeEmpty();
+                    actions.Last().Should().Be(MessageAction.MessageDelete);
+                    var expected = new Queue<MessageAction>(new[] { MessageAction.MessageCreate, MessageAction.MessageUpdate, MessageAction.MessageDelete });
+                    foreach (var action in actions)
+                    {
+                        if (expected.Count > 0 && expected.Peek() == action)
+                        {
+                            expected.Dequeue();
+                        }
+                    }
+
+                    expected.Should().BeEmpty("the versions {0} should contain create, update and delete in order", string.Join(", ", actions));
+                },
+                Timeout,
+                TimeSpan.FromMilliseconds(500));
         }
 
         private static async Task<T> Within<T>(Task<T> task, string what)

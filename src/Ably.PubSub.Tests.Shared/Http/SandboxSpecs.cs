@@ -137,6 +137,29 @@ namespace Ably.PubSub.Tests
             }
         }
 
+        /// <summary>
+        /// Repeats the assertion until it passes or the timeout elapses, then runs it one last time so a persistent failure
+        /// is reported. Unlike <see cref="AssertMultipleTimes"/> a failure on the final attempt is not swallowed.
+        /// </summary>
+        protected async Task AssertEventually(Func<Task> testAction, TimeSpan timeout, TimeSpan durationBetweenAttempts)
+        {
+            var deadline = DateTimeOffset.UtcNow + timeout;
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                try
+                {
+                    await testAction();
+                    return;
+                }
+                catch (Exception)
+                {
+                    await Task.Delay(durationBetweenAttempts);
+                }
+            }
+
+            await testAction();
+        }
+
         protected async Task WaitFor(int timeoutMs, Action<Action> done, Action onFail = null)
         {
             await TestHelpers.WaitFor(timeoutMs, 1, done, onFail);
