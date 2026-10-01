@@ -20,6 +20,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageActionJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageDataConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageExtrasConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\ObjectOnlyJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DefaultLoggerSink.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\ChannelModeExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IInternalLogger.cs" />
