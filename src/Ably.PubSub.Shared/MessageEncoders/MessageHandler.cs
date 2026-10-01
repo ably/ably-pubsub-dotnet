@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Types;
+using Newtonsoft.Json.Linq;
 
 namespace Ably.PubSub.MessageEncoders
 {
@@ -57,12 +58,14 @@ namespace Ably.PubSub.MessageEncoders
             if (response.Type == ResponseType.Json)
             {
                 var messages = JsonHelper.Deserialize<List<Message>>(response.TextResponse);
+                messages?.ForEach(ApplyTm2Defaults);
                 ProcessMessages(messages, context);
                 return messages;
             }
 
 #if MSGPACK
             var payloads = MsgPackHelper.Deserialise(response.Body, typeof(List<Message>)) as List<Message>;
+            payloads?.ForEach(ApplyTm2Defaults);
             ProcessMessages(payloads, options);
             return payloads;
 #else
@@ -500,7 +503,41 @@ namespace Ably.PubSub.MessageEncoders
                 {
                     message.Timestamp = protocolMessage.Timestamp;
                 }
+
+                if (message is Message decodedMessage)
+                {
+                    ApplyTm2Defaults(decodedMessage);
+                }
             }
+        }
+
+        /// <summary>
+        /// Populates the defaults required by TM2s1, TM2s2, TM2u and TM8a on a message received from Ably.
+        /// Shared by the realtime and the REST decode paths.
+        /// </summary>
+        /// <param name="message">the received message.</param>
+        internal static void ApplyTm2Defaults(Message message)
+        {
+            if (message == null)
+            {
+                return;
+            }
+
+            // TM2s: version is always present; TM2s1 and TM2s2 default from the message itself
+            message.Version = message.Version ?? new MessageVersion();
+            if (message.Version.Serial.IsEmpty())
+            {
+                message.Version.Serial = message.Serial;
+            }
+
+            if (message.Version.Timestamp.HasValue == false)
+            {
+                message.Version.Timestamp = message.Timestamp;
+            }
+
+            // TM2u / TM8a
+            message.Annotations = message.Annotations ?? new MessageAnnotations();
+            message.Annotations.Summary = message.Annotations.Summary ?? new Dictionary<string, JToken>();
         }
 
         public RealtimeTransportData GetTransportData(ProtocolMessage protocolMessage)
