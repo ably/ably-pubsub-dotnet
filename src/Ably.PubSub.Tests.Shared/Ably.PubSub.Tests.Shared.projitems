@@ -125,6 +125,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ForwardsCompatibilitySpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\MockHttpRealtimeSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\PresenceSandboxSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\ObjectsToleranceSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ProtocolMessageTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\RealtimeSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\RealtimeSpecs.cs" />
@@ -164,6 +165,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Transport\ConnectionAttemptTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Transport\AttemptFailedStateTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\AnnotationSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\ObjectsWireTypesSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageTm2Specs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystemTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MutableMessageTypesTests.cs" />
