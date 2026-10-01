@@ -497,7 +497,7 @@ namespace Ably.PubSub.Realtime
                     {
                         Presence = new[] { msg },
                     };
-                    _connection.Send(message, callback);
+                    _connection.Send(message, (result, sendError) => callback?.Invoke(sendError == null, sendError));
                     break;
                 default: // RTP16c
                     var error = new ErrorInfo($"Unable to enter presence channel in {_channel.State} state", ErrorCodes.UnableToEnterPresenceChannelInvalidState);
@@ -774,11 +774,11 @@ namespace Ably.PubSub.Realtime
                 }
             }
 
-            _connection.Send(message, (s, e) =>
+            _connection.Send(message, (result, e) =>
             {
                 foreach (var callback in callbacks)
                 {
-                    callback(s, e);
+                    callback(e == null, e);
                 }
             });
         }

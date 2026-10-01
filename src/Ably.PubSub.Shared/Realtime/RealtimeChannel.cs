@@ -530,7 +530,7 @@ namespace Ably.PubSub.Realtime
 
         public void Publish(string name, object data, Action<bool, ErrorInfo> callback = null, string clientId = null)
         {
-            PublishImpl(new[] { new Message(name, data, clientId) }, callback);
+            PublishImpl(new[] { new Message(name, data, clientId) }, ToResultCallback(callback));
         }
 
         /// <summary>Publish a single message on this channel based on a given event name and payload.</summary>
@@ -552,7 +552,7 @@ namespace Ably.PubSub.Realtime
         /// <summary>Publish several messages on this channel.</summary>
         public void Publish(IEnumerable<Message> messages, Action<bool, ErrorInfo> callback = null)
         {
-            PublishImpl(messages, callback);
+            PublishImpl(messages, ToResultCallback(callback));
         }
 
         /// <summary>Publish several messages on this channel.</summary>
@@ -561,7 +561,7 @@ namespace Ably.PubSub.Realtime
             var tw = new TaskWrapper();
             try
             {
-                PublishImpl(messages, tw.Callback);
+                PublishImpl(messages, (result, error) => tw.Callback(error == null, error));
             }
             catch (Exception ex)
             {
@@ -649,7 +649,7 @@ namespace Ably.PubSub.Realtime
             }
         }
 
-        private void PublishImpl(IEnumerable<Message> messages, Action<bool, ErrorInfo> callback)
+        private void PublishImpl(IEnumerable<Message> messages, Action<PublishResult, ErrorInfo> callback)
         {
             EnsureCanPublish();
 
@@ -672,7 +672,13 @@ namespace Ably.PubSub.Realtime
                 Annotations = new[] { annotation },
             };
 
-            SendMessage(msg, callback);
+            SendMessage(msg, ToResultCallback(callback));
+        }
+
+        // Adapts a legacy success/error callback to the result-carrying send pipeline: error == null means success.
+        private static Action<PublishResult, ErrorInfo> ToResultCallback(Action<bool, ErrorInfo> callback)
+        {
+            return callback == null ? (Action<PublishResult, ErrorInfo>)null : (result, error) => callback(error == null, error);
         }
 
         internal void SetChannelState(ChannelState state, ProtocolMessage protocolMessage)
@@ -880,7 +886,7 @@ namespace Ably.PubSub.Realtime
             }
         }
 
-        private void SendMessage(ProtocolMessage protocolMessage, Action<bool, ErrorInfo> callback = null)
+        private void SendMessage(ProtocolMessage protocolMessage, Action<PublishResult, ErrorInfo> callback = null)
         {
             if (Logger.IsDebug)
             {

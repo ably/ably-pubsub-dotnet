@@ -120,4 +120,25 @@ namespace Ably.PubSub.Transport
             _completionSource.TrySetException(new AblyException(ex));
         }
     }
+
+    /// <summary>
+    /// Wraps the result-carrying publish callback into a Task API. Unlike <see cref="TaskWrapper{T}"/>,
+    /// a successful completion may carry a null <see cref="PublishResult"/> (the server sent no result).
+    /// </summary>
+    internal class PublishTaskWrapper
+    {
+        private readonly TaskCompletionSource<Result<PublishResult>> _completionSource = new TaskCompletionSource<Result<PublishResult>>();
+
+        public Task<Result<PublishResult>> Task => _completionSource.Task;
+
+        public void Callback(PublishResult result, ErrorInfo error)
+        {
+            _completionSource.TrySetResult(error != null ? Result.Fail<PublishResult>(error) : Result.Ok(result));
+        }
+
+        public void SetException(Exception ex)
+        {
+            _completionSource.TrySetException(new AblyException(ex));
+        }
+    }
 }
