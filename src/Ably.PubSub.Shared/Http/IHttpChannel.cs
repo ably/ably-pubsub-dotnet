@@ -89,6 +89,37 @@ namespace Ably.PubSub.Http
         Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null);
 
         /// <summary>
+        /// Updates an existing message (RSL15). The fields of <paramref name="message"/> replace those of the existing
+        /// message; the serial identifies the message to update and is required (RSL15a). The message passed in is not
+        /// modified (RSL15c).
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the fields to apply.</param>
+        /// <param name="operation">optional description of the update, sent as the version of the message (RSL15b7).</param>
+        /// <param name="parameters">optional publish parameters, sent in the querystring (RSL15f).</param>
+        /// <returns>The <see cref="UpdateDeleteResult"/> holding the version serial of the update (RSL15e). Failures are thrown as <see cref="AblyException"/>.</returns>
+        Task<UpdateDeleteResult> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Marks a message as deleted (RSL15). The message is not removed from the history of the channel.
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments.
+        /// </summary>
+        /// <param name="message">a message with a populated serial.</param>
+        /// <param name="operation">optional description of the delete, sent as the version of the message (RSL15b7).</param>
+        /// <param name="parameters">optional publish parameters, sent in the querystring (RSL15f).</param>
+        /// <returns>The <see cref="UpdateDeleteResult"/> holding the version serial of the delete (RSL15e).</returns>
+        Task<UpdateDeleteResult> DeleteMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Appends the data of the given message to the data of an existing message (RSL15).
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments.
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the data to append.</param>
+        /// <param name="operation">optional description of the append, sent as the version of the message (RSL15b7).</param>
+        /// <param name="parameters">optional publish parameters, sent in the querystring (RSL15f).</param>
+        /// <returns>The <see cref="UpdateDeleteResult"/> holding the version serial of the append (RSL15e).</returns>
+        Task<UpdateDeleteResult> AppendMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
         /// Returns the active status for the channel including the number of publishers, subscribers and presenceMembers etc.
         /// </summary>
         /// <returns><see cref="ChannelDetails"/>Channel Details.</returns>

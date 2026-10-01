@@ -35,6 +35,40 @@ namespace Ably.PubSub.Tests
             url.Host.Should().Be(Defaults.RestHost);
         }
 
+        [Theory]
+        [InlineData("POST", true)]
+        [InlineData("PUT", true)]
+        [InlineData("PATCH", true)]
+        [InlineData("patch", true)]
+        [InlineData("GET", false)]
+        [InlineData("DELETE", false)]
+        [Trait("spec", "RSC19f")]
+        public async Task ShouldSendTheRequestBodyOnlyForMethodsWhichCarryOne(string method, bool expectBody)
+        {
+            var body = new byte[] { 1, 2, 3 };
+            string wireMethod = null;
+            byte[] wireBody = null;
+            var handler = new FakeHttpMessageHandler(request =>
+            {
+                wireMethod = request.Method.Method;
+                wireBody = request.Content?.ReadAsByteArrayAsync().Result;
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+            });
+            var client = new AblyHttpRequester(new AblyHttpOptions { HttpClient = new HttpClient(handler) });
+
+            await client.Execute(new AblyRequest("/test", new HttpMethod(method)) { RequestBody = body });
+
+            wireMethod.Should().Be(method);
+            if (expectBody)
+            {
+                wireBody.Should().Equal(body);
+            }
+            else
+            {
+                wireBody.Should().BeNull();
+            }
+        }
+
         [Fact]
         [Trait("spec", "RSC7a")]
         [Trait("spec", "G4")]

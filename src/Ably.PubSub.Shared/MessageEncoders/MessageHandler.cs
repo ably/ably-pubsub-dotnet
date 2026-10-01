@@ -118,6 +118,11 @@ namespace Ably.PubSub.MessageEncoders
                     request.ChannelOptions);
             }
 
+            if (request.PostData is Message message)
+            {
+                return GetSingleMessageRequestBody(message, request.ChannelOptions);
+            }
+
             if (request.PostData is IEnumerable<Annotation> annotations)
             {
                 return GetAnnotationsRequestBody(annotations, request.ChannelOptions);
@@ -154,6 +159,30 @@ namespace Ably.PubSub.MessageEncoders
             }
 #endif
             return JsonHelper.Serialize(payloads).GetBytes();
+        }
+
+        // RSL15b, RSL15d - the body of an update, delete or append is one message (not an array), encoded per RSL4.
+        private byte[] GetSingleMessageRequestBody(Message message, ChannelOptions options)
+        {
+            var result = EncodePayload(message, new DecodingContext(options));
+            if (result.IsFailure)
+            {
+                throw new AblyException(result.Error);
+            }
+
+#if MSGPACK
+            if (_protocol == Protocol.MsgPack)
+            {
+                return MsgPackHelper.Serialise(message);
+            }
+#endif
+            var body = JsonHelper.Serialize(message).GetBytes();
+            if (Logger.IsDebug)
+            {
+                Logger.Debug("Request body: " + body.GetText());
+            }
+
+            return body;
         }
 
         private byte[] GetAnnotationsRequestBody(IEnumerable<Annotation> annotations, ChannelOptions options)

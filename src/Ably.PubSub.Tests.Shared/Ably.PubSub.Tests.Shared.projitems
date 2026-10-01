@@ -133,6 +133,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelOptionsDefaultsTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelAnnotationsSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelMessageEditSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\PublishResultSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelMessageRetrievalSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelSpecs.cs" />
