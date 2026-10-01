@@ -187,6 +187,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystem.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\PresenceMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ProtocolMessage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\PublishResult.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\Summary.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityAdapter.cs" />

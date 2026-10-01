@@ -234,6 +234,13 @@ namespace Ably.PubSub.Types
         public Annotation[] Annotations { get; set; }
 
         /// <summary>
+        /// Present in ACK protocol messages: one <see cref="PublishResult"/> per acknowledged protocol message,
+        /// in order, each containing the serials of the messages that were published (TR4s).
+        /// </summary>
+        [JsonProperty("res")]
+        public PublishResult[] Res { get; set; }
+
+        /// <summary>
         /// Connection details received. <see cref="Ably.PubSub.ConnectionDetails"/>.
         /// </summary>
         [JsonProperty("connectionDetails")]
