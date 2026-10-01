@@ -29,6 +29,13 @@ namespace Ably.PubSub.Tests
         private readonly string _channelsPath;
         private readonly string _channelMessagesPath;
 
+        // Both GET /channels (a list of channel objects) and the batch POST /messages (a flat list of per-channel
+        // results) changed response shape in newer protocol versions. Request()/RequestV2() take only a headers
+        // dictionary (there is no RSC19f version argument, and ably-java and ably-cocoa are headers-only too), so a
+        // caller pins a version with a request-level X-Ably-Version header, which takes precedence over the client
+        // default. The tests below that assert the v2 shapes do exactly that.
+        private static readonly Dictionary<string, string> LegacyV2Headers = new Dictionary<string, string> { { "X-Ably-Version", "2" } };
+
         private AblyRequest _lastRequest;
 
         public RequestSandBoxSpecs(ITestOutputHelper output)
@@ -163,7 +170,7 @@ namespace Ably.PubSub.Tests
                     data = "foo",
                 }
             };
-            var paginatedResponse = await client.Request(HttpMethod.Post, "/messages", null, JToken.FromObject(objectPayload), null);
+            var paginatedResponse = await client.Request(HttpMethod.Post, "/messages", null, JToken.FromObject(objectPayload), LegacyV2Headers);
 
             ValidateResponse(paginatedResponse);
 
@@ -190,7 +197,7 @@ namespace Ably.PubSub.Tests
                         }
                     ]
                   }";
-            paginatedResponse = await client.RequestV2(HttpMethod.Post.Method, "/messages", null, jsonPayload, null);
+            paginatedResponse = await client.RequestV2(HttpMethod.Post.Method, "/messages", null, jsonPayload, LegacyV2Headers);
 
             ValidateResponse(paginatedResponse, 5);
 
@@ -220,7 +227,7 @@ namespace Ably.PubSub.Tests
 
             var testParams = new Dictionary<string, string> { { "prefix", _channelNamePrefix } };
 
-            var paginatedResponse = await client.Request(HttpMethod.Get, _channelsPath, testParams);
+            var paginatedResponse = await client.Request(HttpMethod.Get, _channelsPath, testParams, null, LegacyV2Headers);
 
             _lastRequest.Headers.Should().ContainKey("Authorization");
             paginatedResponse.Should().NotBeNull();
@@ -249,7 +256,7 @@ namespace Ably.PubSub.Tests
 
             var testParams = new Dictionary<string, string> { { "prefix", _channelNamePrefix }, { "limit", "1" } };
 
-            var paginatedResponse = await client.Request(HttpMethod.Get, _channelsPath, testParams);
+            var paginatedResponse = await client.Request(HttpMethod.Get, _channelsPath, testParams, null, LegacyV2Headers);
 
             _lastRequest.Headers.Should().ContainKey("Authorization");
             paginatedResponse.Should().NotBeNull();
@@ -275,6 +282,44 @@ namespace Ably.PubSub.Tests
             var item1 = items[0] as JObject;
             var item2 = page2.Items[0] as JObject;
             item1["channelId"].ToString().Should().NotBe(item2["channelId"].ToString());
+        }
+
+        [Trait("spec", "RSC19")]
+        [Trait("spec", "RSC19b")]
+        [Theory]
+        [ProtocolData]
+        public async Task Request_WithoutVersionHeader_ReturnsProtocolV6Shapes(Protocol protocol)
+        {
+            var client = TrackLastRequest(await GetRestClient(protocol));
+
+            // No X-Ably-Version header: the declared protocol version (6) applies.
+            var channelsParams = new Dictionary<string, string> { { "prefix", _channelNamePrefix } };
+            var channelsResponse = await client.Request(HttpMethod.Get, _channelsPath, channelsParams);
+
+            channelsResponse.Success.Should().BeTrue();
+            channelsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            channelsResponse.Items.Should().NotBeEmpty();
+            foreach (var item in channelsResponse.Items)
+            {
+                item.Type.Should().Be(JTokenType.String);
+                item.ToString().Should().StartWith(_channelNamePrefix);
+            }
+
+            var payload = new
+            {
+                channels = new[] { _channelName, _channelAltName },
+                messages = new { data = "v6-shape" },
+            };
+            var batchResponse = await client.Request(HttpMethod.Post, "/messages", null, JToken.FromObject(payload));
+
+            batchResponse.Success.Should().BeTrue();
+            batchResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+            batchResponse.Items.Should().HaveCount(1);
+            var envelope = batchResponse.Items.First() as JObject;
+            envelope.Should().NotBeNull();
+            envelope.Should().ContainKey("results");
+            envelope.Should().ContainKey("successCount");
+            envelope.Should().ContainKey("failureCount");
         }
 
         [Trait("spec", "RSC19")]
