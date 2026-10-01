@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Ably.PubSub.Types
 {
@@ -51,12 +52,12 @@ namespace Ably.PubSub.Types
             Activate = 18,
 
             /// <summary>
-            /// OBJECT action, wire value 19 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// OBJECT action, wire value 19 per TR2. Carried by LiveObjects; tolerated and ignored by this library, other than advancing the channel serial (RTL15b).
             /// </summary>
             Object = 19,
 
             /// <summary>
-            /// OBJECT_SYNC action, wire value 20 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// OBJECT_SYNC action, wire value 20 per TR2. Carried by LiveObjects; tolerated and ignored by this library.
             /// </summary>
             ObjectSync = 20,
 
@@ -90,6 +91,7 @@ namespace Ably.PubSub.Types
             HasLocalPresence = 1 << 3,
             Transient = 1 << 4,
             AttachResume = 1 << 5,
+            HasObjects = 1 << 7,
 
             // Channel modes
             Presence = 1 << 16,
@@ -98,6 +100,8 @@ namespace Ably.PubSub.Types
             PresenceSubscribe = 1 << 19,
             AnnotationPublish = 1 << 21,
             AnnotationSubscribe = 1 << 22,
+            ObjectSubscribe = 1 << 24,
+            ObjectPublish = 1 << 25,
 #pragma warning restore SA1602 // Enumeration items should be documented
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         }
@@ -239,6 +243,15 @@ namespace Ably.PubSub.Types
         /// </summary>
         [JsonProperty("res")]
         public PublishResult[] Res { get; set; }
+
+        /// <summary>
+        /// Opaque pass-through of the <c>state</c> array carried by OBJECT and OBJECT_SYNC protocol messages (TR4r).
+        /// Each element is the raw, unparsed form of an object message; this library does not model or interpret it.
+        /// Objects traffic is tolerated and ignored by this library. Stored so that a future extension could
+        /// consume it; nothing in this library reads it.
+        /// </summary>
+        [JsonProperty("state")]
+        internal JToken[] State { get; set; }
 
         /// <summary>
         /// Connection details received. <see cref="Ably.PubSub.ConnectionDetails"/>.

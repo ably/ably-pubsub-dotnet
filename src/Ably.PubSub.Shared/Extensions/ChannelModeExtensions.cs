@@ -25,6 +25,10 @@ namespace Ably.PubSub
                     return ProtocolMessage.Flag.AnnotationPublish;
                 case ChannelMode.AnnotationSubscribe:
                     return ProtocolMessage.Flag.AnnotationSubscribe;
+                case ChannelMode.ObjectSubscribe:
+                    return ProtocolMessage.Flag.ObjectSubscribe;
+                case ChannelMode.ObjectPublish:
+                    return ProtocolMessage.Flag.ObjectPublish;
                 default:
                     return null;
             }
@@ -60,6 +64,16 @@ namespace Ably.PubSub
             if (flag.HasFlag(ProtocolMessage.Flag.AnnotationSubscribe))
             {
                 yield return ChannelMode.AnnotationSubscribe;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.ObjectSubscribe))
+            {
+                yield return ChannelMode.ObjectSubscribe;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.ObjectPublish))
+            {
+                yield return ChannelMode.ObjectPublish;
             }
         }
     }
