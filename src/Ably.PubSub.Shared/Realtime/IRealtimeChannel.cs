@@ -40,6 +40,12 @@ namespace Ably.PubSub.Realtime
         Presence Presence { get; }
 
         /// <summary>
+        /// Publishes, deletes, retrieves and subscribes to the annotations of the messages on this channel (RTL26).
+        /// Experimental: the annotations API may change.
+        /// </summary>
+        RealtimeAnnotations Annotations { get; }
+
+        /// <summary>
         /// Channel options.
         /// </summary>
         ChannelOptions Options { get; }
@@ -184,6 +190,38 @@ namespace Ably.PubSub.Realtime
         /// <param name="query"><see cref="PaginatedRequestParams"/> query.</param>
         /// <returns><see cref="PaginatedResult{T}"/> of past Messages.</returns>
         Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query);
+
+        /// <summary>
+        /// Retrieves the latest version of the message with the given serial. Identical to
+        /// <see cref="Http.IHttpChannel.GetMessageAsync(string)"/> (RTL28).
+        /// </summary>
+        /// <param name="serial">the serial of the message to retrieve.</param>
+        /// <returns>The decoded <see cref="Message"/>.</returns>
+        Task<Message> GetMessageAsync(string serial);
+
+        /// <summary>
+        /// Retrieves the latest version of the given message (RTL28, RSL11a1). The message must have a populated serial.
+        /// </summary>
+        /// <param name="message">a message which has a serial.</param>
+        /// <returns>The decoded <see cref="Message"/>.</returns>
+        Task<Message> GetMessageAsync(Message message);
+
+        /// <summary>
+        /// Retrieves all the versions of the message with the given serial. Identical to
+        /// <see cref="Http.IHttpChannel.GetMessageVersionsAsync(string, PaginatedRequestParams)"/> (RTL31).
+        /// </summary>
+        /// <param name="serial">the serial of the message whose versions are retrieved.</param>
+        /// <param name="query">optional <see cref="PaginatedRequestParams"/> query.</param>
+        /// <returns>A <see cref="PaginatedResult{T}"/> of the versions of the message.</returns>
+        Task<PaginatedResult<Message>> GetMessageVersionsAsync(string serial, PaginatedRequestParams query = null);
+
+        /// <summary>
+        /// Retrieves all the versions of the given message (RTL31, RSL14a1). The message must have a populated serial.
+        /// </summary>
+        /// <param name="message">a message which has a serial.</param>
+        /// <param name="query">optional <see cref="PaginatedRequestParams"/> query.</param>
+        /// <returns>A <see cref="PaginatedResult{T}"/> of the versions of the message.</returns>
+        Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null);
 
         /// <summary>
         /// Updates the options for a channel. If the ChannelModes or ChannelParams differ and the channel is Attaching or Attached

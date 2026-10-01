@@ -37,6 +37,23 @@ namespace Ably.PubSub.Realtime
             }
         }
 
+        /// <summary>Gets a value indicating whether there are no handlers, with or without a filter.</summary>
+        public bool IsEmpty
+        {
+            get
+            {
+                try
+                {
+                    _lock.EnterReadLock();
+                    return _handlers.Count == 0 && _specificHandlers.Values.All(x => x.Count == 0);
+                }
+                finally
+                {
+                    _lock.ExitReadLock();
+                }
+            }
+        }
+
         /// <summary>Add handler to the collection.</summary>
         /// <param name="handler">MessageHandler action to be added.</param>
         public void Add(MessageHandlerAction<T> handler)

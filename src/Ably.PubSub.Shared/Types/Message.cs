@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Ably.PubSub.CustomSerialisers;
 using Ably.PubSub.MessageEncoders;
 using Ably.PubSub.Shared.CustomSerialisers;
 using Ably.PubSub.Types;
@@ -84,6 +85,38 @@ namespace Ably.PubSub
         [JsonProperty("encoding")]
         public string Encoding { get; set; }
 
+        /// <summary>
+        /// The serial of the message, assigned by the Ably service (TM2r).
+        /// </summary>
+        [JsonProperty("serial")]
+        public string Serial { get; set; }
+
+        /// <summary>
+        /// The version of the message (TM2s). Populated with defaults derived from the message when decoding messages
+        /// received from Ably (TM2s1, TM2s2). A wire value which is not an object (below protocol version 4 the
+        /// service sends the version as a plain string serial) is ignored and the defaults apply.
+        /// </summary>
+        [JsonProperty("version")]
+        [JsonConverter(typeof(ObjectOnlyJsonConverter<MessageVersion>))]
+        public MessageVersion Version { get; set; }
+
+        /// <summary>
+        /// The action of the message (TM2j). <c>null</c> for a message which has not been received from Ably, or
+        /// when the service sent an action this library does not know about. The action is only serialized
+        /// when set, so a plain publish does not send one.
+        /// </summary>
+        [JsonProperty("action")]
+        [JsonConverter(typeof(MessageActionJsonConverter))]
+        public MessageAction? Action { get; set; }
+
+        /// <summary>
+        /// The annotations summary of the message (TM2u). Populated with an empty value when decoding messages
+        /// received from Ably. A wire value which is not an object is ignored and the default applies.
+        /// </summary>
+        [JsonProperty("annotations")]
+        [JsonConverter(typeof(ObjectOnlyJsonConverter<MessageAnnotations>))]
+        public MessageAnnotations Annotations { get; set; }
+
         /// <inheritdoc/>
         public override string ToString()
         {
@@ -116,7 +149,11 @@ namespace Ably.PubSub
                    && Timestamp.Equals(other.Timestamp)
                    && Equals(Data, other.Data)
                    && string.Equals(Encoding, other.Encoding)
-                   && Equals(Extras, other.Extras);
+                   && Equals(Extras, other.Extras)
+                   && string.Equals(Serial, other.Serial)
+                   && Equals(Version, other.Version)
+                   && Action == other.Action
+                   && Equals(Annotations, other.Annotations);
         }
 
         /// <inheritdoc/>
@@ -153,6 +190,10 @@ namespace Ably.PubSub
                 hashCode = (hashCode * 397) ^ (Data != null ? Data.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (Encoding != null ? Encoding.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (Extras != null ? Extras.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (Serial != null ? Serial.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (Version != null ? Version.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ Action.GetHashCode();
+                hashCode = (hashCode * 397) ^ (Annotations != null ? Annotations.GetHashCode() : 0);
                 return hashCode;
             }
         }

@@ -16,8 +16,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)PubSubHttpClient.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Agent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ApiKey.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\AnnotationActionJsonConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageActionJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageDataConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageExtrasConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\ObjectOnlyJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DefaultLoggerSink.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\ChannelModeExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IInternalLogger.cs" />
@@ -51,6 +54,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelEvent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AttemptsHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\LastMessageIds.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\RealtimeAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\Presence.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\Presence.GetParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\Presence.QueuedPresenceMessage.cs" />
@@ -135,8 +139,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\MessageHandlerAction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\IRealtimeChannel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\RealtimeTransportData.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\AnnotationsRequestParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\HttpChannel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\IHttpChannel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\RestAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Result.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Statistics.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TokenDetails.cs" />
@@ -164,6 +170,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Transport\MsWebSocketTransport.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Transport\MsWebSocketConnection.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelProperties.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\Annotation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\AnnotationAction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ChannelModes.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ChannelParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ConnectionDetails.cs" />
@@ -173,11 +181,15 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\IMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\LockedList.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\Message.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageAction.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageExtras.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageVersion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystem.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\PresenceMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ProtocolMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersion.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\Summary.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityAdapter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ActionOnDispose.cs" />
