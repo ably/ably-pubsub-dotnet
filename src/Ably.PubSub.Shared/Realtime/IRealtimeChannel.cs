@@ -144,8 +144,13 @@ namespace Ably.PubSub.Realtime
         /// <param name="eventName">The event name.</param>
         /// <param name="data">The payload of the message.</param>
         /// <param name="clientId">optional, id of the client.</param>
-        /// <returns>Task of Result.</returns>
-        Task<Result> PublishAsync(string eventName, object data, string clientId = null);
+        /// <returns>
+        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
+        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
+        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
+        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<PublishResult>> PublishAsync(string eventName, object data, string clientId = null);
 
         /// <summary>
         /// Publish a single message and execute an optional callback when completed.
@@ -160,8 +165,13 @@ namespace Ably.PubSub.Realtime
         /// Use this if you care whether the message has been received.
         /// </summary>
         /// <param name="message">Message to be published.</param>
-        /// <returns>Task of Result.</returns>
-        Task<Result> PublishAsync(Message message);
+        /// <returns>
+        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
+        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
+        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
+        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<PublishResult>> PublishAsync(Message message);
 
         /// <summary>
         /// Publish a number of messages and execute an optional callback when completed.
@@ -175,8 +185,13 @@ namespace Ably.PubSub.Realtime
         /// The resulted task completes when a response from the server with Ack or Nack.
         /// </summary>
         /// <param name="messages">list of messages.</param>
-        /// <returns>Task of Result.</returns>
-        Task<Result> PublishAsync(IEnumerable<Message> messages);
+        /// <returns>
+        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
+        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
+        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
+        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<PublishResult>> PublishAsync(IEnumerable<Message> messages);
 
         /// <summary>
         /// Returns past message of this channel.

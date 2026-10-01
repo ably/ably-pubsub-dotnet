@@ -6,6 +6,7 @@ using System.Net;
 using Ably.PubSub.Encryption;
 using Ably.PubSub.MessageEncoders;
 using Ably.PubSub.Push;
+using Newtonsoft.Json;
 
 namespace Ably.PubSub.Http
 {
@@ -73,19 +74,19 @@ namespace Ably.PubSub.Http
         public RestAnnotations Annotations => _annotations;
 
         /// <inheritdoc/>
-        public Task PublishAsync(string name, object data, string clientId = null)
+        public Task<PublishResult> PublishAsync(string name, object data, string clientId = null)
         {
             return PublishAsync(new Message(name, data, clientId));
         }
 
         /// <inheritdoc/>
-        public Task PublishAsync(Message message)
+        public Task<PublishResult> PublishAsync(Message message)
         {
             return PublishAsync(new[] { message });
         }
 
         /// <inheritdoc/>
-        public Task PublishAsync(IEnumerable<Message> messages)
+        public async Task<PublishResult> PublishAsync(IEnumerable<Message> messages)
         {
             var result = _ablyRest.AblyAuth.ValidateClientIds(messages);
             if (result.IsFailure)
@@ -114,7 +115,20 @@ namespace Ably.PubSub.Http
             }
 
             request.PostData = messages;
-            return _ablyRest.ExecuteRequest(request);
+
+            // RSL1n: the response body is a superset of a PublishResult. An empty or absent body yields an
+            // empty (never null) PublishResult; a malformed body surfaces as an exception.
+            try
+            {
+                var publishResult = await _ablyRest.ExecuteRequest<PublishResult>(request);
+                return publishResult ?? new PublishResult();
+            }
+            catch (JsonException ex)
+            {
+                throw new AblyException(
+                    new ErrorInfo("Unable to parse the publish response body: " + ex.Message, ErrorCodes.InternalError, HttpStatusCode.InternalServerError),
+                    ex);
+            }
         }
 
         /// <inheritdoc/>
@@ -253,21 +267,21 @@ namespace Ably.PubSub.Http
         }
 
         /// <inheritdoc/>
-        public void Publish(string name, object data, string clientId = null)
+        public PublishResult Publish(string name, object data, string clientId = null)
         {
-            AsyncHelper.RunSync(() => PublishAsync(name, data, clientId));
+            return AsyncHelper.RunSync(() => PublishAsync(name, data, clientId));
         }
 
         /// <inheritdoc/>
-        public void Publish(Message message)
+        public PublishResult Publish(Message message)
         {
-            AsyncHelper.RunSync(() => PublishAsync(message));
+            return AsyncHelper.RunSync(() => PublishAsync(message));
         }
 
         /// <inheritdoc/>
-        public void Publish(IEnumerable<Message> messages)
+        public PublishResult Publish(IEnumerable<Message> messages)
         {
-            AsyncHelper.RunSync(() => PublishAsync(messages));
+            return AsyncHelper.RunSync(() => PublishAsync(messages));
         }
 
         /// <inheritdoc/>

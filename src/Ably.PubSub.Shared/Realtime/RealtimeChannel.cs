@@ -534,7 +534,7 @@ namespace Ably.PubSub.Realtime
         }
 
         /// <summary>Publish a single message on this channel based on a given event name and payload.</summary>
-        public Task<Result> PublishAsync(string name, object data, string clientId = null)
+        public Task<Result<PublishResult>> PublishAsync(string name, object data, string clientId = null)
         {
             return PublishAsync(new[] { new Message(name, data, clientId) });
         }
@@ -544,7 +544,7 @@ namespace Ably.PubSub.Realtime
             Publish(new[] { message }, callback);
         }
 
-        public Task<Result> PublishAsync(Message message)
+        public Task<Result<PublishResult>> PublishAsync(Message message)
         {
             return PublishAsync(new[] { message });
         }
@@ -556,19 +556,19 @@ namespace Ably.PubSub.Realtime
         }
 
         /// <summary>Publish several messages on this channel.</summary>
-        public async Task<Result> PublishAsync(IEnumerable<Message> messages)
+        public async Task<Result<PublishResult>> PublishAsync(IEnumerable<Message> messages)
         {
-            var tw = new TaskWrapper();
+            var tw = new PublishTaskWrapper();
             try
             {
-                PublishImpl(messages, (result, error) => tw.Callback(error == null, error));
+                PublishImpl(messages, tw.Callback);
             }
             catch (Exception ex)
             {
                 tw.SetException(ex);
             }
 
-            var failResult = Result.Fail(new ErrorInfo("PublishAsync timeout expired. Message was not confirmed by the server"));
+            var failResult = Result.Fail<PublishResult>(new ErrorInfo("PublishAsync timeout expired. Message was not confirmed by the server"));
             return await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult);
         }
 
