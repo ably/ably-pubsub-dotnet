@@ -16,6 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)PubSubHttpClient.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Agent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ApiKey.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageActionJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageDataConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageExtrasConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DefaultLoggerSink.cs" />
@@ -173,11 +174,15 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\IMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\LockedList.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\Message.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageAction.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageExtras.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageVersion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystem.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\PresenceMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ProtocolMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersion.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\Summary.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityAdapter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ActionOnDispose.cs" />
