@@ -43,6 +43,7 @@ namespace Ably.PubSub.Realtime
             if (protocolMessage.ChannelSerial.IsNotEmpty() &&
                 (protocolMessage.Action == ProtocolMessage.MessageAction.Message ||
                 protocolMessage.Action == ProtocolMessage.MessageAction.Presence ||
+                protocolMessage.Action == ProtocolMessage.MessageAction.Annotation ||
                 protocolMessage.Action == ProtocolMessage.MessageAction.Attached))
             {
                 Logger.Debug($"Setting channel serial for channelName - {channel.Name}," +
@@ -83,6 +84,9 @@ namespace Ably.PubSub.Realtime
                         channel.Presence.ChannelAttached(protocolMessage);
                         channel.SetChannelState(ChannelState.Attached, protocolMessage);
                     }
+
+                    // RTAN4e
+                    channel.Annotations.ChannelAttached();
 
                     break;
                 case ProtocolMessage.MessageAction.Detach:
@@ -161,9 +165,26 @@ namespace Ably.PubSub.Realtime
                     }
 
                     break;
+                case ProtocolMessage.MessageAction.Annotation:
+                    // RTAN4b
+                    var annotationDecodeResult = _messageHandler.DecodeMessages(
+                                                protocolMessage,
+                                                protocolMessage.Annotations,
+                                                channel.Options);
+
+                    if (annotationDecodeResult.IsFailure)
+                    {
+                        Logger.Error($"{channel.Name} - failed to decode annotation. ErrorCode: {annotationDecodeResult.Error.Code}, Message: {annotationDecodeResult.Error.Message}");
+
+                        channel.OnError(annotationDecodeResult.Error);
+                    }
+
+                    channel.Annotations.OnAnnotations(protocolMessage.Annotations);
+
+                    break;
                 default:
                     // RTF1: tolerate protocol messages with actions this library does not handle
-                    // (e.g. OBJECT/OBJECT_SYNC/ANNOTATION or future additions) by ignoring them.
+                    // (e.g. OBJECT/OBJECT_SYNC or future additions) by ignoring them.
                     Logger.Debug($"Ignoring ProtocolMessage with unhandled action {protocolMessage.Action} on channel {channel.Name}");
                     break;
             }

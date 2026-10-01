@@ -53,6 +53,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelEvent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AttemptsHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\LastMessageIds.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\RealtimeAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\Presence.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\Presence.GetParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\Presence.QueuedPresenceMessage.cs" />
@@ -137,8 +138,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\MessageHandlerAction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\IRealtimeChannel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\RealtimeTransportData.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\AnnotationsRequestParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\HttpChannel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\IHttpChannel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\RestAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Result.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Statistics.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TokenDetails.cs" />
