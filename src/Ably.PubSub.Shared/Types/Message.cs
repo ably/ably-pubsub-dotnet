@@ -196,6 +196,58 @@ namespace Ably.PubSub
         }
 
         /// <summary>
+        /// Builds the message which is sent to Ably to update, delete or append to the message with the serial of
+        /// <paramref name="message"/> (RSL15, RTL32). The result is always a fresh object, so the message supplied
+        /// by the caller is never mutated (RSL15c, RTL32c).
+        /// </summary>
+        /// <remarks>
+        /// RSL15b and RTL32b ask for "whatever fields were in the user-supplied Message". The fields a publisher may
+        /// supply are carried over: id, clientId, name, data, encoding and extras. The remaining fields are assigned by
+        /// Ably (connectionId, connectionKey, timestamp, annotations) or are set here (serial, version, action).
+        /// </remarks>
+        /// <param name="message">the message supplied by the caller. It must have a populated serial.</param>
+        /// <param name="operation">optional description of the operation, sent as the version (RSL15b7, RTL32b2).</param>
+        /// <param name="action">the action to set: update, delete or append (RSL15b1, RTL32b1).</param>
+        /// <returns>A new message to send.</returns>
+        /// <exception cref="AblyException">The serial is empty (RSL15a, RTL32a).</exception>
+        internal static Message CreateEdit(Message message, MessageOperation operation, MessageAction action)
+        {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
+
+            if (message.Serial.IsEmpty())
+            {
+                throw new AblyException(new ErrorInfo("A message serial is required to update, delete or append to a message", ErrorCodes.InvalidParameterValue, System.Net.HttpStatusCode.BadRequest));
+            }
+
+            var edit = new Message
+            {
+                Id = message.Id,
+                ClientId = message.ClientId,
+                Name = message.Name,
+                Data = message.Data,
+                Encoding = message.Encoding,
+                Extras = message.Extras,
+                Serial = message.Serial,
+                Action = action,
+            };
+
+            if (operation != null)
+            {
+                edit.Version = new MessageVersion
+                {
+                    ClientId = operation.ClientId,
+                    Description = operation.Description,
+                    Metadata = operation.Metadata == null ? null : new Dictionary<string, string>(operation.Metadata),
+                };
+            }
+
+            return edit;
+        }
+
+        /// <summary>
         /// Decodes the current message data using the default list of encoders.
         /// </summary>
         /// <param name="encoded">encoded message object.</param>

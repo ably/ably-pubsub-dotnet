@@ -183,6 +183,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageAction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageExtras.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MessageOperation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageVersion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystem.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\PresenceMessage.cs" />
@@ -190,6 +191,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\PublishResult.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\Summary.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\UpdateDeleteResult.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityAdapter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unity\UnityHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ActionOnDispose.cs" />

@@ -163,6 +163,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\AnnotationSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageTm2Specs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystemTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\MutableMessageTypesTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\PublishResultTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersionTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ErrorPolicyTests.cs" />
