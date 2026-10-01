@@ -30,6 +30,7 @@ Task("_NetFramework_Unit_Tests_WithRetry")
     {
         var settings = testExecutionHelper.CreateXUnitSettings("xunit-netframework-unit", isIntegration: false);
         testExecutionHelper.RunXUnitTests(testAssemblies, settings);
+        return; // every test passed: nothing to retry
     }
     catch
     {
@@ -72,6 +73,7 @@ Task("_NetFramework_Integration_Tests_WithRetry")
     {
         var settings = testExecutionHelper.CreateXUnitSettings("xunit-netframework-integration", isIntegration: true);
         testExecutionHelper.RunXUnitTests(testAssemblies, settings);
+        return; // every test passed: nothing to retry
     }
     catch
     {
@@ -120,6 +122,7 @@ Task("_NetStandard_Unit_Tests_WithRetry")
     try
     {
         testExecutionHelper.RunDotNetTests(project, settings);
+        return; // every test passed: nothing to retry
     }
     catch
     {
@@ -159,6 +162,7 @@ Task("_NetStandard_Integration_Tests_WithRetry")
     try
     {
         testExecutionHelper.RunDotNetTests(project, settings);
+        return; // every test passed: nothing to retry
     }
     catch
     {
