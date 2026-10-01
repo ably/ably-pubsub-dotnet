@@ -97,6 +97,31 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
 
+## Publish results and new message APIs
+
+Publishing now reports what the service did with the messages. Typical callers only need to recompile; code that assigns the result of a publish to a variable of the old type needs the new type.
+
+| 1.x | 2.0 |
+|-----|-----|
+| `IRestChannel.PublishAsync(...)` returned `Task` | `IHttpChannel.PublishAsync(...)` returns `Task<PublishResult>` |
+| `IRestChannel.Publish(...)` returned `void` | `IHttpChannel.Publish(...)` returns `PublishResult` |
+| `IRealtimeChannel.PublishAsync(...)` returned `Task<Result>` | `IRealtimeChannel.PublishAsync(...)` returns `Task<Result<PublishResult>>` |
+
+`PublishResult.Serials` holds one serial per published message, in order. A serial is `null` for a message the service discarded because of a conflation rule. On a realtime channel, `Result<PublishResult>.Value` is `null` when the service's acknowledgement carried no result.
+
+**Behaviour change:** a successful REST publish whose response body is not a JSON object (for example plain text) now throws an `AblyException`. 1.x ignored the response body of a publish. An empty or absent body is still accepted and gives a `PublishResult` with no serials.
+
+**Behaviour change:** HTTP `PATCH` requests now send their request body. In 1.x the body of a `PATCH` was silently dropped, which affected the push device-registration update (`PATCH /push/deviceRegistrations/:id`, which now sends its `{"push":{"recipient":...}}` body) and any `PATCH` made through `PubSubHttpClient.RequestV2("PATCH", path, ..., body)`, whose body is now sent. If you worked around the missing body, remove the workaround.
+
+New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message updates and deletes enabled:
+
+| API | Notes |
+|-----|-------|
+| `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` | Take a `Message` with a populated `Serial`, an optional `MessageOperation` (`ClientId`, `Description`, `Metadata`) and optional params. The message you pass is never modified. `IHttpChannel` returns `Task<UpdateDeleteResult>` and throws on failure; `IRealtimeChannel` returns `Task<Result<UpdateDeleteResult>>`, like `PublishAsync`. `UpdateDeleteResult.VersionSerial` is `null` if the message was superseded by a later update. |
+| `GetMessageAsync`, `GetMessageVersionsAsync` | Retrieve the latest version, or all versions, of a message by serial. |
+| `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. |
+| `Message.Serial`, `Message.Version`, `Message.Action`, `Message.Annotations` | Populated on messages received from the service. |
+
 ## Do not mix 1.x and 2.0 in one project
 
 With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.

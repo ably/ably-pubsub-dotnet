@@ -11,7 +11,15 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 - The client-facing "REST" identifiers are renamed to "HTTP", matching the other Ably Pub/Sub SDKs: `AblyRealtime` → `PubSubRealtimeClient`, `AblyRest` → `PubSubHttpClient`, `IRealtimeClient` → `IPubSubRealtimeClient`, `IRestClient` → `IPubSubHttpClient`, `RestChannel`/`RestChannels`/`IRestChannel` → `HttpChannel`/`HttpChannels`/`IHttpChannel`, and the realtime client's `RestClient` property → `HttpClient`. Names that refer to Ably's REST API service or wire options (`ClientOptions.RestHost`, `ClientOptions.IdempotentRestPublishing`, ...) are unchanged.
 - Every member the 1.x line had marked `[Obsolete]` is removed (`Auth.Authorise[Async]`, `Connection.RecoveryKey`, `ClientOptions.FallbackHostsUseDefault`, `ClientOptions.CaptureCurrentSynchronizationContext`, the legacy `CreateTokenRequestObject[Async]` and string-method `Request` overloads, `HistoryRequestParams`, the `HistoryAsync(untilAttach)` overloads and `Presence.IsSyncComplete`). See the "Deprecated API removed" table in [UPDATING.md](UPDATING.md).
 - The root namespace moves from `IO.Ably` to `Ably.PubSub`, so namespace, assembly names and package ids all agree. Sub-namespaces map one-to-one (`IO.Ably.Realtime` → `Ably.PubSub.Realtime`, ...), with `IO.Ably.Rest` becoming `Ably.PubSub.Http` and the door namespaces simplifying to `Ably.PubSub.Device`/`Ably.PubSub.Server`. As a consequence, v1 (`IO.Ably.*`) and v2 (`Ably.PubSub.*`) types no longer collide, so a dependency still on `ably.io` 1.x does not block compiling against 2.0 — see [UPDATING.md](UPDATING.md) for why a mixed graph should still be temporary.
-- The API is otherwise unchanged.
+- Publishing returns the result of the publish: `IHttpChannel.PublishAsync` returns `Task<PublishResult>` (was `Task`), `IHttpChannel.Publish` returns `PublishResult` (was `void`), and `IRealtimeChannel.PublishAsync` returns `Task<Result<PublishResult>>` (was `Task<Result>`). `PublishResult.Serials` holds the serial of each published message (RSL1n, RTL6j). Typical callers only need to recompile.
+- A successful REST publish whose response body is not a JSON object now throws an `AblyException`; 1.x ignored the body.
+- HTTP `PATCH` requests now send their request body. The requester previously dropped the body of a `PATCH` (only `POST` and `PUT` carried one), so the push device-registration update (`PATCH /push/deviceRegistrations/:id`, RSH3d3b) went out without its `{"push":{"recipient":...}}` body, and so did a `PATCH` made through the public `PubSubHttpClient.RequestV2("PATCH", ...)` (RSC19f). Both now send the body.
+- The API is otherwise unchanged apart from the additions below.
+
+**New features**
+
+- Update, delete and append messages by serial: `UpdateMessageAsync`, `DeleteMessageAsync` and `AppendMessageAsync` on `IHttpChannel` (RSL15, returning `Task<UpdateDeleteResult>`) and on `IRealtimeChannel` (RTL32, returning `Task<Result<UpdateDeleteResult>>`), with the new `MessageOperation` and `UpdateDeleteResult` types.
+- Retrieve a message by serial and all of its versions (`GetMessageAsync`, `GetMessageVersionsAsync`), and publish, delete, retrieve and subscribe to message annotations (`Annotations`). `Message` gains `Serial`, `Version`, `Action` and `Annotations`.
 
 **Notes**
 
