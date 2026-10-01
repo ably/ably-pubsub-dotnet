@@ -93,9 +93,11 @@ namespace Ably.PubSub
 
         /// <summary>
         /// The version of the message (TM2s). Populated with defaults derived from the message when decoding messages
-        /// received from Ably (TM2s1, TM2s2).
+        /// received from Ably (TM2s1, TM2s2). A wire value which is not an object (below protocol version 4 the
+        /// service sends the version as a plain string serial) is ignored and the defaults apply.
         /// </summary>
         [JsonProperty("version")]
+        [JsonConverter(typeof(ObjectOnlyJsonConverter<MessageVersion>))]
         public MessageVersion Version { get; set; }
 
         /// <summary>
@@ -109,9 +111,10 @@ namespace Ably.PubSub
 
         /// <summary>
         /// The annotations summary of the message (TM2u). Populated with an empty value when decoding messages
-        /// received from Ably.
+        /// received from Ably. A wire value which is not an object is ignored and the default applies.
         /// </summary>
         [JsonProperty("annotations")]
+        [JsonConverter(typeof(ObjectOnlyJsonConverter<MessageAnnotations>))]
         public MessageAnnotations Annotations { get; set; }
 
         /// <inheritdoc/>

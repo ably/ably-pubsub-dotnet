@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime;
 using Ably.PubSub.Types;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
@@ -46,6 +47,51 @@ namespace Ably.PubSub.Tests.Types
         {
             yield return new object[] { "realtime", (Func<string, IList<Message>>)RealtimeDecode };
             yield return new object[] { "rest", (Func<string, IList<Message>>)RestDecode };
+        }
+
+        // A MESSAGE frame exactly as the sandbox sends it at protocol version 2: the version is a plain string
+        // serial rather than the TM2s object. It must decode, with the TM2s1/TM2s2 defaults applied.
+        private const string ProtocolV2MessageFrame =
+            @"{""action"":15,""id"":""auDjmMw39d:0"",""channel"":""probe"",""channelSerial"":""01790836374852-000@e02SJi6VQC7OQe96943499"",""connectionId"":""auDjmMw39d"",""timestamp"":1790836374852,""messages"":[{""name"":""test"",""action"":0,""serial"":""01790836374852-000@e02SJi6VQC7OQe96943499:000"",""version"":""01790836374852-000@e02SJi6VQC7OQe96943499:000"",""data"":""best""}]}";
+
+        [Fact]
+        [Trait("spec", "TM2s")]
+        [Trait("spec", "TM2s1")]
+        [Trait("spec", "TM2s2")]
+        public void RealtimeFrame_WithProtocolV2StringVersion_DecodesAndAppliesVersionDefaults()
+        {
+            var handler = CreateHandler();
+            var protocolMessage = handler.ParseRealtimeData(new RealtimeTransportData(ProtocolV2MessageFrame));
+
+            protocolMessage.Should().NotBeNull();
+            handler.DecodeMessages(protocolMessage, protocolMessage.Messages, new DecodingContext()).IsSuccess.Should().BeTrue();
+            var message = protocolMessage.Messages.Should().ContainSingle().Subject;
+            message.Name.Should().Be("test");
+            message.Data.Should().Be("best");
+            message.Action.Should().Be(MessageAction.MessageCreate);
+            message.Serial.Should().Be("01790836374852-000@e02SJi6VQC7OQe96943499:000");
+            message.Version.Should().NotBeNull();
+            message.Version.Serial.Should().Be(message.Serial);
+            message.Version.Timestamp.Should().Be(DateTimeOffset.FromUnixTimeMilliseconds(1790836374852));
+            message.Annotations.Summary.Should().NotBeNull().And.BeEmpty();
+        }
+
+        [Theory]
+        [MemberData(nameof(DecodePaths))]
+        [Trait("spec", "TM2s1")]
+        [Trait("spec", "TM2u")]
+        public void NonObjectVersionAndAnnotations_AreIgnoredAndDefaulted(string path, Func<string, IList<Message>> decode)
+        {
+            var json = $@"[{{""serial"":""s1"",""timestamp"":{TimestampMs},""version"":""legacy-serial"",""annotations"":[1,2]}},{{""serial"":""s2"",""timestamp"":{TimestampMs},""version"":42,""annotations"":""x""}}]";
+
+            var messages = decode(json);
+
+            messages.Should().HaveCount(2, "the {0} path should yield both messages", path);
+            messages[0].Version.Serial.Should().Be("s1");
+            messages[0].Version.Timestamp.Should().Be(MessageTimestamp);
+            messages[0].Annotations.Summary.Should().NotBeNull().And.BeEmpty();
+            messages[1].Version.Serial.Should().Be("s2");
+            messages[1].Annotations.Summary.Should().NotBeNull().And.BeEmpty();
         }
 
         [Theory]
