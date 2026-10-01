@@ -50,6 +50,46 @@ namespace Ably.PubSub.Tests.Shared.Realtime
         }
 
         [Fact]
+        [Trait("spec", "TR4s")]
+        public void Res_ShouldDeserialiseOnePublishResultPerAcknowledgedProtocolMessageIncludingNullSerials()
+        {
+            const string ack = @"{
+                ""action"": 1,
+                ""msgSerial"": 4,
+                ""count"": 2,
+                ""res"": [ { ""serials"": [""a"", null] }, { ""serials"": [""b""] } ]
+            }";
+
+            var message = JsonHelper.Deserialize<ProtocolMessage>(ack);
+
+            message.Res.Should().HaveCount(2);
+            message.Res[0].Serials.Should().Equal("a", null);
+            message.Res[1].Serials.Should().Equal("b");
+        }
+
+        [Fact]
+        [Trait("spec", "TR4s")]
+        public void Res_WhenAbsent_ShouldBeNull()
+        {
+            JsonHelper.Deserialize<ProtocolMessage>(@"{ ""action"": 1, ""msgSerial"": 0, ""count"": 1 }").Res.Should().BeNull();
+        }
+
+        [Fact]
+        [Trait("spec", "TR4s")]
+        public void Res_ShouldRoundTripWhenSerialised()
+        {
+            var original = new ProtocolMessage(ProtocolMessage.MessageAction.Ack)
+            {
+                Res = new[] { new PublishResult(new[] { "a", null }) },
+            };
+
+            var roundTripped = JsonHelper.Deserialize<ProtocolMessage>(JsonHelper.Serialize(original));
+
+            roundTripped.Res.Should().HaveCount(1);
+            roundTripped.Res[0].Serials.Should().Equal("a", null);
+        }
+
+        [Fact]
         [Trait("spec", "TR3")]
         public void ProtocolMessageFlagHaveCorrectValues()
         {

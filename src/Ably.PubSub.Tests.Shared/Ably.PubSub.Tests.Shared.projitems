@@ -88,6 +88,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AnnotationsSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\AnnotationsSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\PublishResultSandboxSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\PublishResultSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelsSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionAttemptsInfoSpecs.cs" />
@@ -131,6 +133,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelOptionsDefaultsTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelAnnotationsSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\PublishResultSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelMessageRetrievalSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\ChannelSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\JwtSandboxSpec.cs" />
@@ -160,6 +163,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Types\AnnotationSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\MessageTm2Specs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\OperatingSystemTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\PublishResultTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\SemanticVersionTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ErrorPolicyTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\ReconnectionStrategyTest.cs" />
