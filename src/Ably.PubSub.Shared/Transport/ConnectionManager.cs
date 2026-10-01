@@ -283,8 +283,9 @@ namespace Ably.PubSub.Transport
             {
                 var messagesResult = HttpClient.AblyAuth.ValidateClientIds(protocolMessage.Messages);
                 var presenceResult = HttpClient.AblyAuth.ValidateClientIds(protocolMessage.Presence);
+                var annotationsResult = HttpClient.AblyAuth.ValidateClientIds(protocolMessage.Annotations ?? new Annotation[0]);
 
-                return Result.Combine(messagesResult, presenceResult);
+                return Result.Combine(messagesResult, presenceResult, annotationsResult);
             }
         }
 

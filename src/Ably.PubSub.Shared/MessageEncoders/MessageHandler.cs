@@ -53,6 +53,19 @@ namespace Ably.PubSub.MessageEncoders
 #endif
         }
 
+        private IEnumerable<Annotation> ParseAnnotationsResponse(AblyResponse response, DecodingContext context)
+        {
+            if (response.Type != ResponseType.Json)
+            {
+                throw new AblyException(
+                    $"Response of type '{response.Type}' is invalid because MsgPack support was not enabled for this build.");
+            }
+
+            var annotations = JsonHelper.Deserialize<List<Annotation>>(response.TextResponse) ?? new List<Annotation>();
+            ProcessMessages(annotations, context);
+            return annotations;
+        }
+
         private IEnumerable<Message> ParseMessagesResponse(AblyResponse response, DecodingContext context)
         {
             if (response.Type == ResponseType.Json)
@@ -105,6 +118,11 @@ namespace Ably.PubSub.MessageEncoders
                     request.ChannelOptions);
             }
 
+            if (request.PostData is IEnumerable<Annotation> annotations)
+            {
+                return GetAnnotationsRequestBody(annotations, request.ChannelOptions);
+            }
+
 #if MSGPACK
             byte[] result;
             if (_protocol == Protocol.Json || !Defaults.MsgPackEnabled)
@@ -136,6 +154,24 @@ namespace Ably.PubSub.MessageEncoders
             }
 #endif
             return JsonHelper.Serialize(payloads).GetBytes();
+        }
+
+        private byte[] GetAnnotationsRequestBody(IEnumerable<Annotation> annotations, ChannelOptions options)
+        {
+            var annotationList = annotations.ToList();
+            var result = EncodePayloads(new DecodingContext(options), annotationList);
+            if (result.IsFailure)
+            {
+                throw new AblyException(result.Error);
+            }
+
+            var body = JsonHelper.Serialize(annotationList).GetBytes();
+            if (Logger.IsDebug)
+            {
+                Logger.Debug("Request body: " + body.GetText());
+            }
+
+            return body;
         }
 
         internal static Result EncodePayloads(DecodingContext context, IEnumerable<IMessage> payloads)
@@ -310,6 +346,12 @@ namespace Ably.PubSub.MessageEncoders
                 var context = request.ChannelOptions.ToDecodingContext();
                 typedResult?.Items.AddRange(ParsePresenceMessages(response, context));
             }
+            else if (typeof(T) == typeof(Annotation))
+            {
+                var typedResult = result as PaginatedResult<Annotation>;
+                var context = request.ChannelOptions.ToDecodingContext();
+                typedResult?.Items.AddRange(ParseAnnotationsResponse(response, context));
+            }
             else
             {
                 result?.Items.AddRange(ParseOther<T>(response));
@@ -448,6 +490,11 @@ namespace Ably.PubSub.MessageEncoders
             if (protocolMessage.Presence != null)
             {
                 result = Result.Combine(EncodePayloads(context, protocolMessage.Presence));
+            }
+
+            if (protocolMessage.Annotations != null)
+            {
+                result = Result.Combine(result, EncodePayloads(context, protocolMessage.Annotations));
             }
 
             return result;

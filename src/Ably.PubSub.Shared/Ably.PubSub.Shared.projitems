@@ -16,6 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)PubSubHttpClient.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Agent.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ApiKey.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\AnnotationActionJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageActionJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageDataConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerialisers\MessageExtrasConverter.cs" />
@@ -165,6 +166,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Transport\MsWebSocketTransport.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Transport\MsWebSocketConnection.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelProperties.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\Annotation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Types\AnnotationAction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ChannelModes.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ChannelParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Types\ConnectionDetails.cs" />
