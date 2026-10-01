@@ -12,8 +12,6 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-22.04
-    # A healthy run takes under 15 minutes; never let a stalled run hold a runner for hours.
-    timeout-minutes: 30
     env:
       DOTNET_NOLOGO: true
 

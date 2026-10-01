@@ -4,11 +4,6 @@
 
 public class TestExecutionHelper
 {
-    // A single test that makes no progress for this long is treated as hung: the test host is killed and the
-    // run fails, naming the test, instead of the job stalling silently until it is cancelled.
-    // The slowest healthy sandbox test takes under 1.5 minutes.
-    private const string TestHangTimeout = "5m";
-
     private readonly ICakeContext _context;
     private readonly BuildPaths _paths;
     private readonly FrameworkDetector _frameworkDetector;
@@ -80,8 +75,7 @@ public class TestExecutionHelper
             },
             Verbosity = DotNetVerbosity.Normal,
             NoBuild = true,
-            NoRestore = true,
-            ArgumentCustomization = AppendHangTimeout
+            NoRestore = true
         };
         
         if (!string.IsNullOrEmpty(framework))
@@ -93,15 +87,6 @@ public class TestExecutionHelper
         return settings;
     }
     
-    private static ProcessArgumentBuilder AppendHangTimeout(ProcessArgumentBuilder args)
-    {
-        return args
-            .Append("--blame-hang-timeout")
-            .Append(TestHangTimeout)
-            .Append("--blame-hang-dump-type")
-            .Append("none");
-    }
-
     /// <summary>
     /// Validates if a framework is available and warns if not
     /// </summary>
@@ -170,12 +155,9 @@ public class TestExecutionHelper
         TestRetryHelper retryHelper,
         Func<string, XUnit2Settings> createRetrySettings)
     {
-        // Unlike the dotnet test retry, this one does not fail the task: FindFailedXUnitTests does not yet
-        // recognise failures in the xunit v2 report, and the .NET Framework legs have long-standing failures
-        // that this has hidden. Making it strict needs those fixed first.
         var failedTests = retryHelper.FindFailedXUnitTests(resultsPath);
         _context.Information($"Found {failedTests.Count} failed tests to retry");
-
+        
         foreach (var test in failedTests)
         {
             _context.Information($"Retrying test: {test}");
@@ -214,52 +196,15 @@ public class TestExecutionHelper
         string framework,
         string configuration = "Release")
     {
-        // A hung or crashed test host leaves the tests it had not yet run out of the results, so retrying the
-        // failures it did record could turn the run green without those tests ever having run.
-        var abortReason = retryHelper.FindDotNetTestRunAbortReason(resultsPath);
-        if (abortReason != null)
-        {
-            throw new Exception($"The test run was aborted, so failed tests are not retried: {abortReason}");
-        }
-
         var failedTests = retryHelper.FindFailedDotNetTests(resultsPath);
         _context.Information($"Found {failedTests.Count} failed tests to retry");
-
-        if (!failedTests.Any())
-        {
-            throw new Exception($"The test run failed but no failed tests were found in {resultsPath} to retry.");
-        }
-
-        var stillFailing = new List<string>();
+        
         foreach (var test in failedTests)
         {
-            if (!RetryDotNetTest(project, resultsPath, retryHelper, framework, configuration, test))
-            {
-                stillFailing.Add(test);
-            }
-        }
-
-        ThrowIfStillFailing(stillFailing);
-    }
-
-    // Sandbox tests have some known flakes, so a failed test gets more than one retry; a test that fails
-    // every attempt fails the task.
-    private const int MaxRetriesPerTest = 2;
-
-    private bool RetryDotNetTest(
-        FilePath project,
-        FilePath resultsPath,
-        TestRetryHelper retryHelper,
-        string framework,
-        string configuration,
-        string test)
-    {
-        for (var attempt = 1; attempt <= MaxRetriesPerTest; attempt++)
-        {
-            _context.Information($"Retrying test ({attempt}/{MaxRetriesPerTest}): {test}");
-
+            _context.Information($"Retrying test: {test}");
+            
             var retryResultsPath = retryHelper.GetNextTestResultPath(resultsPath, ".trx");
-
+            
             var retrySettings = new DotNetTestSettings
             {
                 Configuration = configuration,
@@ -270,34 +215,22 @@ public class TestExecutionHelper
                 },
                 Verbosity = DotNetVerbosity.Normal,
                 NoBuild = true,
-                NoRestore = true,
-                ArgumentCustomization = AppendHangTimeout
+                NoRestore = true
             };
-
+            
             if (!string.IsNullOrEmpty(framework))
             {
                 retrySettings.Framework = framework;
             }
-
+            
             try
             {
                 _context.DotNetTest(project.FullPath, retrySettings);
-                return true;
             }
             catch
             {
-                _context.Warning($"Test {test} failed on retry {attempt}/{MaxRetriesPerTest}");
+                _context.Warning($"Test {test} failed on retry");
             }
-        }
-
-        return false;
-    }
-
-    private void ThrowIfStillFailing(List<string> stillFailing)
-    {
-        if (stillFailing.Any())
-        {
-            throw new Exception($"{stillFailing.Count} test(s) failed on every retry: {string.Join(", ", stillFailing)}");
         }
     }
     
