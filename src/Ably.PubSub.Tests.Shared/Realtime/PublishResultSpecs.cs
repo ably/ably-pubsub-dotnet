@@ -92,8 +92,9 @@ namespace Ably.PubSub.Tests.Realtime
             client.FakeProtocolMessageReceived(Ack(1, 1, Serials("s2")));
             client.FakeProtocolMessageReceived(Ack(0, 1, Serials("s1")));
 
-            // The first ACK, with msgSerial 1, also implicitly acknowledges serial 0 (no result for it).
-            (await first).IsSuccess.Should().BeTrue();
+            // The first ACK, with msgSerial 1, skips past serial 0, which therefore fails; the later ACK
+            // for serial 0 relates to a message that is no longer pending and is ignored.
+            (await first).IsFailure.Should().BeTrue();
             (await second).Value.Serials.Should().Equal("s2");
         }
 
@@ -172,7 +173,7 @@ namespace Ably.PubSub.Tests.Realtime
 
         [Fact]
         [Trait("spec", "RTL6j")]
-        public async Task PublishAsync_WhenAnEarlierPublishIsAckedBySerialBeforeTheAckRange_ShouldSucceedWithANullValue()
+        public async Task PublishAsync_WhenAnEarlierPublishLiesBelowTheAckRange_ShouldFailWithTheUnknownError()
         {
             var (client, channel) = await GetAttachedChannel();
 
@@ -181,12 +182,12 @@ namespace Ably.PubSub.Tests.Realtime
             var second = channel.PublishAsync("two", "2");
             await client.ProcessCommands();
 
-            // msgSerial 1 acknowledges serial 0 as well, but serial 0 lies before the range res describes.
+            // The ACK covers only serial 1; serial 0 lies below its range, so it counts as NACKed.
             client.FakeProtocolMessageReceived(Ack(1, 1, Serials("s2")));
 
             var firstResult = await first;
-            firstResult.IsSuccess.Should().BeTrue();
-            firstResult.Value.Should().BeNull();
+            firstResult.IsFailure.Should().BeTrue();
+            firstResult.Error.Code.Should().Be(ErrorInfo.ReasonUnknown.Code);
             (await second).Value.Serials.Should().Equal("s2");
         }
 

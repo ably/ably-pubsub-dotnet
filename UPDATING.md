@@ -113,6 +113,8 @@ Publishing now reports what the service did with the messages. Typical callers o
 
 **Behaviour change:** HTTP `PATCH` requests now send their request body. In 1.x the body of a `PATCH` was silently dropped, which affected the push device-registration update (`PATCH /push/deviceRegistrations/:id`, which now sends its `{"push":{"recipient":...}}` body) and any `PATCH` made through `PubSubHttpClient.RequestV2("PATCH", path, ..., body)`, whose body is now sent. If you worked around the missing body, remove the workaround.
 
+**Behaviour change:** a realtime publish whose serial falls below the range of a later `ACK` now completes as a failure (error code 50000) instead of silently succeeding. An `ACK` covers only `msgSerial` to `msgSerial + count - 1`, and the protocol treats skipped messages as not acknowledged; java and cocoa behave the same way. Entries inside the range are unaffected.
+
 New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message updates and deletes enabled:
 
 | API | Notes |

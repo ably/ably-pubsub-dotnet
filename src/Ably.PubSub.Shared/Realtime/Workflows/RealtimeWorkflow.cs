@@ -1359,14 +1359,24 @@ namespace Ably.PubSub.Realtime.Workflow
                     {
                         if (message.Action == ProtocolMessage.MessageAction.Ack)
                         {
-                            // TR4s / RTL6j: res holds one PublishResult per acknowledged protocol message,
-                            // in order, so this entry's result sits at its offset from the ACK's msgSerial.
-                            // It is null when the server sent no (or too short a) res, e.g. a pre-v5 server.
-                            var index = current.Serial - message.MsgSerial;
-                            var publishResult = message.Res != null && index >= 0 && index < message.Res.Length
-                                ? message.Res[index]
-                                : null;
-                            current.SafeExecute(publishResult, null);
+                            if (current.Serial < message.MsgSerial)
+                            {
+                                // An ACK covers only msgSerial..msgSerial+count-1; a pending message below that
+                                // range was skipped, so it counts as NACKed (protocol.md "Message acknowledgement
+                                // protocol"). Like java and cocoa, fail it with the ACK's error, else an unknown error.
+                                current.SafeExecute(null, message.Error ?? ErrorInfo.ReasonUnknown);
+                            }
+                            else
+                            {
+                                // TR4s / RTL6j: res holds one PublishResult per acknowledged protocol message,
+                                // in order, so this entry's result sits at its offset from the ACK's msgSerial.
+                                // It is null when the server sent no (or too short a) res, e.g. a pre-v5 server.
+                                var index = current.Serial - message.MsgSerial;
+                                var publishResult = message.Res != null && index < message.Res.Length
+                                    ? message.Res[index]
+                                    : null;
+                                current.SafeExecute(publishResult, null);
+                            }
                         }
                         else
                         {
