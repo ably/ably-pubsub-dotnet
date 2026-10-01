@@ -21,6 +21,7 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 - Update, delete and append messages by serial: `UpdateMessageAsync`, `DeleteMessageAsync` and `AppendMessageAsync` on `IHttpChannel` (RSL15, returning `Task<UpdateDeleteResult>`) and on `IRealtimeChannel` (RTL32, returning `Task<Result<UpdateDeleteResult>>`), with the new `MessageOperation` and `UpdateDeleteResult` types.
 - Retrieve a message by serial and all of its versions (`GetMessageAsync`, `GetMessageVersionsAsync`), and publish, delete, retrieve and subscribe to message annotations (`Annotations`). `Message` gains `Serial`, `Version`, `Action` and `Annotations`.
 - Declares wire protocol version 6 (was 2): the realtime `v` transport param and the REST `X-Ably-Version` header now send `6` (CSV2). The `/stats` endpoint stays pinned to the v2 response format.
+- `Request()`/`RequestV2()` callers that send no `X-Ably-Version` header now receive protocol-6 response shapes (for example, `GET /channels` returns channel names, and a batch `POST /messages` returns a single results envelope). Pass the `X-Ably-Version` header to pin a version.
 
 **Notes**
 
