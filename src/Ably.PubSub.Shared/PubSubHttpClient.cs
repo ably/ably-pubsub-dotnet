@@ -438,6 +438,12 @@ namespace Ably.PubSub
             return new AblyRequest(path, HttpMethod.Post, Protocol) { ChannelOptions = options };
         }
 
+        // HttpMethod.Patch does not exist on netstandard2.0, so the method is created from its name.
+        internal AblyRequest CreatePatchRequest(string path, ChannelOptions options = null)
+        {
+            return new AblyRequest(path, new HttpMethod("PATCH"), Protocol) { ChannelOptions = options };
+        }
+
         /// <summary>
         /// Makes an Http request to check whether there is connectivity to ably.
         /// If Option.SkipInternetCheck is set to true, the method always returns 'true'.

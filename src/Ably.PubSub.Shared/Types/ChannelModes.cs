@@ -37,6 +37,16 @@ namespace Ably.PubSub
         /// AnnotationSubscribe mode (TR3x). Allows the attached channel to subscribe to annotations. Experimental.
         /// </summary>
         AnnotationSubscribe,
+
+        /// <summary>
+        /// ObjectSubscribe mode (TR3y). Allows the attached channel to subscribe to object messages.
+        /// </summary>
+        ObjectSubscribe,
+
+        /// <summary>
+        /// ObjectPublish mode (TR3z). Allows the attached channel to publish object messages.
+        /// </summary>
+        ObjectPublish,
     }
 
     /// <summary>

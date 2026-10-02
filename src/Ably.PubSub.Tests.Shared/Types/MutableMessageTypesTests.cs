@@ -1,0 +1,156 @@
+using System;
+using System.Collections.Generic;
+using Ably.PubSub.Types;
+using FluentAssertions;
+using Newtonsoft.Json;
+using Xunit;
+
+namespace Ably.PubSub.Tests.Types
+{
+    public class MutableMessageTypesTests
+    {
+        [Fact]
+        [Trait("spec", "MOP2a")]
+        [Trait("spec", "MOP2b")]
+        [Trait("spec", "MOP2c")]
+        public void MessageOperation_ShouldHoldClientIdDescriptionAndMetadata()
+        {
+            var operation = new MessageOperation
+            {
+                ClientId = "user1",
+                Description = "fixed typo",
+                Metadata = new Dictionary<string, string> { { "reason", "typo" } },
+            };
+
+            operation.ClientId.Should().Be("user1");
+            operation.Description.Should().Be("fixed typo");
+            operation.Metadata.Should().Contain("reason", "typo");
+        }
+
+        [Fact]
+        [Trait("spec", "UDR2a")]
+        public void UpdateDeleteResult_ShouldHoldTheVersionSerial()
+        {
+            new UpdateDeleteResult("vs1").VersionSerial.Should().Be("vs1");
+            new UpdateDeleteResult(null).VersionSerial.Should().BeNull();
+            new UpdateDeleteResult().VersionSerial.Should().BeNull();
+        }
+
+        [Fact]
+        [Trait("spec", "UDR2a")]
+        public void UpdateDeleteResult_ShouldDeserializeVersionSerialFromJson()
+        {
+            JsonConvert.DeserializeObject<UpdateDeleteResult>("{\"versionSerial\":\"vs1\",\"other\":1}").VersionSerial.Should().Be("vs1");
+            JsonConvert.DeserializeObject<UpdateDeleteResult>("{\"versionSerial\":null}").VersionSerial.Should().BeNull();
+        }
+
+        [Theory]
+        [InlineData(MessageAction.MessageUpdate)]
+        [InlineData(MessageAction.MessageDelete)]
+        [InlineData(MessageAction.MessageAppend)]
+        [Trait("spec", "RSL15c")]
+        [Trait("spec", "RTL32c")]
+        public void CreateEdit_ShouldReturnAFreshCopyWithoutMutatingTheOriginal(MessageAction action)
+        {
+            var extras = new MessageExtras();
+            var original = new Message("name", "data", "client", extras) { Serial = "s1", Id = "id1" };
+
+            var edit = Message.CreateEdit(original, null, action);
+
+            edit.Should().NotBeSameAs(original);
+            edit.Serial.Should().Be("s1");
+            edit.Action.Should().Be(action);
+            edit.Name.Should().Be("name");
+            edit.Data.Should().Be("data");
+            edit.ClientId.Should().Be("client");
+            edit.Id.Should().Be("id1");
+            edit.Extras.Should().BeSameAs(extras);
+            edit.Version.Should().BeNull();
+
+            original.Action.Should().BeNull();
+            original.Version.Should().BeNull();
+        }
+
+        [Fact]
+        [Trait("spec", "RSL15b")]
+        [Trait("spec", "RTL32b")]
+        public void CreateEdit_ShouldCarryEveryFieldOfTheUserSuppliedMessage()
+        {
+            var version = new MessageVersion { ClientId = "caller-version" };
+            var annotations = new MessageAnnotations();
+            var original = new Message("name", "data", "client", new MessageExtras())
+            {
+                Id = "id1",
+                ConnectionId = "conn",
+                ConnectionKey = "ck",
+                Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(1700000000000),
+                Encoding = "json",
+                Serial = "s1",
+                Version = version,
+                Annotations = annotations,
+            };
+
+            var edit = Message.CreateEdit(original, null, MessageAction.MessageUpdate);
+
+            edit.ConnectionId.Should().Be("conn");
+            edit.ConnectionKey.Should().Be("ck");
+            edit.Timestamp.Should().Be(original.Timestamp);
+            edit.Encoding.Should().Be("json");
+            edit.Annotations.Should().BeSameAs(annotations);
+            edit.Version.Should().BeSameAs(version);
+
+            var withOperation = Message.CreateEdit(original, new MessageOperation { ClientId = "op" }, MessageAction.MessageUpdate);
+            withOperation.Version.ClientId.Should().Be("op");
+            original.Version.Should().BeSameAs(version);
+        }
+
+        [Fact]
+        [Trait("spec", "RSL15b")]
+        [Trait("spec", "RTL32b")]
+        public void CreateEdit_ShouldSerializeTheVersionAsAnObject()
+        {
+            var withOperation = Message.CreateEdit(new Message { Serial = "s1", Data = "x" }, new MessageOperation { ClientId = "op", Description = "d" }, MessageAction.MessageUpdate);
+            var callerVersion = Message.CreateEdit(new Message { Serial = "s1", Data = "x", Version = new MessageVersion { ClientId = "caller" } }, null, MessageAction.MessageUpdate);
+
+            var fromOperation = Newtonsoft.Json.Linq.JObject.Parse(JsonHelper.Serialize(withOperation));
+            var fromCaller = Newtonsoft.Json.Linq.JObject.Parse(JsonHelper.Serialize(callerVersion));
+
+            fromOperation["version"].Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Object);
+            fromOperation["version"]["clientId"].ToString().Should().Be("op");
+            fromCaller["version"].Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Object);
+            fromCaller["version"]["clientId"].ToString().Should().Be("caller");
+        }
+
+        [Fact]
+        [Trait("spec", "RSL15b7")]
+        [Trait("spec", "RTL32b2")]
+        public void CreateEdit_WithOperation_ShouldSetTheVersionFromTheOperation()
+        {
+            var operation = new MessageOperation
+            {
+                ClientId = "user1",
+                Description = "desc",
+                Metadata = new Dictionary<string, string> { { "k", "v" } },
+            };
+
+            var edit = Message.CreateEdit(new Message { Serial = "s1", Data = "x" }, operation, MessageAction.MessageUpdate);
+
+            edit.Version.ClientId.Should().Be("user1");
+            edit.Version.Description.Should().Be("desc");
+            edit.Version.Metadata.Should().Contain("k", "v");
+            edit.Version.Metadata.Should().NotBeSameAs(operation.Metadata);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [Trait("spec", "RSL15a")]
+        [Trait("spec", "RTL32a")]
+        public void CreateEdit_WithoutSerial_ShouldThrow40003(string serial)
+        {
+            var ex = Assert.Throws<AblyException>(() => Message.CreateEdit(new Message { Serial = serial }, null, MessageAction.MessageDelete));
+            ex.ErrorInfo.Code.Should().Be(40003);
+            ex.ErrorInfo.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        }
+    }
+}
