@@ -103,6 +103,22 @@ RTL6j tests that do not.
 
 ---
 
+## Integration tier
+
+| Spec file | Tests | Status | Absent API |
+|---|---|---|---|
+| `realtime/integration/mutable_messages_test.md` | 8 | fully blocked | the mutation and annotation surface; two of the eight cannot even construct their channel, since `ChannelMode` has no annotation variants |
+| `rest/integration/mutable_messages.md` | 8 | fully blocked | as above, **plus** the `mutable:` namespace is not provisioned in the vendored app setup |
+| `rest/integration/revoke_tokens.md` | 4 | fully blocked | `Auth#revokeTokens` |
+| `rest/integration/batch_presence.md` | 3 | fully blocked | `RestClient#batchPresence` |
+| `rest/integration/publish.md` | 5 | 2 skipped | `RSL1n` asserts on `PublishResult.serials`; `RSL1l1` needs a publish `params` overload to send `_forceNack` |
+
+`rest/integration/batch_presence.md` is the cheapest of these to unblock: everything around it
+already works — realtime connect, attach, `EnterClientAsync`, and `keys[2]` with the `channel6`
+capability the spec needs. The gap is one client method and three result types.
+
+---
+
 ## The REC endpoint model is not implemented
 
 This one was not on the inherited list and is the largest single finding of the translation work.
@@ -222,6 +238,10 @@ Found while deriving; each is a bug in the spec rather than in this SDK.
    (line 966), has no `**Test ID**`.
 3. `rest/unit/rest_client.md` — "Additional Test - Token auth over HTTP allowed" (line 571) has no
    `**Test ID**`.
-4. `rest/unit/encoding/message_encoding.md` — `RSL4/encoding-fixtures-ably-common-0` branches on
+4. `rest/integration/revoke_tokens.md` contradicts itself on who computes the result counts: its
+   header says the server supplies `successCount` / `failureCount` and that "no client-side
+   computation is needed" (lines 41-44), while its RSA17c row says the SDK computes them
+   client-side (line 89). This changes what an implementation must do.
+5. `rest/unit/encoding/message_encoding.md` — `RSL4/encoding-fixtures-ably-common-0` branches on
    `fixture.use_binary_protocol`, but the real `common/test-resources/messages-encoding.json` has
    no such field and uses different field names entirely, so that branch can never be taken.

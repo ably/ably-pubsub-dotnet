@@ -410,6 +410,31 @@ Two cautions for that issue:
   grants no such concession. Worth one sentence upstream either way. Unlike REC1c1, nothing in the
   repo pins the non-compliant direction.
 
+### D10 — `request()` does not renew a token on a token error
+
+**Spec point:** RSC10. **Test:** `Rest.Integration.AuthTests.RSC10_TokenRenewalExpiredJwt`.
+Measured against the live sandbox.
+
+**Spec:** RSC10 — when a REST request fails with a token error (40140-40149) the client renews the
+token and retries. The spec drives this through `client.request(...)`.
+
+**SDK:** the renewal branch lives in `PubSubHttpClient.ExecuteRequest`'s `catch (AblyException)`
+(`PubSubHttpClient.cs:208-231`), so it only fires when the 401 is *thrown*. `Request()` goes through
+`HttpPaginatedRequestInternal`, which sets `NoExceptionOnHttpError` (`PubSubHttpClient.cs:306`), and
+`AblyHttpRequester.Execute` then **returns** the error response instead of throwing
+(`AblyHttpRequester.cs:141`). No renewal is attempted, the auth callback is invoked once, and the 401
+reaches the caller.
+
+**Status:** open bug, and specifically a `Request()`-shaped hole — the renewal path *is* reachable
+from publish, history and stats, which do not set that flag. The spec chose `request()` as its
+vehicle.
+
+A second, independent reason a REST client cannot renew proactively, worth noting in the same issue:
+`TokenDetailsExtensions.IsValidToken` returns true whenever `serverTime` is null
+(`TokenDetails.cs:138-143`) and `AblyAuth.ServerNow` is null unless `QueryTime` is set, so an
+already-expired token is sent as-is; and a `TokenDetails` built from a bare token string has
+`Expires == DateTimeOffset.MinValue`, so `CanBeUsedToCheckExpiry` is false.
+
 ### D11 — a token whose `clientId` conflicts with `ClientOptions.clientId` is never rejected
 
 **Spec points:** RSA15a, RSA15c, and case 2 of RSA7's consistency table.
@@ -1586,3 +1611,31 @@ throw new AblyException(new ErrorInfo(
 `Connection.CanPublishMessages`, which is correct. Measured on a CLOSED connection with a channel
 that had never attached: "connection is in Initialized state". A one-word fix
 (`Connection.State`), but until then the diagnostic actively misleads.
+
+### N4 — the integration tier's three groups contend in one process
+
+Not an SDK defect and not a translation bug, but it shapes how the tier must be run. There are
+three groups — the repo's own sandbox specs, the UTS REST integration tier, and the UTS realtime
+integration tier — and **no two of them can share a process**. Each is green alone:
+
+| Group | Alone |
+|---|---|
+| the repo's own sandbox specs (`tier!=realtime&tier!=uts-rest`) | 227 passed, 12 skipped, 6 failed, in 4 minutes |
+| `tier=uts-rest` | 58 passed, 1 skipped, 0 failed |
+| `tier=realtime` | 33 passed, 0 failed |
+
+Combined, the failures are always the same shape: "timed out waiting for Connected". Measured, UTS
+REST and UTS realtime together: every realtime test fails. Measured, the repo's own specs sharing
+a pass with UTS REST: **52 failures**, 10 of them in `ChannelSandboxSpecs` — the class that passes
+49/50 by itself. It is not ephemeral-port exhaustion (32 sockets in `TIME_WAIT` against a
+16384-port range), so it is contention on the shared sandbox app all three reach.
+
+`cake-build/tasks/test.cake` therefore runs the integration target as **three** passes in separate
+processes, split on the `tier` trait: `tier!=realtime&tier!=uts-rest`, then `tier=uts-rest`, then
+`tier=realtime`. Collapsing any two back together reintroduces the failures — and because CI runs
+this leg through `.WithRetry`, which exits 0 regardless, it would do so silently.
+
+The six that remain in the first pass are the repo's own residual sandbox flakiness, not
+contention: a different handful on each run, all of them token-renewal or presence-timing specs,
+none of them UTS. They are what the retry wrapper exists for. Splitting took that pass from 52
+failures in over forty minutes to 6 in four.
