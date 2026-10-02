@@ -161,6 +161,23 @@ ciphertext with the SDK's own cipher from the spec's key and plaintext, so it te
 about: that presence data is decrypted using the channel's cipher options. Upstream should
 regenerate the fixture.
 
+### S7 — RTN15h1's expected `errorReason.code` contradicts RSA4a2
+
+**Spec points:** RTN15h1, RSA4a2. **Test:** `ConnectionFailuresTests.RTN15h1_TokenErrorNoRenew`
+(passing, asserting the RSA4a2 code).
+
+The spec test asserts `errorReason.code == 40142` — the code the server put on the DISCONNECTED.
+RSA4a2 (features.md:190) says what the library must report instead: when a token or tokenDetails was
+used and there is no means to renew it, and the server responds with a token error, "the client
+library should indicate an error with error code **40171**, not retry the request and, in the case
+of the realtime library, transition the connection to the `FAILED` state". RTN15h1 itself requires
+only that the connection goes to FAILED and that `Connection#errorReason` "will be set" — it names
+no code.
+
+Measured: this SDK reports 40171 with status 401, which is the compliant answer. The derived test
+asserts that, with the spec's 40142 recorded here. Upstream should either drop the code assertion or
+change it to 40171.
+
 ---
 
 ## Failing Tests
@@ -594,6 +611,693 @@ asks for are present and correct, so `RSH1a_RejectsNullRecipient` passes.
 trip and the resulting error is a server 40000 about a malformed request rather than the local,
 immediate one the spec asks for.
 
+### D21 — the connection leaves FAILED on its own
+
+**Spec points:** RTN14g, RTN15h1, RTN15j, and every test that samples a property after FAILED.
+**Tests:** referenced by `ConnectionOpenFailuresTests`, `ConnectionFailuresTests` and
+`ErrorReasonTests`, which read the FAILED transition out of a recorder rather than from
+`Connection.State`.
+
+FAILED is a terminal state: RTN11b lists it among the states only an explicit `connect()` leaves,
+and nothing in RTN14/RTN15 reconnects from it. This SDK re-enters CONNECTING unprompted. Measured
+twice today, with `DisconnectedRetryTimeout` pushed to ten minutes so the ordinary retry timer
+cannot be the cause:
+
+- RTN15h1: `Connected -> Disconnected(80003) -> Failed(40171) -> Connecting -> Connected`
+- RTN15j: `Connected -> Disconnected(80003) -> Failed(50000) -> Connecting -> Connected`
+
+The consequence for testing is what makes it worth a numbered entry: because
+`RealtimeState.ConnectionData.UpdateState` reassigns `ErrorReason` on every transition and CONNECTING
+carries none, a test that reaches FAILED and then samples `Connection.State` or
+`Connection.ErrorReason` finds neither. Every affected derived test therefore reads the transition
+out of `UtsClients.RecordConnectionStateChanges`, which is also the shape `mock_websocket.md`
+prescribes.
+
+**It is not only a testing problem.** RSA4a2 says that a client with no means to renew its token
+"should ... not retry the request" when the server rejects it. The connection reaches FAILED
+correctly - `TokenExpiryNonRenewableTests.RSA4a2_TokenErrorNonRenewableFailed` passes, with 40171 -
+and then re-enters CONNECTING and tries again: three connection attempts measured where the spec
+requires one, with `DisconnectedRetryTimeout` at ten minutes so the ordinary retry timer is ruled
+out (`RSA4a2_TokenErrorNonRenewableNoRetry`, gated). A client holding a dead non-renewable token
+reconnects in a loop instead of stopping. The same re-entry also makes
+`RealtimeAuthorizeTests.RTC8c_AuthorizeFromFailedInitiatesConnection` untestable - by the time
+`authorize()` is called the connection has already recovered, so the test is no longer exercising
+RTC8c - and it is what stops RTC8a2's error reaching the caller (D24).
+
+**Likely mechanism, not isolated.** Both measured paths pass through a DISCONNECTED that qualifies
+for the RTN15a/RTN17j instant retry, which *queues* a `SetConnectingStateCommand`
+(`RealtimeWorkflow.cs:1022`); the token-error or ERROR handler then sets FAILED, and the already
+queued CONNECTING runs after it. If that is right, the fix is to drop queued reconnect work when a
+terminal state is entered. I have not confirmed it by instrumenting the command queue, so treat the
+mechanism as a lead and the measurements as the finding.
+
+### D22 — a fatal connection-level ERROR during CONNECTING goes to DISCONNECTED, not FAILED
+
+**Spec points:** RTN14g, RTN15c4.
+**Tests:** `ConnectionOpenFailuresTests.RTN14g_ErrorEmptyChannelFailed`,
+`ConnectionFailuresTests.RTN15c4_FatalErrorDuringResume` (both gated).
+
+**Spec:** RTN14g (features.md:577) is unconditional — an ERROR with an empty channel attribute, for
+any reason other than RTN14b, transitions the connection to FAILED. RTN15c4 says the same for an
+ERROR arriving on a resume attempt.
+
+**SDK:** `HandleConnectingErrorCommand` (`RealtimeWorkflow.cs:551-569`) conflates "retryable HTTP
+status" with "recoverable connection failure": any non-token error whose status is 500-504 goes to
+DISCONNECTED and is retried. Measured for both tests — a 50000/500 connection-level ERROR gives
+`Connecting -> Disconnected(50000) -> Connecting -> ...` and never reaches FAILED.
+
+**The gap is specific to CONNECTING, and that is now confirmed rather than assumed.** The same ERROR
+arriving while CONNECTED *does* reach FAILED: `ConnectionFailuresTests.RTN15j_ErrorEmptyChannelFailed`
+passes, measuring `Connected -> Disconnected(80003) -> Failed(50000)`. So RTN14g is implemented once
+and missing once, which narrows the fix to the CONNECTING handler.
+
+**Status:** open bug. The 500-504 branch should not apply to an ERROR that carries no channel.
+
+### D23 — a token error on a resume opens one more transport than the spec expects
+
+**Spec point:** RTN15c5. **Test:**
+`ConnectionFailuresTests.RTN15c5_TokenErrorDuringResumeAttemptCount` (gated).
+
+The substance of RTN15c5 is met and is asserted by the passing
+`RTN15c5_TokenErrorDuringResume`: the token error on the resume attempt is routed to renewal
+(`RealtimeWorkflow.cs:554` sends any token error during CONNECTING to
+`HandleConnectingTokenErrorCommand`), exactly one new token is obtained, and the connection returns
+to CONNECTED. Only the attempt count is wrong — four transports where the spec expects three.
+
+Measured: `Connected -> Disconnected(80003) -> Connecting -> Disconnected(50000) -> Connecting ->
+Connected -> Connected`, four connection attempts, two token requests. The trailing
+`Connected -> Connected` is a second CONNECTED arriving on a second transport, which is what gives
+it away.
+
+**Status:** worth filing, low severity — a redundant connection attempt, not a wrong outcome. Kept
+separate from D22 because the renewal path taken here is the correct one, so this is not the same
+mis-routing; `HandleConnectingTokenErrorCommand` calls `AttemptANewConnection()` directly
+(`RealtimeWorkflow.cs:509`) while the DISCONNECTED it passes through may also queue one, which would
+explain it, but I have not isolated which of the two opens the extra transport.
+
+### D24 — a FAILED state change during `authorize()` is never delivered to listeners
+
+**Spec point:** RTC8a2. **Test:** `RealtimeAuthorizeTests.RTC8a2_FailedReauthFailsConnection`
+(gated).
+
+This is the most consequential finding in the realtime auth area, because the state change is not
+merely late — it is **lost**.
+
+**Spec:** RTC8a2 — if the reauth fails, `authorize()` fails with the error and the connection
+transitions to FAILED with that error as its `errorReason`.
+
+**Measured:** the SDK's own debug log records `Changing state from Disconnected => Failed` and
+`Updating state to \`Failed\``, and the *next* transition reports `Failed -> Connecting` — so the
+state really did become FAILED. But a listener armed **before** the reauth and given five seconds
+never fires, and a recorder attached beforehand shows `Connected -> Disconnected(80003)` followed by
+`Failed -> Connecting` with no `-> Failed` in between. `authorize()` also returns a token rather
+than failing.
+
+**Mechanism, and this one is nailed down:**
+
+1. `ConnectionChangeAwaiter.Wait` builds its `TaskCompletionSource` with no
+   `TaskCreationOptions.RunContinuationsAsynchronously` (`ConnectionChangeAwaiter.cs:28`) and
+   completes it from an `InternalStateChanged` handler, so the awaiting continuation runs
+   **synchronously, inline**.
+2. That continuation is `ConnectionManager.OnAuthUpdated`'s wait loop, which for a failed state does
+   `throw new AblyException(Connection.ErrorReason)` (`ConnectionManager.cs:213`).
+3. `Connection.NotifyUpdate` calls `internalHandlers(this, stateChange)` **unguarded**
+   (`Connection.cs:306`) and only wraps the *external* handlers in a try/catch two lines later.
+
+So the throw unwinds `NotifyUpdate` before `RealtimeClient.NotifyExternalClients` on the next line
+ever runs, and the application is never told the connection failed.
+
+**Status:** open bug, and worth more than its single spec point. Any library-internal
+`InternalStateChanged` handler that throws silently suppresses a state change the application is
+relying on. Two independent fixes, either of which closes it: give the `TaskCompletionSource`
+`RunContinuationsAsynchronously` so the continuation cannot run inside the emit, and guard
+`internalHandlers` in `NotifyUpdate` the way the external handlers already are. Both are worth doing.
+
+A third, smaller bug sits on the same line: `ChangeListener` calls `SetResult` rather than
+`TrySetResult`, so a second transition arriving before the `-=` in the `finally` would throw
+`InvalidOperationException` into the emit path as well.
+
+### D25 — `authorize()` while CONNECTING neither halts nor restarts the attempt
+
+**Spec points:** RTC8b, RTC8b1.
+**Tests:** `RealtimeAuthorizeTests.RTC8b_AuthorizeWhileConnectingHaltsAttempt`,
+`RTC8b1_AuthorizeWhileConnectingFailsOnFailed` (both gated).
+
+**Spec:** RTC8b — `authorize()` on a CONNECTING connection halts the attempt in flight and, once the
+new token is in hand, immediately starts a new attempt with it. RTC8b1 — if that new attempt ends in
+FAILED, `authorize()` fails with the error.
+
+**SDK:** the token is obtained and then dropped on the floor.
+`ConnectionManager.OnAuthUpdated` takes its `Connection.State != Connected` branch and issues
+`Connect()`, and `ConnectionConnectingState.Connect()` returns `EmptyCommand.Instance`
+(`ConnectionConnectingState.cs:29-32`) — correct for an ordinary duplicate `connect()` call, wrong
+here, because the existing attempt is using the *old* token. Measured: the connection stays
+CONNECTING and no second transport is opened. RTC8b1 then fails for the same reason — the attempt
+never fails, so there is nothing to report.
+
+**Status:** open bug. The practical effect is that a `authorize()` issued during a slow connect is a
+no-op: the attempt completes with the token it started with, and the caller's new token is only used
+on some later reconnect.
+
+### D26 — a 403 from `authCallback` during a reauth does not fail the connection
+
+**Spec point:** RSA4d.
+**Tests:** `AuthCallbackErrorsTests.RSA4d_Callback403ReauthFailed`,
+`ConnectionAuthTests.RSA4d_Callback403ReauthCausesFailed` (both gated).
+
+**Spec:** RSA4d is not conditional on connection state — an `authCallback` that produces an
+`ErrorInfo` with statusCode 403 transitions the connection to FAILED. It is the one case that
+overrides RSA4c3's "a failed reauth while connected changes nothing".
+
+**SDK:** no distinction is made. Measured: a 403 from the callback during an RTN22 server-initiated
+reauth is swallowed exactly like any other reauth failure and the connection stays CONNECTED. The
+non-403 half is handled correctly — `AuthCallbackErrorsTests.RSA4c3_CallbackErrorConnectedStays`
+passes, including its assertion that *no* state change at all is emitted — and a 403 at
+connect time is handled correctly too (`RSA4d_Callback403ConnectingFailed` passes). The gap is
+specifically a 403 arriving while CONNECTED.
+
+**Status:** open bug. A client whose credentials have been revoked keeps running on its old token
+until it expires, where the spec wants it to fail fast.
+
+### D27 — REST auth-callback failures report 80019 instead of 40170, and the invalid-type status is 400
+
+**Spec points:** RSA4e, RSA4c2 (via RSA4f).
+**Tests:** `AuthCallbackErrorsTests.RSA4e_RestCallbackError40170`,
+`AuthCallbackErrorsTests.RSA4f_CallbackInvalidTypeFormat` (both gated).
+
+Two small pieces of wrong error metadata on the same code path.
+
+**RSA4e** requires a REST request whose `authCallback` fails to "result in an error with code
+**40170**, statusCode 401". Measured: code 80019, status Unauthorized, cause code 0, message "Error
+calling AuthCallback, token request failed.". 80019 is the code RSA4c1 specifies for the *realtime*
+case, and one shared wrapper in `AblyAuth.RequestTokenAsync` serves both, always raising
+`ErrorCodes.ClientAuthProviderRequestFailed`. The SDK already knows about 40170 —
+`ErrorCodes.ClientCallbackError` — and uses it for the inner null/timeout case
+(`AblyAuth.cs:326-328`), so what is missing is a REST/realtime split at the outer wrapper.
+
+**RSA4c2** requires "code 80019, statusCode 401" for an invalid token format. The code is right and
+the connection does reach DISCONNECTED; only the status is wrong, because the
+unsupported-callback-type branch raises it with `HttpStatusCode.BadRequest` (`AblyAuth.cs:343-347`),
+giving 400.
+
+**Status:** both open, both small. Worth one issue between them.
+
+### D28 — `presence.get()` does not wait for the implicit attach it starts
+
+**Spec points:** RTP11e, RTL33b (RTP11b in the spec file's numbering).
+**Test:** `RealtimePresenceGetTests.RTP11b_GetImplicitlyAttaches` (gated).
+
+**Spec:** RTP11b has been replaced by RTP11e (features.md:937), which requires `get()` to run the
+*ensure-active-channel* procedure, RTL33. For a channel in INITIALIZED, RTL33b is unambiguous:
+"perform an implicit attach per RTL4 **and wait for it to complete**", and RTL33b1 says the
+procedure rejects with whatever error the attach failed on.
+
+**SDK:** the attach is started and not awaited. Measured: with the channel in INITIALIZED,
+`get(waitForSync: false)` resolved while the channel was still ATTACHING.
+
+**Status:** open bug, and a narrow one - the attach does happen, so the member list arrives a beat
+later rather than never. Worth filing because the caller cannot tell the difference between "no
+members" and "not attached yet", which is exactly what RTL33b exists to prevent. Note also that the
+rest of the RTP11e family is newer than this SDK: RTP11f's `strictMode` and its 91008 have no
+counterpart here either, though no spec test in this file reaches them.
+
+**A second RTL33b case, found while translating RTP5a.** RTL33b lists DETACHED alongside
+INITIALIZED as a state that should trigger an implicit attach; this SDK raises 90001 "Invalid
+channel state (Detached)" from `get()` instead. There is no UTS test that calls `get()` on a
+detached channel directly — `realtime/unit/RTP5a/detached-clears-presence-maps-0` does so only as
+its way of reading the map, and its derived test reads the map directly instead so it stays about
+RTP5a. Recorded here so the RTL33b fix covers both states.
+
+### D29 — the presence map never marks a member ABSENT, so a LEAVE during a sync deletes it
+
+**Spec points:** RTP2h, RTP2h2, RTP2h2a, RTP2h2b.
+**Tests:** `PresenceMapTests.RTP2h2a_LeaveDuringSyncStoresAbsent`,
+`PresenceMapTests.RTP2_ValuesExcludesAbsent` (both gated).
+
+**Spec:** RTP2h2 splits on whether a sync is running. RTP2h2a: if one is, "the incoming message must
+be stored in the presence map with the action set to `ABSENT`". RTP2h2b: "when the `SYNC` completes,
+then all `ABSENT` members in the presence map must be deleted". The ABSENT marker is what stops a
+later SYNC message in the same sequence resurrecting a member that has just left.
+
+**SDK:** `PresenceMap.Remove` (`PresenceMap.cs:118`) has no sync check at all — it deletes the entry
+and returns. Nothing anywhere in the SDK ever writes `PresenceAction.Absent` into the map; the only
+three references to it are the two places that *read* it. Which means the two halves that are
+implemented correctly are both dead code:
+
+- `Values` filters ABSENT members out (`PresenceMap.cs:77`) — nothing to filter.
+- `EndSync` deletes ABSENT members (`PresenceMap.cs:174`) — nothing to delete.
+
+**Status:** open bug. The failure it allows is specific: a member who leaves part-way through a
+presence sync is deleted, and if an earlier-generated SYNC message in the same sequence still lists
+them as PRESENT, `Put` puts them back — the newness check does not help, because the SYNC entry can
+legitimately carry a higher `msgSerial` than the LEAVE. The member then stays in the map until the
+next sync. RTP19's before-sync bookkeeping does not cover it either, since that only removes members
+the sync never mentioned.
+
+### D30 — `PresenceMap.Remove` reports a removal that did not happen
+
+**Spec point:** RTP2h. **Test:** `PresenceMapTests.RTP2h1_LeaveNonexistentReturnsNull` (gated).
+
+RTP2h opens "if and only if there is a member with a matching `memberKey` currently in the presence
+map", so a LEAVE for an unknown member must do nothing and emit nothing.
+
+`PresenceMap.Remove` (`PresenceMap.cs:118`) returns `true`. With no existing entry the newness check
+is skipped, `TryRemove` quietly does nothing, the `existingItem?.Action == Absent` guard is false on
+a null, and the method falls through to `return true`. Measured.
+
+**Status:** open bug, and the cheapest fix in this file — the `TryGetValue` result is already in
+hand. The user-visible effect is a spurious LEAVE event for a member the client never saw join.
+
+### D31 — `PresenceMap.Clear` leaves the sync flag set
+
+**Spec point:** RTP2 (the spec file's `clear-resets-state-3`).
+**Test:** `PresenceMapTests.RTP2_ClearResetsState` (gated).
+
+The spec's clear() test asserts `values()` is empty, the member is gone, **and**
+`isSyncInProgress == false`. `PresenceMap.Clear` (`PresenceMap.cs:214`) empties `_members` and
+`_beforeSyncMembers` and does not touch `SyncInProgress`, so a map cleared mid-sync still believes a
+sync is running — which is what `get()` waits on.
+
+**Status:** open bug, two lines. Grouped with D29 and D30 as one PresenceMap tidy-up.
+
+### D32 — automatic presence re-entry is queued and never sent
+
+**Spec points:** RTP17e, RTP17f, RTP17g, RTP17g1, RTP17i.
+**Tests:** `RealtimePresenceReentryTests.RTP17i_AutoReentryOnAttached`,
+`RTP17g_ReentryPublishesEnterWithStoredData`,
+`RTP17g1_ReentryOmitsIdWhenConnectionIdChanged`,
+`RTP17e_FailedReentryEmitsUpdateWithError` (all gated).
+
+Four spec tests, one cause, and it is a three-line ordering mistake with a large consequence.
+
+**Spec:** RTP17f/RTP17i — on receiving an ATTACHED that is not a RESUMED re-attach, the client must
+re-enter every member it holds in its internal presence map, because the server has forgotten them.
+
+**SDK:** the machinery is all there and correct — the internal map is maintained (`RTP17b`), it
+survives a reconnect, and `EnterMembersFromInternalPresenceMap` (`Presence.cs:650`) builds exactly
+the right ENTER for each member. The messages just never go out. `Presence.ChannelAttached`
+(`Presence.cs:731-748`) runs in this order:
+
+1. `StartSync()`
+2. `EndSync()` if the ATTACHED carried no HAS_PRESENCE
+3. `SendQueuedMessages()` — flushes the pending presence queue
+4. `EnterMembersFromInternalPresenceMap()` — the re-entries
+
+and it is called from `ChannelMessageProcessor` (`ChannelMessageProcessor.cs:82-83`) *before*
+`SetChannelState(ChannelState.Attached)`. So at step 4 the channel is still ATTACHING, and
+`UpdatePresence`'s ATTACHING branch (`Presence.cs:491-493`) enqueues each re-entry per RTP16b — into
+the queue that was flushed one step earlier. Nothing flushes it again until the *next* attach.
+
+**Measured.** With the member confirmed in the internal map (`internal=1`) and the channel going
+`Attaching -> Attached` on the reconnect, no presence message reached the transport in half a
+second, and none had arrived by the five-second deadline.
+
+**Status:** open bug, and the most user-visible one in the presence area. After any non-resumed
+reconnection — which is every reconnection that fails to resume — the client believes it is present
+on the channel and the server does not, with no error raised anywhere. The fix is to enqueue the
+re-entries before the flush, or to flush again after the state has moved to ATTACHED.
+
+Worth knowing when reading the tests: while this stands,
+`RTP17i_NoReentryWithResumedFlag` cannot fail, because nothing is ever re-entered. It is kept as
+written rather than deleted — it is a correct assertion that starts doing real work the moment this
+is fixed — but it should not be read as evidence that the RESUMED branch works.
+
+### D33 — presence operations put the clientId on the wire where the spec forbids it
+
+**Spec points:** RTP8c, RTP9d, RTP10c.
+**Tests:** `RealtimePresenceEnterTests.RTP8a_EnterSendsPresenceEnter`,
+`RTP9a_UpdateSendsPresenceUpdate`, `RTP10a_LeaveSendsPresenceLeave` (all gated).
+
+All three clauses say the same thing in the same words. RTP8c (features.md:910): "A `PRESENCE
+ProtocolMessage` with a `PresenceMessage` with the action `ENTER` is sent to the Ably service. The
+`clientId` attribute of the `PresenceMessage` **must not be present**. Entering without an explicit
+`PresenceMessage#clientId`, implicitly uses the `clientId` for the current connection." RTP9d and
+RTP10c repeat it for UPDATE and LEAVE.
+
+**SDK:** `Presence.EnterAsync` is `EnterClientAsync(_clientId, data)` (`Presence.cs:307`), and
+`Update`/`Leave` do the same, so the connection's own clientId is written into the message. Measured
+on the wire: `clientId: "my-client"` on all three.
+
+**Status:** open bug, low severity but easy. The server derives the identity from the connection
+anyway, so nothing breaks; it is redundant bytes on every presence operation and a divergence from
+what the spec says the frame looks like. The fix is to pass null for the self-operations and keep
+the explicit clientId only on the `*Client` variants, which already work correctly and are covered
+by the passing RTP14a/RTP15a tests.
+
+### D34 — an anonymous client's `enter()` is sent rather than refused
+
+**Spec point:** RTP8j. **Test:** `RealtimePresenceEnterTests.RTP8j_EnterWithNoClientIdErrors`
+(gated).
+
+RTP8j (features.md:914-917) says that when `RealtimeClient#clientId` is `'*'` or `null` — "the
+client is anonymous and is not permitted to associate a client identifier with the operations it
+performs" — then "the `enter` request results in an error immediately".
+
+This SDK sends it. `EnterAsync` passes its own empty `_clientId` through with no check, and the
+request goes to the service, which refuses it under RTP8i. So the outcome is right and the place is
+wrong: a round trip and a NACK instead of a local failure.
+
+The wildcard half of RTP8j cannot arise here at all — `ClientOptions.ClientId` throws for `"*"`
+(`ClientOptions.cs:42-48`), which the derived
+`RTP8j_WildcardClientIdIsRejectedAtConstruction` asserts and which passes.
+
+**Status:** open bug, low severity.
+
+### D35 — a pending channel retry cannot be cancelled and ignores the channel's state
+
+**Spec point:** RTL14. **Test:** `ChannelErrorTests.RTL14_CancelsPendingChannelRetryTimer` (gated).
+
+**Spec:** RTL14 — a channel-scoped ERROR fails the channel, and the spec test that goes with it
+checks that a channel retry already armed is cancelled rather than allowed to fire.
+
+**SDK:** there is nothing to cancel. `RealtimeChannel.ReattachAfterTimeout`
+(`RealtimeChannel.cs:785-804`) schedules the retry as a detached
+`Task.Run(async () => { await Task.Delay(retryTimeout); ... })` and keeps no handle on it - no
+`CountdownTimer`, no `CancellationToken` - so no later transition can stop it. Its only guard
+before reattaching is `Connection.State == ConnectionState.Connected`; the channel's own state is
+never consulted.
+
+Measured: with `ChannelRetryTimeout` at 200ms, the channel reached FAILED on the ERROR and was back
+in SUSPENDED a second later, having been reattached out of a terminal state.
+
+**Status:** open bug. RTL13c's "only retry if the connection is connected" is implemented and the
+channel half of the same question is missing, which is a small fix - check the channel state too,
+and keep a handle so the transition can abort it.
+
+Worth checking in the same pass, though I have not tested it: the same unguarded retry would
+reattach a channel the application explicitly detached while the timer was armed, since DETACHED is
+no more consulted than FAILED is.
+
+### D36 — `attachSerial` is updated from a resumed ATTACHED
+
+**Spec point:** RTL15c. **Test:**
+`ChannelPropertiesTests.RTL15c_AttachSerialNotUpdatedWhenResumed` (gated).
+
+RTL15c (features.md:793) scopes the update precisely: `attachSerial` "is updated with the
+`channelSerial` from each `ATTACHED` `ProtocolMessage` received from Ably with a matching `channel`
+attribute **whose [RTL2f] `resumed` attribute is `false`**".
+
+`ChannelMessageProcessor.cs:59` assigns `channel.Properties.AttachSerial =
+protocolMessage.ChannelSerial` for every ATTACHED, with no resumed check - the comment next to it
+cites RTL15a rather than RTL15c. Measured: an unsolicited ATTACHED carrying the RESUMED flag moved
+`attachSerial` from `initial-serial` to `resumed-serial`.
+
+**Status:** open bug. `attachSerial` exists to anchor `untilAttach` queries, so moving it on a
+resumed re-attach means a later `untilAttach` history query starts from the wrong point and silently
+skips messages. The channel's own history has no `untilAttach` overload here (see coverage.md), but
+`Presence.HistoryAsync(query, untilAttach: true)` does, and it reads this field.
+
+### D37 — a server-initiated DETACHED routes through DETACHED, clearing `channelSerial`
+
+**Spec points:** RTL13a, RTL15b2. **Test:**
+`ChannelPropertiesTests.RTL15b2_ChannelSerialRetainedInSuspended` (gated).
+
+This one is worth reading carefully, because the clause that appears to be broken is implemented
+correctly. `RealtimeChannel.cs:692` clears `channelSerial` on DETACHED and FAILED only, and the
+comment above it quotes RTL15b2's "(Unlike previous spec versions, it must not clear it when
+entering the `SUSPENDED` state)". Nothing clears it on SUSPENDED.
+
+What breaks it is the route taken to get there. RTL13a: on a server-initiated DETACHED while
+ATTACHED, "an attempt to reattach the channel should be made immediately by sending a new `ATTACH`
+message and the channel **should transition to the `ATTACHING` state**". This SDK enters DETACHED
+first and reattaches from there, so the RTL15b2 clear fires on the way past. Measured state
+sequence from ATTACHED, with the reattach left unanswered so it times out:
+`Attaching, Detached, Suspended`, with `channelSerial` null on arrival.
+
+(The emitted order puts Attaching before Detached because the reattach is kicked off from inside the
+DETACHED state handler and emits before the outer transition does; the state is set to Detached
+either way, which is what matters here.)
+
+**Status:** open bug. The consequence is the one RTL15b2 was changed to prevent: a channel suspended
+by a failed reattach cannot resume from where it left off, because the serial it would resume from
+has been discarded. Fixing RTL13a's transition fixes RTL15b2 with it.
+
+### D38 — a connection going away takes its channels through DETACHING
+
+**Spec point:** RTL3b.
+**Tests:** `ChannelConnectionStateTests.RTL3b_ClosedConnectionDetachesAttachedChannel`,
+`RTL3b_ClosedConnectionDetachesAttachingChannel` (both gated).
+
+RTL3b (features.md:695): "If the connection state enters the `CLOSED` state, then an `ATTACHING` or
+`ATTACHED` channel state will **transition to** `DETACHED`". One transition, from the state the
+channel was in.
+
+`RealtimeChannel.DetachForConnectionGoingAway` (`RealtimeChannel.cs:252-261`) calls the ordinary
+`Detach(...)`, which sets DETACHING first and only then DETACHED. Measured: the DETACHED change
+arrives with `previous == Detaching` rather than Attached or Attaching, so a listener sees a
+DETACHING the application never asked for.
+
+That matters beyond the extra event, because RTL2's state model gives DETACHING a specific meaning —
+the client has explicitly requested a detach — which is exactly what did not happen here. Code that
+distinguishes "we are detaching because I asked" from "the connection went away" is misled.
+
+**Status:** open bug, same family as D37: the destination is right and the route invents a state.
+Both are the ordinary multi-step helper being reused where the spec describes a single transition.
+
+### D39 — `attach()` on a DETACHING channel does not wait for the detach
+
+**Spec point:** RTL4h. **Test:**
+`ChannelAttachTests.RTL4h_AttachWhileDetachingWaitsThenAttaches` (gated).
+
+RTL4h (features.md:704) covers both pending states in one sentence: "If the channel is in a pending
+state `DETACHING` or `ATTACHING`, do the attach operation **after the completion of the pending
+request**."
+
+The ATTACHING half is implemented - `RTL4h_AttachWhileAttachingWaitsForCompletion` passes, with the
+second `attach()` joining the first and only one ATTACH on the wire. The DETACHING half is not.
+Measured with the server holding the DETACH unanswered: `attach()` took the channel straight from
+DETACHING to ATTACHING and put a second ATTACH on the wire before the detach had completed.
+
+**Status:** open bug. The practical damage shows up when the server's DETACHED finally lands: the
+channel is in ATTACHING by then, so it is read as a server-initiated detach during an attach and
+RTL13b sends the channel to SUSPENDED. So an `attach()` racing a `detach()` ends suspended rather
+than attached, which is what the derived test records.
+
+### D40 — `detach()` on an ATTACHING channel is dropped
+
+**Spec point:** RTL5i. **Test:**
+`ChannelDetachTests.RTL5i_DetachWhileAttachingWaitsThenDetaches` (gated).
+
+RTL5i (features.md:723) is the mirror of RTL4h: "If the channel is in a pending state `DETACHING`
+or `ATTACHING`, do the detach operation after the completion of the pending request."
+
+The DETACHING half works - `RTL5i_DetachWhileDetachingWaitsForCompletion` passes, with the second
+detach joining the first and one DETACH on the wire. The ATTACHING half does nothing at all:
+measured, `detach()` issued while ATTACHING resolved with the channel still ATTACHING and **no
+DETACH ever sent**, even after the ATTACHED arrived. The caller is told the detach completed and
+the channel stays attached.
+
+**Status:** open bug, and read it with D39 - RTL4h's DETACHING half and RTL5i's ATTACHING half are
+the two cross-cases, and both are missing. Each spec point has one direction implemented and one
+not.
+
+### D41 — `detach()` on a SUSPENDED channel leaves it suspended
+
+**Spec point:** RTL5j. **Test:**
+`ChannelDetachTests.RTL5j_DetachFromSuspendedGoesToDetached` (gated).
+
+RTL5j (features.md:725) is one sentence with no conditions: "If the channel state is `SUSPENDED`,
+the `detach` request transitions the channel immediately to the `DETACHED` state."
+
+Measured: the channel stayed SUSPENDED. Nothing was sent, which is right, but the transition never
+happened.
+
+**Status:** open bug. A suspended channel is one the library keeps retrying (RTL13b), so a caller
+who detaches it to stop that retrying does not get what they asked for.
+
+### D42 — an ATTACHED arriving on a detaching or detached channel is ignored
+
+**Spec point:** RTL5k.
+**Tests:** `ChannelDetachTests.RTL5k_AttachedWhileDetachingSendsNewDetach`,
+`RTL5k_AttachedWhileDetachedSendsDetach` (both gated).
+
+RTL5k (features.md:731): "If the channel receives an `ATTACHED` message while in the `DETACHING` or
+`DETACHED` state, it should send a new `DETACH` message and remain in (or transition to) the
+`DETACHING` state."
+
+Neither case is handled. Measured:
+
+- **DETACHING**: with the server answering the DETACH with an ATTACHED instead of a DETACHED, the
+  client sent no further DETACH and the channel sat in DETACHING until the request timed out.
+- **DETACHED**: an unsolicited ATTACHED for an already-detached channel was ignored entirely, with
+  no second DETACH in five seconds.
+
+**Status:** open bug. RTL5k exists to settle precisely this disagreement — the server believes the
+channel is attached and the client does not — and without it the client silently stops receiving
+messages it is still subscribed to server-side, or hangs in DETACHING.
+
+### D43 — a server-initiated DETACHED emits a spurious, out-of-order DETACHED state change
+
+**Spec point:** RTL13, RTL13a, RTL13b.
+**Test:** `ChannelServerInitiatedDetachTests.RTL13_NoIntermediateDetachedStateChange` (gated).
+
+RTL13 (features.md:797-799) gives a server-initiated DETACHED exactly two destinations: ATTACHING
+if the channel was ATTACHED or SUSPENDED (RTL13a), SUSPENDED if it was already ATTACHING (RTL13b).
+DETACHED is not one of them — it is the state the spec reserves for a detach the client asked for.
+
+Measured on the RTL13a path, a listener sees three changes where the spec describes two:
+
+| # | Current | Previous |
+|---|---------|----------|
+| 1 | ATTACHING | DETACHED |
+| 2 | DETACHED | ATTACHED |
+| 3 | ATTACHED | ATTACHING |
+
+Not merely one change too many: the DETACHED arrives *after* the ATTACHING that claims to have come
+from it, so the emitted sequence is not a walk of the state machine in either order.
+
+The mechanism is an ordering bug in `SetChannelState` (RealtimeChannel.cs:641-671). It builds the
+`ChannelStateChange` at :660, then calls `HandleStateChange` at :661, and only emits at :663/:666.
+`HandleStateChange` assigns `State` (:698) and then, for DETACHED-from-ATTACHED, calls `Reattach`
+(:721) synchronously — so the nested `SetChannelState(Attaching)` runs to completion, emit
+included, before the outer DETACHED emit is reached.
+
+The RTL13b path has the same shape: ATTACHING to SUSPENDED goes via DETACHED, so the SUSPENDED
+change reports its previous state as DETACHED rather than ATTACHING.
+
+**Status:** open bug. The recovery itself is right - the ATTACH goes out, the retry loop runs, the
+channel ends up ATTACHED - so this is about what listeners are told, not about whether the channel
+recovers. It still matters: application code that treats DETACHED as "the server is done with this
+channel" acts on a channel that is already reattaching.
+
+### D44 — a message with no envelope id to inherit is given the id `":0"`
+
+**Spec point:** TM2a. **Test:** `MessageFieldPopulationTests.TM2a_NoIdWhenProtocolMessageHasNoId`
+(gated).
+
+TM2a derives a message's id as `protocolMsgId:index` when the message has none. With no
+`protocolMsgId` there is nothing to derive, and the spec leaves the id unset.
+
+`MessageHandler.DecodeMessages` (MessageHandler.cs:487-490) does not check:
+
+```csharp
+if (message.Id.IsEmpty())
+{
+    message.Id = $"{protocolMessage.Id}:{i}";
+}
+```
+
+A null `protocolMessage.Id` interpolates to the empty string, so subscribers are handed `":0"`.
+Measured: exactly that.
+
+**Status:** open bug, small but not cosmetic. RTL20's delta continuity check compares message ids,
+and `":0"` is a value that compares equal across unrelated envelopes rather than an absence that
+cannot.
+
+### D45 — a message's own timestamp is always overwritten by the envelope's
+
+**Spec point:** TM2f. **Test:** `MessageFieldPopulationTests.TM2f_ExistingTimestampIsNotOverwritten`
+(gated).
+
+TM2f, like TM2a and TM2c, fills the field in only when the message does not already carry one. The
+SDK has that logic — `DecodeMessages` guards the assignment with
+`if (message.Timestamp.HasValue == false)` (MessageHandler.cs:499-502) — and it is dead code on the
+realtime path.
+
+`MessageHandler.ParseRealtimeData` (MessageHandler.cs:420-431) runs first, immediately after
+deserialising the frame, and assigns unconditionally:
+
+```csharp
+foreach (var presenceMessage in protocolMessage.Presence)
+{
+    presenceMessage.Timestamp = protocolMessage.Timestamp;
+}
+
+foreach (var message in protocolMessage.Messages)
+{
+    message.Timestamp = protocolMessage.Timestamp;
+}
+```
+
+By the time the guarded assignment is reached, `HasValue` is always true and the value is always
+the envelope's. Measured both halves: a message carrying its own timestamp was delivered with the
+envelope's instead, and a message carrying its own inside an envelope with none was delivered with
+`Timestamp` null — the field was not merely ignored, it was destroyed.
+
+Note the first loop: presence messages are overwritten the same way, so this is not confined to
+TM2f.
+
+**Status:** open bug. Deleting the two loops in `ParseRealtimeData` would leave the correct,
+already-written guarded assignment in `DecodeMessages` to do the job.
+
+### D46 — publishing a message with every field null sends a MESSAGE with no messages
+
+**Spec point:** RTL6i3.
+**Test:** `ChannelPublishTests.RTL6i3_AMessageWithEveryFieldNullStillReachesTheWire` (gated).
+
+RTL6i3 requires null message fields to be left off the wire rather than sent as nulls, and the
+spec's test covers three cases: a null `data`, a null `name`, and both null. The first two pass -
+`JsonHelper`'s `NullValueHandling.Ignore` does exactly what is asked.
+
+The third does not. Measured, the frame was:
+
+```json
+{"action":15,"channel":"test-RTL6i3-all-null","msgSerial":2}
+```
+
+No `messages` array at all, where the spec asserts a message object with neither key. The cause is
+`ProtocolMessage.OnSerializing` (ProtocolMessage.cs:206-222):
+
+```csharp
+if (Messages != null)
+{
+    Messages = Messages.Where(m => !m.IsEmpty).ToArray();
+    if (Messages.Length == 0)
+    {
+        Messages = null;
+    }
+}
+```
+
+`Message.IsEmpty` (Message.cs:103) is equality against a default-constructed `Message`, so a
+message with no name and no data is one. Two things follow from this being a serialisation hook
+rather than a filter at publish time:
+
+- The caller is not told. The publish is accepted, gets a `msgSerial`, and the awaited task
+  completes successfully once the ACK arrives - for a frame that carried nothing.
+- It mutates. `Messages` is assigned on the live object, so the in-memory `ProtocolMessage` loses
+  its payload too, not just the copy on the wire. Anything that re-reads it afterwards - RTN19a's
+  resend of unacked messages is the obvious one - sees the emptied version.
+
+**Status:** open bug. Publishing an empty message is legitimate: the server assigns it an id and
+delivers it, and a subscriber sees a message with no name and no data. Here it is silently
+discarded.
+
+### D47 — a pending attach or detach is told it failed, then succeeds
+
+**Spec points:** RTL4d, and RTN19b's caller-facing half.
+**Test:** `PendingPublishTests.RTL4d_APendingAttachReportsTheOutcomeOfTheResentAttach` (gated).
+
+RTL4d (features.md:711) is specific about when the attach callback fires: "when the channel next
+moves to one of `ATTACHED`, `DETACHED`, `SUSPENDED`, or `FAILED` states. In the case of `ATTACHED`
+the callback is called with no argument."
+
+RealtimeChannel.cs:187-190 fires it somewhere else entirely:
+
+```csharp
+case ConnectionState.Disconnected:
+    AttachedAwaiter.Fail(new ErrorInfo("Connection is Disconnected"));
+    DetachedAwaiter.Fail(new ErrorInfo("Connection is Disconnected"));
+    break;
+```
+
+DISCONNECTED is not one of the four states, and the channel has not moved at all - it is still
+ATTACHING. Measured: `AttachAsync` resolved with `IsSuccess == false` and
+`"Connection is Disconnected"`, and the channel then reached ATTACHED. The caller was told the
+attach failed by an attach that worked.
+
+What makes it plainly a bug rather than a judgement call is that the correct behaviour is
+implemented twenty lines above, in the same `switch`. On CONNECTED, RealtimeChannel.cs:174-184
+resends the ATTACH or DETACH for exactly these pending states - RTN19b, and it works: the test
+above confirms the resend reaches the new transport and the channel settles. So one half of the
+class knows the operation is still in flight while the other has already given up on it.
+
+Both directions are affected; the detach case is identical, with `DetachedAwaiter` and DETACHING.
+
+**Status:** open bug. The fix is to leave the awaiters alone on DISCONNECTED and let RTN19b's
+resend run to its conclusion - RTL4f's `realtimeRequestTimeout` is still there to bound it if the
+new transport never answers either.
+
 ### D48 — a clientId change throws if another client in the process has used push
 
 **Spec point:** none directly; found by running the unit tier in one process.
@@ -701,6 +1405,85 @@ because the spec grants the latitude — but the chosen field is the wrong one, 
 produces (a POST to `/keys//requestToken`, then a deserialisation error) tells the caller nothing
 about what went wrong.
 
+### A3 — "absent" is an empty string, not null
+
+**Spec points:** RTN8d, RTN9d, and RTN4c's `errorReason`.
+**Tests:** `Realtime.Integration.ConnectionLifecycleTests.RTN4c_GracefulClose`;
+`Realtime.Unit.Connection.ConnectionOpenFailuresTests.RTN14a_InvalidKeyFailed` (parked with the
+realtime unit tier).
+
+The spec writes `connection.id IS null`, `connection.key IS null` and `errorReason IS null`. This SDK
+spells all three absences as values rather than as null:
+
+- `RealtimeState.ConnectionData.ClearKeyAndId()` sets both `Id` and `Key` to `string.Empty`.
+- `ConnectionClosedState` sets `Error = error ?? ErrorInfo.ReasonClosed`, and `ReasonClosed` carries
+  `ErrorCodes.NoError` — a constant literally named for the absence of an error.
+
+The behaviour each spec point protects holds: after a close there is no id and no key, so nothing to
+resume with, and a graceful close reports no *real* error. Only the representation differs, and it is
+deliberate, so the assertions read "no id / no key / no real error" rather than "null". They still
+catch a regression that put a genuine error on a clean close, which is what RTN4c is for.
+
+Not recorded as a deviation: `writing-derived-tests.md` is explicit that a differently-spelled
+observable is idiomatic translation, and the governing preference is an assertion that runs.
+
+### A4 — `ChannelOptions` has no unset state; nothing on it is ever null
+
+**Spec points:** TB2, TB2b, TB2c, TB2d. **Test:** `ChannelOptionsTests.TB2_ChannelOptionsAttributeDefaults`.
+
+TB2 asserts a freshly constructed `ChannelOptions` has `cipherParams`, `params` and `modes` all
+null. None of the three can be null here:
+
+- `Params` and `Modes` are backed by fields initialised to empty collections, and both setters
+  coalesce an assigned null back to a fresh empty one (ChannelOptions.cs:30-43).
+- `CipherParams` is assigned `@params ?? Crypto.GetDefaultParams()` in the only constructor that
+  takes one (ChannelOptions.cs:74), so an unencrypted channel still has a populated cipher. The
+  "is a cipher configured" answer lives on `Encrypted` instead.
+
+The test asserts the same thing in this SDK's terms: nothing is configured. An empty collection and
+a null one are the same answer to "which params were set", so the assertion still catches an
+option leaking in from somewhere.
+
+Not recorded as a deviation: `writing-derived-tests.md` treats a differently-spelled observable as
+translation rather than non-compliance, and empty-not-null is the ordinary .NET spelling. The
+`CipherParams` half is the weaker of the two - a caller reading `options.CipherParams` on an
+unencrypted channel gets a real object - but `Encrypted` is unambiguous and is what the SDK's own
+encryption path reads.
+
+### A5 — the vcdiff deltas are real, because there is nowhere to put a mock decoder
+
+**Spec points:** RTL18, RTL19a, RTL19b, RTL19c, RTL20, RTL21.
+**Tests:** all ten in `ChannelDeltaDecodingTests`.
+
+`channel_delta_decoding.md` builds its deltas with a `MockVCDiffEncoder` and installs a matching
+`MockVCDiffDecoder` through `ClientOptions.plugins`, so the two agree by construction and the tests
+never need a real delta. This SDK has no plugin seam: `VcDiffEncoder` calls
+`IO.Ably.DeltaCodec.DeltaDecoder.ApplyDelta` directly, and the codec is compiled in.
+
+So the deltas have to be ones the real decoder accepts, and that library decodes only — it has no
+encoder. `Uts/Helpers/VcdiffDeltas.cs` supplies one: a small RFC 3284 encoder, single window,
+default code table, emitting a COPY for any run of four or more bytes it finds in the source and an
+ADD for the rest. It is deliberately naive, and being a real encoder is the point — a delta that
+ignored its source would decode the same against a wrong base as a right one, and most of these
+tests are about which base the SDK kept.
+
+Two consequences worth naming:
+
+- **The encodings differ from the spec's.** The specs write `encoding: "vcdiff"` with the raw delta
+  as data. On a JSON transport that cannot travel, and the spec's own transport note says so: these
+  tests use `utf-8/vcdiff/base64` where a string is expected and `vcdiff/base64` where bytes are.
+- **RTL19a's payloads differ.** The spec patches `"Hello"` to `"World"`, which share no run long
+  enough to copy, so the delta would not reference the source at all and the test could not detect
+  a wrong base. `"Hello world"` to `"Hello there, world"` keeps the binary-via-base64 shape the
+  test is about and makes the base payload load-bearing.
+
+The RTL18 failures are provoked the same way round: instead of a decoder rigged to throw, the
+message carries bytes that are not a VCDIFF stream, so the real decoder throws. That is the
+production failure path rather than a simulation of it.
+
+Not recorded as a deviation: nothing about the SDK's behaviour is being accommodated here. All ten
+tests pass.
+
 ---
 
 ## Mock Infrastructure Limitations
@@ -727,6 +1510,15 @@ Two details for whoever re-enables it: `Defaults.cs` defines `DefaultProtocol` i
 branch but `Protocol` in the live branch, so turning the define on would not compile as-is; and
 `common/test-resources/msgpack_test_fixtures.json` exists on disk but is not declared as an
 `EmbeddedResource` in `Ably.PubSub.Tests.DotNET.csproj`.
+
+### M2 — WebSocket ping frames are not observable
+
+**Spec point:** RTN23b. Affects the realtime unit tier (parked).
+
+.NET's `ClientWebSocket` answers ping frames inside the protocol and surfaces no event to
+`ITransport`, which is the same reason the spec gives for Dart. `MockConnection.SendPingFrame()`
+records the attempt so a test can see it was made, but there is nothing for it to drive. RTN23a via a
+HEARTBEAT protocol message works and is translated.
 
 ---
 
@@ -766,3 +1558,31 @@ first.
 throw satisfies. It is an internal inconsistency in the SDK — a declared contract the code does not
 deliver — worth a tidy-up ticket but not a compliance failure. The derived tests assert the thrown
 exception.
+
+### N3 — publish reports failure two different ways, and the state check misnames the state
+
+**Spec points:** RTL6c2, RTL6c4. **Tests:** the five refusal tests in `ChannelPublishTests`.
+
+Not a spec deviation - the spec says a publish that cannot proceed must fail, and it does - but
+two things found while translating RTL6c are worth writing down.
+
+**The failure arrives two ways.** `PublishAsync` returns `Task<Result>`, and a NACK from the server
+resolves it as a failed `Result` (RTL6j's test reads `result.Error.Code == 40160` that way). A
+state check that refuses to publish at all does not: `PublishImpl` (RealtimeChannel.cs:613-621)
+throws, `TaskWrapper.Wrap` catches it and calls `SetException`, and the caller gets an
+`AblyException` out of the `await`. So a caller who only checks `IsSuccess` misses every RTL6c4
+case, and one who only catches misses every NACK. Worth noting too that `TaskWrapper.SetException`
+re-wraps, so the thrown error is a 50000 "Unexpected error" with the real 40000 as its inner - the
+code a caller reads first is the one that says nothing.
+
+**The message names the wrong state.** RealtimeChannel.cs:620:
+
+```csharp
+throw new AblyException(new ErrorInfo(
+    $"Message cannot be published. Client is not allowed to queue messages when connection is in {State} state", ...));
+```
+
+`State` is the *channel's* state; the sentence is about the *connection's*. The guard above it is
+`Connection.CanPublishMessages`, which is correct. Measured on a CLOSED connection with a channel
+that had never attached: "connection is in Initialized state". A one-word fix
+(`Connection.State`), but until then the diagnostic actively misleads.

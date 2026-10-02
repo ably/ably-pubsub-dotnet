@@ -67,6 +67,17 @@ namespace Ably.PubSub.Tests.Infrastructure
             }
 
             _connection.On(Conn_StateChanged);
+
+            // Checked again, after subscribing. The check above and this subscription are not
+            // atomic, so a transition landing between them would be seen by neither - and the
+            // symptom is the contradiction in the timeout message below, "expected 'Connected'
+            // but current state was 'Connected'". Measured under load on net7.0.
+            if (_awaitedStates.Contains(_connection.State))
+            {
+                RemoveListener();
+                return TimeSpan.Zero;
+            }
+
             var tResult = _taskCompletionSource.Task;
             var tCompleted = await Task.WhenAny(tResult, Task.Delay(timeout)).ConfigureAwait(false);
             if (tCompleted == tResult)

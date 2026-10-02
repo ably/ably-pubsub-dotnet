@@ -28,6 +28,10 @@ it arrives with the last of them rather than being revised four times.
 
 | Spec file | Tests | Absent API |
 |---|---|---|
+| `realtime/unit/channels/channel_get_message.md` | 1 | `RealtimeChannel#getMessage`; `Message.serial`, `Message.version` |
+| `realtime/unit/channels/channel_message_versions.md` | 1 | `getMessageVersions`; `Message.action`, `Message.version` |
+| `realtime/unit/channels/channel_update_delete_message.md` | 9 | `updateMessage` / `deleteMessage` / `appendMessage`; `MessageOperation`; `UpdateDeleteResult`; `ProtocolMessage.res` |
+| `realtime/unit/channels/channel_annotations.md` | 14 | the whole annotations surface; ANNOTATION protocol action; annotation channel modes; `attachOnSubscribe` |
 | `rest/unit/channel/get_message.md` | 4 | `HttpChannel#getMessage`; `Message.serial`, `Message.version` |
 | `rest/unit/channel/message_versions.md` | 3 | `getMessageVersions`; `Message.action` |
 | `rest/unit/channel/update_delete_message.md` | 12 | as the realtime equivalent |
@@ -37,21 +41,65 @@ it arrives with the last of them rather than being revised four times.
 | `rest/unit/batch_publish.md` | 28 | `batchPublish`; `BatchPublishSpec`; `BatchResult` |
 | `rest/unit/batch_presence.md` | 13 | `batchPresence`; `BatchResult` |
 | `rest/unit/auth/revoke_tokens.md` | 17 | `Auth#revokeTokens`; `TokenRevocationTargetSpecifier`; the revocation result types |
+| `realtime/unit/connection/when_state_test.md` | 6 | `Connection#whenState`. `Connection` derives from `EventEmitter<ConnectionEvent, ConnectionStateChange>`, whose whole listener surface is `On` / `Once` / `Off`. `Once` is not a stand-in: it supplies only RTN26b's deferred half and never fires for the state the emitter is already in, which is exactly what RTN26a asserts |
+| `realtime/unit/channels/channel_when_state_test.md` | 4 | `RealtimeChannel#whenState`. The nearest internal thing, `ChannelAwaiter`, has a `(bool success, ErrorInfo error)` callback and so cannot distinguish RTL25a's null result from RTL25b's `ChannelStateChange` — the exact observable both tests turn on — and it completes with a timeout failure rather than simply not resolving, which is what `RTL25a/past-state-does-not-resolve-1` asserts |
 | `rest/unit/encoding/msgpack_interop.md` | 2 sections | msgpack compiled out — see below |
+| `realtime/unit/connection/when_state_test.md` is listed above; `heartbeat_test.md`'s RTN23b/c/c1 tail is partial — see the note below this table | 10 | `ProtocolMessage.MessageAction` and observable ping frames |
 
 **Note on `rest/unit/channel/annotations.md`:** it contains **10** tests, not the 6 its
 `**Test ID**` markers suggest. Four fully specified tests (at lines 280, 331, 382 and 459) carry no
 marker. Reported upstream.
 
+### `heartbeat_test.md`'s RTN23b/RTN23c/RTN23c1 tail — three separate reasons
+
+All seven RTN23a tests are translated and pass. The remaining ten are not covered, and it is worth
+separating why, because only one of the three reasons is a gap in this SDK:
+
+- **RTN23b, six tests** — blocked by the mock, see M1/M2 in [`deviations.md`](deviations.md).
+  `send_ping_frame()` has nothing to drive: .NET's `ClientWebSocket` answers ping frames inside the
+  protocol and raises no event an `ITransport` could see.
+- **RTN23b/heartbeats-false-query-param-0, one test** — **not applicable**, not blocked. RTN23b
+  (features.md:654) says a client that *can* observe websocket pings should send
+  `heartbeats=false`, and one that cannot should send `heartbeats=true`. This SDK cannot, so
+  `heartbeats=true` is the correct behaviour, and that is what the passing
+  `HeartbeatTests.RTN23a_HeartbeatsTrueQueryParam` asserts. Translating this one would require the
+  SDK to be wrong to pass.
+- **RTN23c, one test** — **not applicable** by the spec's own words: `heartbeats=bounce` is for an
+  environment "where client code execution might be suspended while leaving the transport itself
+  alive (for example, a browser...)", and the spec file says "Only applies to browser (or
+  equivalent) builds of an SDK".
+- **RTN23c1, two tests** — absent protocol surface. The client must answer a `PING` protocol
+  message with a `PONG`, and `ProtocolMessage.MessageAction`
+  (`src/Ably.PubSub.Shared/Types/ProtocolMessage.cs:27-45`) stops at `Auth = 17`. TR2
+  (features.md:1594) lists the actions in order from zero and continues `ACTIVATE`, `OBJECT`,
+  `OBJECT_SYNC`, `ANNOTATION`, `PING`, `PONG` — so `PING` is 22 and `PONG` is 23, and neither
+  exists here. The practical exposure is nil, since the server only sends `PING` to a client that
+  asked for `heartbeats=bounce`, and an unrecognised action is ignored rather than fatal (covered by
+  the passing `ForwardsCompatibilityTests`). Worth noting all the same: the enum is six values short
+  of TR2.
+
 ### Partially blocked — the file is translated, these tests are skipped
 
 | Spec file | Tests | Skipped | Which, and why |
 |---|---|---|---|
+| `realtime/unit/channels/channel_publish.md` | 35 | 3 | Re-measured during translation; the inherited figure of six was too pessimistic. Three are genuinely blocked: `RTL6j/publish-result-serials-0` and `RTL6j/batch-publish-serials-1` are wholly about the `PublishResult` that `PublishAsync` does not return (it returns `Task<Result>`), leaving nothing but a msgSerial check another test already makes; `RTL6i3/null-fields-msgpack-1` needs a msgpack frame. The other three the census listed — `RTL6j/incrementing-msg-serial-2`, `RTN7d/survive-disconnected-queue-1` and `RTN19a/resent-on-new-transport-0` — each have a `PublishResult` assertion *and* a substantive one (incrementing msgSerials; a publish surviving DISCONNECTED; a message resent on the new transport), so they are translated with the `PublishResult` line dropped and noted in the test |
 | `rest/unit/rest_client.md` | 15 | 3 | `RSC8/error-decoded-from-msgpack-0`, `RSC8d/mismatched-response-content-type-0`, `RSC8a/protocol-selection-0` (msgpack half) |
 | `rest/unit/channel/publish.md` | 8 | 2 | `RSL1i/message-size-limit-0` — there is no `ClientOptions.MaxMessageSize`, only the server-sent read-only `ConnectionDetails.MaxMessageSize`; `RSL1l/params-as-querystring-0` — no publish overload takes params |
 | `rest/unit/encoding/message_encoding.md` | 21 | 4 | `RSL4c/binary-direct-msgpack-protocol-1`, `RSL6/msgpack-binary-stays-binary-0`, `RSL6/msgpack-string-stays-string-1`, `RSL4/msgpack-protocol-content-type-3` |
 | `rest/unit/auth/token_renewal.md` | 9 | 1 | `RSA4b/renewal-msgpack-response-4` — the 401 token-error body is msgpack, so it can neither be produced nor decoded in this build |
 | `rest/unit/presence/rest_presence.md` | 42 | 1 | `RSP5/decode-msgpack-binary-3` — needs a msgpack response body carrying a binary presence payload |
+| `realtime/unit/channels/channel_state_events.md` | 13 | 2 | `RTL2i/has-backlog-flag-true-0` and `RTL2i/has-backlog-flag-false-1` — `ChannelStateChange` has no `hasBacklog` member; its surface is Previous, Current, Error, Resumed, Event. The HAS_BACKLOG flag exists on `ProtocolMessage.Flag` (`:58`) and is simply never surfaced on the state change |
+| `realtime/unit/channels/channel_history.md` | 3 | 2 | `RTL10b/adds-from-serial-0` and `RTL10b/errors-when-not-attached-1` — there is no `untilAttach` overload on `IRealtimeChannel.HistoryAsync`, which takes only a `PaginatedRequestParams`. The SDK *has* the machinery — `RealtimeChannel.AddUntilAttachParameter` adds `fromSerial` from the attach serial — but only `Presence.HistoryAsync(query, untilAttach)` calls it, so the channel-level behaviour RTL10b describes cannot be invoked. RTL10a is covered |
+| `realtime/unit/presence/realtime_presence_subscribe.md` | 10 | 1 | `RTP6e/subscribe-no-attach-option-0` — there is no `attachOnSubscribe` channel option; `ChannelOptions` carries Encrypted, CipherParams, Modes and Params and nothing else that bears on subscribe-time attaching |
+| `realtime/unit/channels/channel_delta_decoding.md` | 12 | 2 | `PC3/vcdiff-plugin-decodes-0` and `PC3/no-plugin-fails-1` both require vcdiff to be a plugin passed through client options, so that a client can be built with it and another without. Here it is `IO.Ably.DeltaCodec`, referenced directly by `VcDiffEncoder` and compiled in; there is no plugin surface and no way to construct the "no plugin" client the second test needs. The other ten are translated and pass — see A5 in [`deviations.md`](deviations.md) for how the deltas are produced |
+| `realtime/unit/channels/channel_subscribe.md` | 21 | 6 | Five are the RTL22 message-filter tests — `RTL22a/filter-matching-name-0`, `RTL22a/filter-matching-ref-timeserial-1`, `RTL22a/filter-matching-clientid-2`, `RTL22b/filter-isref-false-0` and `RTL22c/filter-multiple-criteria-0` — and there is no `MessageFilter` type: `IRealtimeChannel.Subscribe` takes a handler or a name and a handler, nothing else. The sixth, `RTL7h/no-attach-on-subscribe-0`, needs `attachOnSubscribe`. The remaining fifteen pass |
+| `realtime/unit/channels/channel_options.md` | 16 | 6 | Five of the six are the derived-channel surface — `RTS5a/creates-derived-channel-0`, `RTS5a1/filter-base64-encoded-0`, `RTS5a2/derived-with-params-0`, `RTS5/get-derived-with-options-0` and `DO2a/filter-attribute-0` all need `channels.getDerived` and a `DeriveOptions` type, and neither exists: `IChannels<T>` offers `Get(name)` and `Get(name, options)` and nothing else. The sixth, `TB4/attach-on-subscribe-default-0`, needs `attachOnSubscribe`. RTS3c and RTL16 are translated and pass, each having lost only its `attachOnSubscribe` assertion |
+| `realtime/unit/connection/backoff_jitter_test.md` | 4 | 1 | `RTB1/suspended-channel-retry-delay-1` asserts on `ChannelStateChange.retryIn`, and `ChannelStateChange` has no such member — its surface is Previous, Current, Error, Resumed, Event (`Realtime/ChannelStateChangedEventArgs.cs`). The SDK *does* apply RTB1 to a suspended channel (`RealtimeChannel.ReattachAfterTimeout` calls `ReconnectionStrategy.GetRetryTime(Options.ChannelRetryTimeout, retryCount)`) but keeps the figure in a local, so there is no observable to read — writing the test would be a compile error, not a failing assertion. The RTB1a/RTB1b arithmetic and RTB1's connection-level half are all covered and pass |
+
+`realtime/unit/channels/channel_publish.md` is worth a note in the other direction:
+`RTL6j/nack-results-error-3` **is** covered. It does not touch `PublishResult` — the server's
+`ErrorInfo` reaches the publish callback directly — so it translates despite sitting among the
+RTL6j tests that do not.
 
 ---
 
@@ -81,12 +129,32 @@ behaviour the SDK does implement — is translated and passing.
 
 ---
 
+## Derived channels
+
+Five tests in `realtime/unit/channels/channel_options.md` describe `channels.getDerived(name,
+DeriveOptions(filter: ...))` — a channel qualified by a server-side filter expression, with the
+filter base64-encoded into the channel name on the wire. None of it exists here: searching product
+code for `derive` in any casing returns nothing, and `DeriveOptions` has no counterpart among the
+options types. This is one feature, so the five move together.
+
+---
+
+## Message filters
+
+RTL22 subscribes with a `MessageFilter` — name, clientId, `isRef`, `refType` and
+`refTimeserial` — and delivers only messages matching every criterion set on it. The type does not
+exist here and nor does any overload that would take one; `IRealtimeChannel.Subscribe` offers
+`(handler)` and `(name, handler)`. Five tests, one feature.
+
+---
+
 ## Other absent API
 
 Gaps that do not belong to a larger theme:
 
 | Spec point | Test | What is absent |
 |---|---|---|
+| TB4, RTL7h | `realtime/unit/TB4/attach-on-subscribe-default-0` and `realtime/unit/RTL7h/no-attach-on-subscribe-0` | `ChannelOptions.attachOnSubscribe`. `ChannelOptions` carries Encrypted, CipherParams, Modes and Params; `RealtimeChannel.Subscribe` attaches unconditionally when the channel is neither ATTACHED nor ATTACHING, with nothing to opt out of it. The same absence skips `RTP6e/subscribe-no-attach-option-0` and trims two assertions from the RTS3c and RTL16 tests. Two tests here, so this is the one row in this table that is not a single test |
 | TG4 | `rest/unit/TG4/first-returns-first-page-0` | `PaginatedResult<T>` has no `First()` / `FirstAsync()`. It carries `FirstQueryParams` but exposes no method to fetch that page; `First()` exists only on the `HttpPaginatedResponse` subclass |
 | TO3c2 | `rest/unit/TO3c2/context-contains-expected-keys-0` | there is no structured log context. The sink contract is `ILoggerSink.LogEvent(LogLevel, string)` — a level and a flat message, with no context map to assert `method` / `host` / `path` against |
 | TP5 | `rest/unit/TP5/presence-message-size-0` | no message-size API. There is no `PresenceMessage.Size`, no `Message.Size` and no TM6-style size calculation; the only `MaxMessageSize` is the server-sent read-only `ConnectionDetails.MaxMessageSize`, which no REST path consults |

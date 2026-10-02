@@ -20,6 +20,7 @@ Uts/
     Sandbox/            the integration tier's app_config and wall-clock polling
     Proxy/              the proxy tier's session lifecycle and event-log readers
   Rest/Unit/            derived from uts/rest/unit/**
+  Realtime/Unit/        derived from uts/realtime/unit/**
   coverage.md           what is not covered, and why
   deviations.md         where the SDK does the wrong thing
 ```
@@ -36,6 +37,12 @@ Every test carries a `// UTS: <test id>` comment naming the spec point it came f
 `MockHttpClient` and every frame by `MockWebSocket`, both installed through seams the SDK already
 exposes publicly — `ClientOptions.HttpClient` and `ClientOptions.TransportFactory`. No SDK code was
 changed to make these tests possible.
+
+The realtime half of the unit tier runs in a single xUnit collection, declared on
+`UtsTestBase.RealtimeUnitCollection`. These tests share one process with real timers and there is no
+timer seam, so running them in parallel is not free: serialising them took the failure count from
+eleven to three. A new realtime unit class needs that `[Collection]` attribute — xUnit does not
+inherit it from a base class.
 
 **Integration** (`*/Integration`) runs against the real Ably sandbox. It needs no secrets: the app
 is self-provisioned from the vendored `common/test-resources/test-app-setup.json`. There is no mock
