@@ -168,6 +168,21 @@ Task("_NetStandard_Integration_Tests_WithRetry")
     testExecutionHelper.RetryFailedDotNetTests(project, resultsPath, testRetryHelper, framework, configuration);
 });
 
+Task("_NetStandard_Proxy_Tests")
+    .IsDependentOn("Build.NetStandard")
+    .Does(() =>
+{
+    Information("Running UTS proxy tests (requires ably/uts-proxy)...");
+
+    var project = paths.Src.CombineWithFilePath("Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj");
+    var resultsPath = paths.TestResults.CombineWithFilePath("tests-netstandard-proxy.trx");
+
+    var filter = testExecutionHelper.CreateProxyTestFilter();
+    var settings = testExecutionHelper.CreateDotNetTestSettings(resultsPath, filter, framework, configuration);
+
+    testExecutionHelper.RunDotNetTests(project, settings);
+});
+
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC TARGETS
 ///////////////////////////////////////////////////////////////////////////////
@@ -203,3 +218,10 @@ Task("Test.NetStandard.Integration")
 Task("Test.NetStandard.Integration.WithRetry")
     .Description("Run .NET Standard integration tests with retry on failure")
     .IsDependentOn("_NetStandard_Integration_Tests_WithRetry");
+
+// Deliberately no .WithRetry variant. The proxy tier asserts on an event log that accumulates
+// across a session, so a retry of a single test is not a clean repeat; and the retry wrappers
+// swallow failures and exit 0, which would make this leg report nothing useful.
+Task("Test.NetStandard.Proxy")
+    .Description("Run the UTS proxy tests against the sandbox through ably/uts-proxy")
+    .IsDependentOn("_NetStandard_Proxy_Tests");
