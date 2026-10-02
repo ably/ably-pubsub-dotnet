@@ -250,11 +250,25 @@ public class TestExecutionHelper
     }
     
     /// <summary>
-    /// Creates filter for DotNet integration tests
+    /// Creates filter for DotNet integration tests.
+    ///
+    /// Proxy tests are excluded. They carry type=integration so that the unit filter above
+    /// (type!=integration) keeps them out of the unit leg, but they need the ably/uts-proxy
+    /// control API running, which the plain integration leg does not provide.
     /// </summary>
     public string CreateIntegrationTestFilter()
     {
-        return "type=integration";
+        return "type=integration&requires!=proxy";
+    }
+
+    /// <summary>
+    /// Creates filter for the UTS proxy tier, which runs against the Ably sandbox through
+    /// ably/uts-proxy. Requires UTS_PROXY_PATH or UTS_PROXY_CONTROL_URL to be set, or uts-proxy
+    /// to be on PATH; without one the tests skip themselves rather than fail.
+    /// </summary>
+    public string CreateProxyTestFilter()
+    {
+        return "requires=proxy";
     }
 }
 
