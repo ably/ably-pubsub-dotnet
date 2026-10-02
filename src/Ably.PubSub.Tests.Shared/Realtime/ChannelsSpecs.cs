@@ -190,6 +190,13 @@ namespace Ably.PubSub.Tests.Realtime
 
             await new ChannelAwaiter(channel, ChannelState.Detached).WaitAsync();
 
+            // The awaiter resolves when the channel reaches DETACHED, which is not when the
+            // release has been applied to the collection - that happens on the workflow, after.
+            // ReleaseAll_ShouldRemoveChannelWhenFailed below already waits for it; this one did
+            // not, and failed on every Release run once the UTS realtime tier was added to the
+            // assembly and the machine had something else to do.
+            await client.ProcessCommands();
+
             // Assert
             client.Channels.Should().BeEmpty();
         }
