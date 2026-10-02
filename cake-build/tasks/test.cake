@@ -136,12 +136,44 @@ Task("_NetStandard_Integration_Tests")
     Information("Running .NET Standard integration tests...");
     
     var project = paths.Src.CombineWithFilePath("Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj");
-    var resultsPath = paths.TestResults.CombineWithFilePath("tests-netstandard-integration.trx");
-    
-    var filter = testExecutionHelper.CreateIntegrationTestFilter();
-    var settings = testExecutionHelper.CreateDotNetTestSettings(resultsPath, filter, framework, configuration);
-    
-    testExecutionHelper.RunDotNetTests(project, settings);
+
+    // Three passes, in separate processes, because these groups cannot share one. Every group is
+    // green on its own and fails in numbers when combined, and the failures are always the same
+    // shape: "timed out waiting for Connected". It is not ephemeral-port exhaustion (32 sockets in
+    // TIME_WAIT against a 16384-port range), so it is contention on the shared sandbox app they
+    // all reach.
+    //
+    // Measured, each alone: the repo's own sandbox specs green, UTS REST 58/58, UTS realtime
+    // 33/33. Measured, the repo's specs sharing a pass with UTS REST: 52 failures, including 10
+    // in ChannelSandboxSpecs - which passes 49/50 by itself. Collapsing any two of these back
+    // together reintroduces that.
+    //
+    // Split on the `tier` trait rather than on the name: FullyQualifiedName has no negated-contains
+    // operator, and vstest rejects `FullyQualifiedName!~x` as an invalid condition and then runs
+    // nothing while still exiting 0 - so a name-based pass would silently test nothing.
+    testExecutionHelper.RunDotNetTests(
+        project,
+        testExecutionHelper.CreateDotNetTestSettings(
+            paths.TestResults.CombineWithFilePath("tests-netstandard-integration.trx"),
+            testExecutionHelper.CreateIntegrationTestFilter() + "&tier!=realtime&tier!=uts-rest",
+            framework,
+            configuration));
+
+    testExecutionHelper.RunDotNetTests(
+        project,
+        testExecutionHelper.CreateDotNetTestSettings(
+            paths.TestResults.CombineWithFilePath("tests-netstandard-integration-uts-rest.trx"),
+            testExecutionHelper.CreateIntegrationTestFilter() + "&tier=uts-rest",
+            framework,
+            configuration));
+
+    testExecutionHelper.RunDotNetTests(
+        project,
+        testExecutionHelper.CreateDotNetTestSettings(
+            paths.TestResults.CombineWithFilePath("tests-netstandard-integration-uts-realtime.trx"),
+            testExecutionHelper.CreateIntegrationTestFilter() + "&tier=realtime",
+            framework,
+            configuration));
 });
 
 Task("_NetStandard_Integration_Tests_WithRetry")

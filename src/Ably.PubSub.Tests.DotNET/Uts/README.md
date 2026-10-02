@@ -20,13 +20,12 @@ Uts/
     Sandbox/            the integration tier's app_config and wall-clock polling
     Proxy/              the proxy tier's session lifecycle and event-log readers
   Rest/Unit/            derived from uts/rest/unit/**
+  Rest/Integration/     derived from uts/rest/integration/**
   Realtime/Unit/        derived from uts/realtime/unit/**
+  Realtime/Integration/ derived from uts/realtime/integration/**
   coverage.md           what is not covered, and why
   deviations.md         where the SDK does the wrong thing
 ```
-
-The remaining tiers arrive as they are translated, each with its own additions to those two
-documents.
 
 A spec at `uts/<path>/<name>.md` becomes `Uts/<Path>/<Name>Tests.cs`, each segment PascalCased.
 Every test carries a `// UTS: <test id>` comment naming the spec point it came from.
@@ -62,6 +61,7 @@ Through Cake, not bare `dotnet` — StyleCop runs as a **build error** in Releas
 ```bash
 ./build.sh --target=Build.NetStandard                                # lint gate
 ./build.sh --target=Test.NetStandard.Unit --framework=net6.0         # unit tier
+./build.sh --target=Test.NetStandard.Integration --framework=net6.0  # integration tier
 ./build.sh --target=Test.NetStandard.Proxy --framework=net6.0        # proxy tier
 ```
 
@@ -79,6 +79,16 @@ For a fast inner loop on one file:
 dotnet test src/Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj \
   -f net6.0 -c Release --filter "FullyQualifiedName~Uts.Rest.Unit.Time"
 ```
+
+### The integration target runs three passes
+
+`Test.NetStandard.Integration` starts the test runner three times, split on the `tier` trait: the
+repo's own sandbox specs, then `tier=uts-rest`, then `tier=realtime`. That is not tidiness. All
+three groups reach the same sandbox app, and any two of them in one process produce "timed out
+waiting for Connected" in numbers — measured at 52 failures when the first two were combined, against
+6 when they were not. A new integration test must inherit one of the two UTS bases so that it lands
+in a pass; one carrying only `type=integration` falls into the repo's pass and takes the contention
+with it. N4 in `deviations.md` has the measurements.
 
 ### The proxy tier needs a proxy
 
