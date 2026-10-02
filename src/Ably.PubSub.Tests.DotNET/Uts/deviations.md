@@ -680,7 +680,9 @@ mechanism as a lead and the measurements as the finding.
 
 **Spec points:** RTN14g, RTN15c4.
 **Tests:** `ConnectionOpenFailuresTests.RTN14g_ErrorEmptyChannelFailed`,
-`ConnectionFailuresTests.RTN15c4_FatalErrorDuringResume` (both gated).
+`ConnectionFailuresTests.RTN15c4_FatalErrorDuringResume`, and at the proxy tier
+`Proxy.ConnectionOpenFailuresTests.RTN14g_AConnectionLevelServerErrorFailsTheConnection`
+(all gated).
 
 **Spec:** RTN14g (features.md:577) is unconditional — an ERROR with an empty channel attribute, for
 any reason other than RTN14b, transitions the connection to FAILED. RTN15c4 says the same for an
@@ -695,6 +697,12 @@ DISCONNECTED and is retried. Measured for both tests — a 50000/500 connection-
 arriving while CONNECTED *does* reach FAILED: `ConnectionFailuresTests.RTN15j_ErrorEmptyChannelFailed`
 passes, measuring `Connected -> Disconnected(80003) -> Failed(50000)`. So RTN14g is implemented once
 and missing once, which narrows the fix to the CONNECTING handler.
+
+**Confirmed against a real server.** The proxy test replaces the first CONNECTED of a genuine
+handshake with a 50000/500 ERROR and waits for FAILED; after fifteen seconds the connection was
+CONNECTED, having gone DISCONNECTED, retried, and succeeded on the second attempt. The companion
+RTN14a test in the same class - identical but for a 40005/400 error - passes, so the SDK is
+branching on the status code exactly as the mechanism above says.
 
 **Status:** open bug. The 500-504 branch should not apply to an ERROR that carries no channel.
 
@@ -911,7 +919,8 @@ sync is running — which is what `get()` waits on.
 **Tests:** `RealtimePresenceReentryTests.RTP17i_AutoReentryOnAttached`,
 `RTP17g_ReentryPublishesEnterWithStoredData`,
 `RTP17g1_ReentryOmitsIdWhenConnectionIdChanged`,
-`RTP17e_FailedReentryEmitsUpdateWithError` (all gated).
+`RTP17e_FailedReentryEmitsUpdateWithError` (all gated), and at the proxy tier
+`PresenceReentryTests.RTP17i_PresenceIsReEnteredAfterARealDisconnect` (gated).
 
 Four spec tests, one cause, and it is a three-line ordering mistake with a large consequence.
 
@@ -937,10 +946,28 @@ the queue that was flushed one step earlier. Nothing flushes it again until the 
 `Attaching -> Attached` on the reconnect, no presence message reached the transport in half a
 second, and none had arrived by the five-second deadline.
 
+**The other branch works, and that pins it down.** `ChannelMessageProcessor` handles an ATTACHED
+two ways (`ChannelMessageProcessor.cs:72-85`). When the channel is *already* ATTACHED - RTL12's
+case - it calls `Presence.ChannelAttached` with `channel.State` already `Attached`, so
+`UpdatePresence` takes its ATTACHED branch and sends each re-entry straight to the transport. When
+the channel is not yet attached - every reconnection - it calls `ChannelAttached` *first* and
+`SetChannelState(Attached)` second, so the same code queues instead.
+
+Measured at the proxy tier, which can reach both paths against a real server:
+`PresenceReentryTests.RTP17i_ANonResumedAttachedReEntersPresenceMembers` injects a non-resumed
+ATTACHED into a live, attached channel and **passes** - a PRESENCE ENTER with the stored clientId
+and data goes out on the wire. `RTP17i_PresenceIsReEnteredAfterARealDisconnect` provokes a real
+drop and rewrites the reattach's ATTACHED to be non-resumed, and **no PRESENCE frame is sent on
+the new transport at all**.
+
+So the re-entry machinery is correct and is already demonstrated working in production code. Only
+the second call site is wrong.
+
 **Status:** open bug, and the most user-visible one in the presence area. After any non-resumed
 reconnection — which is every reconnection that fails to resume — the client believes it is present
-on the channel and the server does not, with no error raised anywhere. The fix is to enqueue the
-re-entries before the flush, or to flush again after the state has moved to ATTACHED.
+on the channel and the server does not, with no error raised anywhere. The fix is the one-line swap
+at `ChannelMessageProcessor.cs:83-84`: set the channel state before telling presence about it, so
+the second call site behaves like the first.
 
 Worth knowing when reading the tests: while this stands,
 `RTP17i_NoReentryWithResumedFlag` cannot fail, because nothing is ever re-entered. It is kept as
@@ -1544,6 +1571,38 @@ branch but `Protocol` in the live branch, so turning the define on would not com
 `ITransport`, which is the same reason the spec gives for Dart. `MockConnection.SendPingFrame()`
 records the attempt so a test can see it was made, but there is nothing for it to drive. RTN23a via a
 HEARTBEAT protocol message works and is translated.
+
+### M3 — the proxy cannot hold a client in DISCONNECTED long enough to suspend it
+
+**Spec point:** RTN14h. **Test:** `realtime/proxy/RTN14h/resume-after-ttl-expiry-0`, not
+translated.
+
+RTN14h asserts that the reconnection attempt made *after* the connection has gone SUSPENDED still
+carries a `resume` parameter. Reaching SUSPENDED is the whole difficulty, and the spec's recipe for
+it needs two things from the proxy that `uts-proxy` **v0.3.0** does not do — the version the CI leg
+pins, and the version measured against here. Both were measured, not inferred:
+
+- **`__PASSTHROUGH__` in a replaced CONNECTED is not substituted.** The spec shortens
+  `connectionStateTtl` to 2s by replacing the first CONNECTED, keeping the real connection key by
+  writing the sentinel `"__PASSTHROUGH__"` in its place. Measured: the client stored the literal
+  string and sent `resume=__PASSTHROUGH__` on its next attempt. So the TTL cannot be shortened
+  without destroying the key the test then needs.
+- **`refuse_connection` matched on a `ws_connect` `count` above 1 does not fire.** With rules on
+  counts 2 and 3, the log showed three `ws_connect` events and `ruleMatched` empty on every one of
+  them; the client reconnected normally. The same rule shape on `count: 1` does work - it is what
+  `ConnectionOpenFailuresTests.RTN14d_ARefusedConnectionIsRetried` relies on, and that test passes.
+
+Without either, the client cannot be kept out of CONNECTED for the ~3s the shortened TTL needs, and
+the real TTL is two minutes.
+
+**Not an SDK gap.** This SDK does suspend on TTL expiry, and the unit tier covers it:
+`ConnectionOpenFailuresTests.RTN14e_DisconnectedToSuspended` drives it with a `TestClock` and
+passes. What is missing is only the proxy-tier confirmation that the attempt *after* SUSPENDED
+carries a resume.
+
+**To unblock:** either a proxy build that honours the sentinel and counted connection refusals, or
+a `connectionStateTtl` the client can be given directly - there is no such client option, which is
+why the spec injects it.
 
 ---
 

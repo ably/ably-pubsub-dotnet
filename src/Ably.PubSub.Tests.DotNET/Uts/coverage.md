@@ -22,6 +22,52 @@ it arrives with the last of them rather than being revised four times.
 
 ---
 
+## Summary
+
+Grouped by root cause, because that is how the gap gets closed — each row is one piece of work,
+not a list of unrelated tests.
+
+| Cause | Tests |
+|---|---|
+| Mutable messages, annotations and publish results — client API absent | 84 |
+| Batch publish — client API absent | 28 |
+| Token revocation — client API absent | 21 |
+| Batch presence — client API absent | 16 |
+| **The REC endpoint model — client API absent** | **16** |
+| msgpack compiled out of this build | 20 (+2 untagged spec sections) |
+| Message size limit and publish `params` — client API absent | 4 |
+| `whenState` on Connection and RealtimeChannel — client API absent | 10 |
+| Derived channels — client API absent | 5 |
+| `MessageFilter` subscriptions — client API absent | 5 |
+| Assorted smaller absences (see *Other absent API* below) | 13 |
+| **Total not covered** | **222** |
+| **In scope** | **903 of 1125** |
+
+Reading the first row: it is one feature area, not six. Message mutation, message versions,
+annotations and publish results all hang off the same absent surface — `Message.serial`,
+`Message.version`, `Message.action`, `Message.annotations`, and the methods that return them — so a
+single implementation effort moves all 84.
+
+The declared wire protocol version stays at `"2"` (`Defaults.ProtocolVersion`). That is deliberate
+and is **not** the cause of most of the gap: by mechanism, the version constant alone gates only a
+handful of integration-tier assertions, while the great majority of what is missing is absent
+client API surface that no version bump would supply. Bumping the version is a separate, larger
+piece of work with its own risk — the server starts sending protocol shapes the SDK does not model.
+
+### Two gaps that are not about this SDK at all
+
+- **The `mutable:` channel namespace is not provisioned.** `rest/integration/mutable_messages.md`
+  requires an app created with `mutableMessages: true`, and the vendored
+  `common/test-resources/test-app-setup.json` declares only `persisted` and `pushenabled`. Even
+  once the client API lands, this file needs an `ably-common` change too.
+- **Two integration files assume a protocol header this SDK does not send.**
+  `rest/integration/revoke_tokens.md` and `rest/integration/batch_presence.md` both state that
+  their `BatchResult` envelope (`successCount` / `failureCount` / `results`) is returned only for
+  `X-Ably-Version >= 3`. This SDK sends `2`, so the assertions as written presume a header it does
+  not send — a second reason those files cannot simply be switched on once the methods exist.
+
+---
+
 ## Unit tier
 
 ### Fully blocked
@@ -181,6 +227,25 @@ from the `Defaults.ProtocolVersion` constant.
 
 ---
 
+## Proxy tier
+
+Nothing is blocked by absent API. All 8 proxy spec files (7 realtime, 1 REST) exercise only the
+public surface, and 37 of their 38 tests are translated.
+
+The exception is `realtime/integration/proxy/connection_resume.md`'s
+`RTN14h/resume-after-ttl-expiry-0`, which is blocked by the proxy rather than by the SDK: reaching
+SUSPENDED needs a shortened `connectionStateTtl` injected into a replaced CONNECTED *and* the
+client held out of CONNECTED while it expires, and neither the `__PASSTHROUGH__` sentinel nor a
+counted `refuse_connection` works in the build used here. Measured; see M3 in
+[`deviations.md`](deviations.md). The behaviour itself is covered at the unit tier by
+`RTN14e_DisconnectedToSuspended`.
+
+The tier needs `ably/uts-proxy` running, so it has its own CI leg and its own trait
+(`requires=proxy` alongside `type=integration`). Without a proxy the tests skip rather than fail;
+see the README.
+
+---
+
 ## Out of scope entirely
 
 `uts/objects/**` — LiveObjects. 19 spec files carrying test ids (15 unit, 3 integration, 1 proxy),
@@ -216,6 +281,45 @@ Two details for whoever re-enables it: `Defaults.cs` defines `DefaultProtocol` i
 branch but `Protocol` in the live branch, so turning the define on would not compile as-is; and
 `common/test-resources/msgpack_test_fixtures.json` exists on disk but is not declared as an
 `EmbeddedResource` in `Ably.PubSub.Tests.DotNET.csproj`.
+
+---
+
+## Translated so far, and what is still outstanding
+
+This document separates two different things, and conflating them would be misleading: what
+**cannot** be covered (everything above), and what simply **has not been translated yet**.
+
+### In the stack and verified
+
+Measured on `net6.0`, three consecutive clean runs of the unit tier
+(`--filter "type!=integration"`): **0 failed, 2102 passed, 97 skipped**.
+
+| Tier | Spec files | Tests | State |
+|---|---|---|---|
+| `rest/unit` | 31 of 41 | 407 passing, 29 env-gated or skipped | green |
+| `realtime/unit` | 48 of 54 | 426 passing, 48 env-gated or skipped | green |
+| `rest/integration` | 8 | 58 passing, 1 skipped | green |
+| `realtime/integration` | 12 | 33 passing | green |
+| proxy tier | 8 | 34 passing, 3 gated as deviations, 1 blocked by the proxy | green |
+| harness self-tests | — | 36 passing | green |
+| proxy harness self-tests | — | 4 passing (skip without a proxy) | green |
+
+The skipped counts are almost entirely `[DeviationFact]` tests, which run under `RUN_DEVIATIONS=1`
+and are each written up in [`deviations.md`](deviations.md). A handful are msgpack cases that
+cannot execute in this build.
+
+### Not yet translated
+
+Nothing. Every spec file in scope now has derived tests.
+
+Both tiers of unit tests are complete. The 16 spec files not translated - 10 under `rest/unit`,
+6 under `realtime/unit` - are exactly the fully blocked ones tabulated earlier in this document;
+every other unit spec file has a derived test class, with the per-file omissions accounted for in
+the partially-blocked table.
+
+`.claude/skills/uts-to-csharp/SKILL.md` is what makes the remainder repeatable: it carries the
+layout rule, the pseudocode mapping, the harness API and the traps that cost the most time on this
+pass.
 
 ---
 

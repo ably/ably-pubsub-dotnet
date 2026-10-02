@@ -23,6 +23,7 @@ Uts/
   Rest/Integration/     derived from uts/rest/integration/**
   Realtime/Unit/        derived from uts/realtime/unit/**
   Realtime/Integration/ derived from uts/realtime/integration/**
+    Proxy/              the subset that runs through ably/uts-proxy
   coverage.md           what is not covered, and why
   deviations.md         where the SDK does the wrong thing
 ```
