@@ -1,12 +1,9 @@
 # UTS — Universal Test Suite tests for the .NET SDK
 
-The tests that will live here are **derived**, not written. Each one is a translation of a portable
-test spec in [`ably/specification`](https://github.com/ably/specification) under `uts/`, and the
-spec is the source of truth for *what* is tested. When a spec changes, the test is re-derived from
-it rather than edited to taste.
-
-What is here so far is the harness they stand on. The tiers arrive as they are translated, each
-with its own record of what it found and what it could not cover.
+These tests are **derived**, not written. Every one of them is a translation of a portable test
+spec in [`ably/specification`](https://github.com/ably/specification) under `uts/`, and the spec is
+the source of truth for *what* is tested. When a spec changes, the test is re-derived from it
+rather than edited to taste.
 
 If you are about to add or change a test here, read
 [`.claude/skills/uts-to-csharp/SKILL.md`](../../../.claude/skills/uts-to-csharp/SKILL.md) first.
@@ -22,15 +19,18 @@ Uts/
     WebSockets/         MockWebSocket, per uts/realtime/unit/helpers/mock_websocket.md
     Sandbox/            the integration tier's app_config and wall-clock polling
     Proxy/              the proxy tier's session lifecycle and event-log readers
+  Rest/Unit/            derived from uts/rest/unit/**
+  coverage.md           what is not covered, and why
+  deviations.md         where the SDK does the wrong thing
 ```
+
+The remaining tiers arrive as they are translated, each with its own additions to those two
+documents.
 
 A spec at `uts/<path>/<name>.md` becomes `Uts/<Path>/<Name>Tests.cs`, each segment PascalCased.
 Every test carries a `// UTS: <test id>` comment naming the spec point it came from.
 
 ## The three tiers
-
-Nothing is derived yet, but the harness is shaped by what each tier needs, so it is worth knowing
-the three apart.
 
 **Unit** (`Rest/Unit`, `Realtime/Unit`) reaches no network. Every request is served by
 `MockHttpClient` and every frame by `MockWebSocket`, both installed through seams the SDK already
@@ -62,12 +62,16 @@ On Windows run `./build.cmd` with the same arguments. `build.sh` needs a POSIX s
 PowerShell or `cmd` it is not an executable, so Windows offers to open it with a program and then
 closes the window it picked.
 
-The harness has 40 tests of its own, and they run under those two targets: a mock that mis-models
-the SDK is invisible from every test built on it, so the mocks are themselves tested.
-
 Use the **non-retry** targets. `Test.NetStandard.Unit.WithRetry` and its siblings wrap the run in
 warn-only `catch` blocks with no rethrow and **exit 0 even when tests fail** — and CI uses the
 retry variants. A green CI run is not evidence that these tests pass; a green non-retry run is.
+
+For a fast inner loop on one file:
+
+```bash
+dotnet test src/Ably.PubSub.Tests.DotNET/Ably.PubSub.Tests.DotNET.csproj \
+  -f net6.0 -c Release --filter "FullyQualifiedName~Uts.Rest.Unit.Time"
+```
 
 ### The proxy tier needs a proxy
 
@@ -83,6 +87,19 @@ go build -o uts-proxy.exe .
 export UTS_PROXY_PATH=$PWD/uts-proxy.exe
 ```
 
+### Deviation tests
+
+A test that carries the spec-correct assertion against behaviour the SDK gets wrong is marked
+`[DeviationFact]` and skipped by default. Each is individually reproducible:
+
+```bash
+RUN_DEVIATIONS=1 dotnet test ... --filter "FullyQualifiedName~RSA7b"
+```
+
+`deviations.md` is the catalogue, grouped by root cause. Running the suite with
+`RUN_DEVIATIONS=1` is also how you check the record is still true: every gated test must still
+fail, and nothing may pass under both behaviours.
+
 ## Which target frameworks these run on
 
 `net6.0` and `net7.0` — the frameworks `Ably.PubSub.Tests.DotNET` targets. They do **not** run on
@@ -91,3 +108,12 @@ export UTS_PROXY_PATH=$PWD/uts-proxy.exe
 Two pre-existing CI defects are worth knowing before you read a result here. The `net8.0` and
 `net9.0` legs discover **zero** tests, because the test project does not target them. And the
 `*.WithRetry` targets cannot fail. Neither is caused by the UTS work and neither is fixed by it.
+
+## What is not covered
+
+`coverage.md`, grouped by tier, with the reason for each omission. The short version: the
+mutable-messages area — message mutation, annotations, publish results, batch publish, batch
+presence and token revocation — needs client API this SDK does not have, and in C# a test calling a
+method that does not exist is a compile error rather than a failing assertion, so those specs are
+skipped rather than written. Separately, msgpack is compiled out of this build, so every
+protocol-variant spec has exactly one runnable variant.
