@@ -121,7 +121,7 @@ namespace IO.Ably.Tests
         [Trait("docUrl", "https://ably.com/docs/api/rest-api#batch-publish")]
         [Theory]
         [ProtocolData]
-        public async Task BatchMessagePublishOnMultipleChannelsUsingHttpPostRequest(Protocol protocol)
+        public async Task BatchMessagePublishOnMultipleChannelsUsingHttpPostRequest_Flaky(Protocol protocol)
         {
             var client = TrackLastRequest(await GetRestClient(protocol));
 

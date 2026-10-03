@@ -209,15 +209,15 @@ namespace IO.Ably.Tests.MessageEncodes
             [Fact]
             public void WithCipherEncodingThatDoesNotMatchTheCurrentCipher_LeavesMessageUnencrypted()
             {
-                 const string initialEncoding = "utf-8/cipher+aes-128-cbc";
-                 const string encryptedValue = "test";
-                 IPayload payload = new Message { Data = encryptedValue, Encoding = initialEncoding };
+                const string initialEncoding = "utf-8/cipher+aes-128-cbc";
+                const string encryptedValue = "test";
+                IPayload payload = new Message { Data = encryptedValue, Encoding = initialEncoding };
 
-                 var result = _encoder.Decode(payload, _channelOptions.ToDecodingContext());
+                var result = _encoder.Decode(payload, _channelOptions.ToDecodingContext());
 
-                 result.IsFailure.Should().BeTrue();
-                 payload.Encoding.Should().Be(initialEncoding);
-                 payload.Data.Should().Be(encryptedValue);
+                result.IsFailure.Should().BeTrue();
+                payload.Encoding.Should().Be(initialEncoding);
+                payload.Data.Should().Be(encryptedValue);
             }
         }
 

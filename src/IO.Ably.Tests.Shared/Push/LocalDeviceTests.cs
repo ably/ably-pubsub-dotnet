@@ -311,7 +311,7 @@ namespace IO.Ably.Tests.Push
             // Arrange
             const string initialClientId = "123";
             var options = new ClientOptions(ValidKey)
-                { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true, ClientId = initialClientId };
+            { TransportFactory = new FakeTransportFactory(), SkipInternetCheck = true, ClientId = initialClientId };
             var mobileDevice = new FakeMobileDevice();
             var setupRealtime = new AblyRealtime(options, mobileDevice: mobileDevice);
 

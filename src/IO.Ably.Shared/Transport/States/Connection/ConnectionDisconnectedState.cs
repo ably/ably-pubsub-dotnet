@@ -32,7 +32,7 @@ namespace IO.Ably.Transport.States.Connection
 
         public override RealtimeCommand Connect()
         {
-           return SetConnectingStateCommand.Create().TriggeredBy("DisconnectedState.Connect()");
+            return SetConnectingStateCommand.Create().TriggeredBy("DisconnectedState.Connect()");
         }
 
         public override void Close()

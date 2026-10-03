@@ -18,14 +18,14 @@ namespace AndroidSample
             _ably = new AblyRealtime(new ClientOptions("lNj80Q.iGyVcQ:2QKX7FFASfX-7H9H")
             {
                 LogHandler = this,
-                LogLevel = LogLevel.Debug, 
+                LogLevel = LogLevel.Debug,
                 AutoConnect = false,
                 UseBinaryProtocol = false
             });
             _ably.Connection.On(change =>
             {
-                if(change.Current == ConnectionState.Connected)
-                    foreach(var channel in _ably.Channels)
+                if (change.Current == ConnectionState.Connected)
+                    foreach (var channel in _ably.Channels)
                         channel.Attach();
 
                 _connectionSubject.OnNext(change.Current.ToString());
@@ -48,7 +48,7 @@ namespace AndroidSample
             _ably.Channels.Get(channelName).Subscribe(subject.OnNext);
             return subject;
         }
-             
+
         public void LogEvent(LogLevel level, string message)
         {
             Android.Util.Log.Debug("ably", $"[{level}] {message}");
@@ -66,6 +66,6 @@ namespace AndroidSample
         }
     }
 
-    
+
 
 }

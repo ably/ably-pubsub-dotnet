@@ -8,10 +8,16 @@ root = true
 indent_style = space
 indent_size = 4
 trim_trailing_whitespace = true
-insert_final_newline = false
+insert_final_newline = true
 
 # SA1200: Using directives should be placed correctly
 dotnet_diagnostic.SA1200.severity = none
+
+[*.cake]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
 
 [*.{xaml,xml,config,manifest}]
 indent_style = space

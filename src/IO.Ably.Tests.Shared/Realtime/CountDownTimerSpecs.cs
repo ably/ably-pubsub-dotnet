@@ -114,7 +114,7 @@ namespace IO.Ably.Tests.Realtime
                 Count = 0;
             }
 
-            public int Count { get; private set;  }
+            public int Count { get; private set; }
 
             public void Invoke()
             {
