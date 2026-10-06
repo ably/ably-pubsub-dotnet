@@ -38,6 +38,21 @@ namespace Ably.PubSub.Tests.Shared
         }
 
         [Fact]
+        [Trait("spec", "CSV2")]
+        public void Defaults_DeclaresWireProtocolVersion()
+        {
+            // Documents the declared wire protocol version (CSV2c/CSV2d). The constant reaches the
+            // wire in exactly two places, both of which reference it symbolically:
+            // - TransportParams.cs: the websocket "v" query parameter;
+            // - AblyHttpRequester.cs: the "X-Ably-Version" HTTP request header.
+            // A deliberate protocol-version bump is made by changing Defaults.ProtocolVersion; this
+            // test intentionally does not pin the literal value, only its shape.
+            int.TryParse(Defaults.ProtocolVersion, out var declaredVersion)
+                .Should().BeTrue("the declared protocol version must be an integer string");
+            declaredVersion.Should().BePositive();
+        }
+
+        [Fact]
         public void Defaults_ProtocolIsJson()
         {
             Defaults.Protocol.Should().Be(Protocol.Json);
