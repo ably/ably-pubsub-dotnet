@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
-    <CodeAnalysisRuleSet>..\IO.Ably.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet>..\Ably.PubSub.ruleset</CodeAnalysisRuleSet>
     <Configurations>Debug;Release;package</Configurations>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AssemblyName>Ably.PubSub.Core</AssemblyName>
@@ -15,7 +15,7 @@
 
   <PropertyGroup Condition="'$(Package)'=='True'">
     <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>..\..\IO.Ably.snk</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>..\..\Ably.PubSub.snk</AssemblyOriginatorKeyFile>
     <!-- DeltaCodec is built unsigned from the submodule for the SDK TFMs; suppression is scoped
          to signed Package builds only - the plain-Release CS8002 guard stays fully live.
          Proper cure is signing the submodule build (follow-up). -->
