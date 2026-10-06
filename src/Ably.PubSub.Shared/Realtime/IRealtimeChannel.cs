@@ -144,8 +144,13 @@ namespace Ably.PubSub.Realtime
         /// <param name="eventName">The event name.</param>
         /// <param name="data">The payload of the message.</param>
         /// <param name="clientId">optional, id of the client.</param>
-        /// <returns>Task of Result.</returns>
-        Task<Result> PublishAsync(string eventName, object data, string clientId = null);
+        /// <returns>
+        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
+        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
+        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
+        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<PublishResult>> PublishAsync(string eventName, object data, string clientId = null);
 
         /// <summary>
         /// Publish a single message and execute an optional callback when completed.
@@ -160,8 +165,13 @@ namespace Ably.PubSub.Realtime
         /// Use this if you care whether the message has been received.
         /// </summary>
         /// <param name="message">Message to be published.</param>
-        /// <returns>Task of Result.</returns>
-        Task<Result> PublishAsync(Message message);
+        /// <returns>
+        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
+        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
+        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
+        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<PublishResult>> PublishAsync(Message message);
 
         /// <summary>
         /// Publish a number of messages and execute an optional callback when completed.
@@ -175,8 +185,49 @@ namespace Ably.PubSub.Realtime
         /// The resulted task completes when a response from the server with Ack or Nack.
         /// </summary>
         /// <param name="messages">list of messages.</param>
-        /// <returns>Task of Result.</returns>
-        Task<Result> PublishAsync(IEnumerable<Message> messages);
+        /// <returns>
+        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
+        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
+        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
+        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<PublishResult>> PublishAsync(IEnumerable<Message> messages);
+
+        /// <summary>
+        /// Updates an existing message (RTL32). The serial of <paramref name="message"/> identifies the message to update and is
+        /// required (RTL32a); an empty serial throws an <see cref="AblyException"/> with code 40003. The message passed in is not
+        /// modified (RTL32c). The same connection and channel state conditions apply as for publishing a message.
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the fields to apply.</param>
+        /// <param name="operation">optional description of the update, sent as the version of the message (RTL32b2).</param>
+        /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
+        /// <returns>
+        /// A task of <see cref="Result{T}"/> which completes on the ACK or NACK. Failure (including a NACK or the confirmation
+        /// timing out) is reported as a failed result rather than thrown. On success <c>Value</c> holds the version serial of the
+        /// edit (RTL32d); its <see cref="UpdateDeleteResult.VersionSerial"/> is null if the message was superseded, or if the
+        /// server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// </returns>
+        Task<Result<UpdateDeleteResult>> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Marks a message as deleted (RTL32). The message is not removed from the history of the channel.
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments and the result.
+        /// </summary>
+        /// <param name="message">a message with a populated serial.</param>
+        /// <param name="operation">optional description of the delete, sent as the version of the message (RTL32b2).</param>
+        /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
+        /// <returns>A task of <see cref="Result{T}"/> holding the version serial of the delete (RTL32d).</returns>
+        Task<Result<UpdateDeleteResult>> DeleteMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Appends the data of the given message to the data of an existing message (RTL32).
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments and the result.
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the data to append.</param>
+        /// <param name="operation">optional description of the append, sent as the version of the message (RTL32b2).</param>
+        /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
+        /// <returns>A task of <see cref="Result{T}"/> holding the version serial of the append (RTL32d).</returns>
+        Task<Result<UpdateDeleteResult>> AppendMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
 
         /// <summary>
         /// Returns past message of this channel.

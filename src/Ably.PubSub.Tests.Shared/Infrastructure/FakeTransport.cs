@@ -80,8 +80,8 @@ namespace Ably.PubSub.Tests
 
         public Result Send(RealtimeTransportData data)
         {
-            _sendAction(data);
             SentMessages.Add(data);
+            _sendAction(data);
             return Result.Ok();
         }
 

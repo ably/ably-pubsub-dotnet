@@ -255,7 +255,7 @@ namespace Ably.PubSub.Tests
             public HostSpecs(ITestOutputHelper output)
                 : base(output)
             {
-                var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("12345678") };
+                var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("{}") };
                 _handler = new FakeHttpMessageHandler(response);
             }
 

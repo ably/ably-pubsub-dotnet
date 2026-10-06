@@ -15,6 +15,12 @@ namespace Ably.PubSub.Types
     ///  See the Ably client library developer documentation for further
     ///  details on the members of a ProtocolMessage.
     /// </summary>
+    /// <remarks>
+    ///  OBJECT and OBJECT_SYNC protocol messages carry a <c>state</c> array of object messages (TR4r). This library
+    ///  has no objects support, so that payload is deliberately not modelled: the unknown field is ignored on
+    ///  deserialization, as in the other Ably Pub/Sub SDKs when no objects plugin is present. A future objects
+    ///  extension would add the property and consume it.
+    /// </remarks>
     public class ProtocolMessage
     {
         /// <summary>
@@ -51,12 +57,12 @@ namespace Ably.PubSub.Types
             Activate = 18,
 
             /// <summary>
-            /// OBJECT action, wire value 19 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// OBJECT action, wire value 19 per TR2. Carried by LiveObjects; tolerated and ignored by this library, other than advancing the channel serial (RTL15b).
             /// </summary>
             Object = 19,
 
             /// <summary>
-            /// OBJECT_SYNC action, wire value 20 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// OBJECT_SYNC action, wire value 20 per TR2. Carried by LiveObjects; tolerated and ignored by this library.
             /// </summary>
             ObjectSync = 20,
 
@@ -90,6 +96,7 @@ namespace Ably.PubSub.Types
             HasLocalPresence = 1 << 3,
             Transient = 1 << 4,
             AttachResume = 1 << 5,
+            HasObjects = 1 << 7,
 
             // Channel modes
             Presence = 1 << 16,
@@ -98,6 +105,8 @@ namespace Ably.PubSub.Types
             PresenceSubscribe = 1 << 19,
             AnnotationPublish = 1 << 21,
             AnnotationSubscribe = 1 << 22,
+            ObjectSubscribe = 1 << 24,
+            ObjectPublish = 1 << 25,
 #pragma warning restore SA1602 // Enumeration items should be documented
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         }
@@ -232,6 +241,13 @@ namespace Ably.PubSub.Types
         /// </summary>
         [JsonProperty("annotations")]
         public Annotation[] Annotations { get; set; }
+
+        /// <summary>
+        /// Present in ACK protocol messages: one <see cref="PublishResult"/> per acknowledged protocol message,
+        /// in order, each containing the serials of the messages that were published (TR4s).
+        /// </summary>
+        [JsonProperty("res")]
+        public PublishResult[] Res { get; set; }
 
         /// <summary>
         /// Connection details received. <see cref="Ably.PubSub.ConnectionDetails"/>.

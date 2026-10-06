@@ -160,7 +160,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
         public readonly List<MessageAndCallback> WaitingForAck = new List<MessageAndCallback>();
 
-        public void AddAckMessage(ProtocolMessage message, Action<bool, ErrorInfo> callback) =>
+        public void AddAckMessage(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback) =>
             WaitingForAck.Add(new MessageAndCallback(message, callback));
 
         public RealtimeState()

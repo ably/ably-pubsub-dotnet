@@ -12,6 +12,16 @@ namespace Ably.PubSub.Realtime
         private readonly List<MessageHandlerAction<T>> _handlers = new List<MessageHandlerAction<T>>();
         private readonly Dictionary<string, List<MessageHandlerAction<T>>> _specificHandlers = new Dictionary<string, List<MessageHandlerAction<T>>>();
         private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
+        private readonly bool _caseSensitive;
+
+        /// <summary>Initializes a new instance of the <see cref="Handlers{T}"/> class.</summary>
+        /// <param name="caseSensitive">When true, filter names must match exactly; by default they are matched case-insensitively.</param>
+        public Handlers(bool caseSensitive = false)
+        {
+            _caseSensitive = caseSensitive;
+        }
+
+        private string Key(string eventName) => _caseSensitive ? eventName : eventName.ToLower();
 
         public IEnumerable<MessageHandlerAction<T>> GetHandlers(string eventName = null)
         {
@@ -21,7 +31,7 @@ namespace Ably.PubSub.Realtime
                 if (eventName.IsNotEmpty())
                 {
                     List<MessageHandlerAction<T>> result;
-                    if (_specificHandlers.TryGetValue(eventName.ToLower(), out result))
+                    if (_specificHandlers.TryGetValue(Key(eventName), out result))
                     {
                         return new List<MessageHandlerAction<T>>(result);
                     }
@@ -75,7 +85,7 @@ namespace Ably.PubSub.Realtime
             {
                 _lock.EnterWriteLock();
                 List<MessageHandlerAction<T>> result;
-                var key = eventName.ToLower();
+                var key = Key(eventName);
                 if (_specificHandlers.TryGetValue(key, out result))
                 {
                     if (result != null)
@@ -119,7 +129,7 @@ namespace Ably.PubSub.Realtime
             try
             {
                 _lock.EnterWriteLock();
-                var key = eventName.ToLower();
+                var key = Key(eventName);
                 if (_specificHandlers.ContainsKey(key))
                 {
                     if (handler == null)

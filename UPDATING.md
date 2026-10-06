@@ -97,6 +97,37 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
 
+## Publish results and new message APIs
+
+Publishing now reports what the service did with the messages. Typical callers only need to recompile; code that assigns the result of a publish to a variable of the old type needs the new type.
+
+| 1.x | 2.0 |
+|-----|-----|
+| `IRestChannel.PublishAsync(...)` returned `Task` | `IHttpChannel.PublishAsync(...)` returns `Task<PublishResult>` |
+| `IRestChannel.Publish(...)` returned `void` | `IHttpChannel.Publish(...)` returns `PublishResult` |
+| `IRealtimeChannel.PublishAsync(...)` returned `Task<Result>` | `IRealtimeChannel.PublishAsync(...)` returns `Task<Result<PublishResult>>` |
+
+`PublishResult.Serials` holds one serial per published message, in order. A serial is `null` for a message the service discarded because of a conflation rule. On a realtime channel, `Result<PublishResult>.Value` is `null` when the service's acknowledgement carried no result.
+
+**Behaviour change:** a successful REST publish whose response body is not a JSON object (for example plain text) now throws an `AblyException`. 1.x ignored the response body of a publish. An empty or absent body is still accepted and gives a `PublishResult` with no serials.
+
+**Behaviour change:** HTTP `PATCH` requests now send their request body. In 1.x the body of a `PATCH` was silently dropped, which affected the push device-registration update (`PATCH /push/deviceRegistrations/:id`, which now sends its `{"push":{"recipient":...}}` body) and any `PATCH` made through `PubSubHttpClient.RequestV2("PATCH", path, ..., body)`, whose body is now sent. If you worked around the missing body, remove the workaround.
+
+**Behaviour change:** a realtime publish whose serial falls below the range of a later `ACK` now completes as a failure (error code 50000) instead of silently succeeding. An `ACK` covers only `msgSerial` to `msgSerial + count - 1`, and the protocol treats skipped messages as not acknowledged; java and cocoa behave the same way. Entries inside the range are unaffected.
+
+New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message updates and deletes enabled:
+
+| API | Notes |
+|-----|-------|
+| `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` | Take a `Message` with a populated `Serial`, an optional `MessageOperation` (`ClientId`, `Description`, `Metadata`) and optional params. The message you pass is never modified. `IHttpChannel` returns `Task<UpdateDeleteResult>` and throws on failure; `IRealtimeChannel` returns `Task<Result<UpdateDeleteResult>>`, like `PublishAsync`. `UpdateDeleteResult.VersionSerial` is `null` if the message was superseded by a later update. |
+| `GetMessageAsync`, `GetMessageVersionsAsync` | Retrieve the latest version, or all versions, of a message by serial. |
+| `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. |
+| `Message.Serial`, `Message.Version`, `Message.Action`, `Message.Annotations` | Populated on messages received from the service. |
+
+**Behaviour change:** the SDK now declares wire protocol version 6 (1.x declared 2). The version is sent as the realtime `v` parameter and the REST `X-Ably-Version` header, and the service sends the newer message structure. The stats endpoint remains pinned to the v2 response format, so `StatsAsync` results are unchanged.
+
+**Behaviour change:** `Request()`/`RequestV2()` callers that send no `X-Ably-Version` header now receive protocol-6 response shapes (for example, `GET /channels` returns channel names, and a batch `POST /messages` returns a single results envelope). Pass the `X-Ably-Version` header to pin a version.
+
 ## Do not mix 1.x and 2.0 in one project
 
 With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.
