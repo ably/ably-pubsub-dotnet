@@ -1,0 +1,57 @@
+name: "UTS Proxy Test: Linux"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'integration/**'
+
+permissions:
+  contents: read
+
+jobs:
+  proxy:
+    runs-on: ubuntu-22.04
+    env:
+      DOTNET_NOLOGO: true
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            6.0.428
+            7.0.410
+
+      - name: Download dotnet build-script tools
+        run: dotnet tool restore
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version: '1.22'
+
+      # Built from source at a pinned tag rather than downloaded from the release assets. The
+      # release archive names carry the version and platform, so a bump means editing the URL and
+      # the checksum; `go install` at a tag is reproducible through the module proxy and go.sum,
+      # and it is the same path a Windows developer has to take anyway, since the project's
+      # releases are linux/darwin only.
+      - name: Install uts-proxy
+        run: go install github.com/ably/uts-proxy@v0.3.0
+
+      # The proxy tests skip themselves when no proxy is reachable, which is right for a local run
+      # but would make this leg silently vacuous. Fail here instead, so a broken install is
+      # obvious rather than looking like a pass.
+      - name: Verify uts-proxy is on PATH
+        run: |
+          which uts-proxy
+          echo "UTS_PROXY_PATH=$(which uts-proxy)" >> "$GITHUB_ENV"
+
+      # No .WithRetry variant on purpose: those wrappers catch test failures and exit 0, so a
+      # retrying leg cannot report a real result.
+      - name: UTS proxy tests
+        run: ./build.sh --target=Test.NetStandard.Proxy --framework=net6.0
