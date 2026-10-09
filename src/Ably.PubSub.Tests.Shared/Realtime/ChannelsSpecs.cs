@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 
 using Ably.PubSub.Realtime;
@@ -75,142 +76,115 @@ namespace Ably.PubSub.Tests.Realtime
             Assert.Same(options, existing.Options);
         }
 
+        // UTS: realtime/unit/RTS4c/release-nonexistent-noop-0
         [Fact]
-        [Trait("spec", "RTS4")]
-        [Trait("spec", "RTS4a")]
-        public async Task Release_ShouldDetachChannel()
+        [Trait("spec", "RTS4c")]
+        public void Release_WhenChannelDoesNotExist_ShouldReturnWithoutError()
         {
-            // Arrange
-            var client = await GetConnectedClient();
-            var channel = client.Channels.Get("test");
-            channel.Attach();
+            var client = GetClientWithFakeTransport(options => options.AutoConnect = false);
 
-            // Act
-            client.Channels.Release("test");
+            client.Channels.Release("nonexistent").Should().BeFalse();
 
-            // Assert
-            channel.State.Should().Be(ChannelState.Detaching);
+            client.Channels.Exists("nonexistent").Should().BeFalse();
         }
 
+        // UTS: realtime/unit/RTS4d/release-removes-channel-0
         [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task Release_ShouldNotRemoveChannelBeforeDetached()
+        [Trait("spec", "RTS4d")]
+        public void Release_WhenChannelInitialized_ShouldRemoveChannel()
         {
-            // Arrange
-            var client = await GetConnectedClient();
-            var channel = client.Channels.Get("test");
-            channel.Attach();
+            var client = GetClientWithFakeTransport(options => options.AutoConnect = false);
+            var channel = client.Channels.Get(TestChannelName);
+            channel.State.Should().Be(ChannelState.Initialized);
 
-            // Act
-            client.Channels.Release("test");
+            client.Channels.Release(TestChannelName).Should().BeTrue();
 
-            // Assert
-            Assert.Same(channel, client.Channels.Single());
+            client.Channels.Exists(TestChannelName).Should().BeFalse();
         }
 
+        // UTS: realtime/unit/RTS4d/release-after-detach-1
         [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task Release_ShouldRemoveChannelWhenDetached()
+        [Trait("spec", "RTS4d")]
+        public async Task Release_WhenChannelDetached_ShouldRemoveChannel()
         {
-            // Arrange
             var (client, channel) = await GetClientAndChannel();
-
-            channel.Attach();
-            client.Channels.Release(TestChannelName);
-
-            // Act
+            await AttachChannel(client, channel);
+            channel.Detach();
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached, TestChannelName));
+            await channel.WaitForState(ChannelState.Detached);
 
-            await client.ProcessCommands();
+            client.Channels.Release(TestChannelName).Should().BeTrue();
 
-            // Assert
-            client.Channels.Should().BeEmpty();
+            client.Channels.Exists(TestChannelName).Should().BeFalse();
         }
 
         [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task Release_RemovesChannelWhenFailed()
+        [Trait("spec", "RTS4d")]
+        public async Task Release_WhenChannelFailed_ShouldRemoveChannel()
         {
-            // Arrange
             var (client, channel) = await GetClientAndChannel();
             channel.Attach();
-            client.Channels.Release("test");
-
-            // Act
-            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error, "test"));
-
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error, TestChannelName));
             await channel.WaitForState(ChannelState.Failed);
 
-            // Assert
+            client.Channels.Release(TestChannelName).Should().BeTrue();
+
+            client.Channels.Exists(TestChannelName).Should().BeFalse();
+        }
+
+        // UTS: realtime/unit/RTS4e/release-attached-fails-0
+        [Fact]
+        [Trait("spec", "RTS4e")]
+        public async Task Release_WhenChannelAttached_ShouldThrowAndLeaveChannelAttached()
+        {
+            var (client, channel) = await GetClientAndChannel();
+            await AttachChannel(client, channel);
+            var sentMessageCount = LastCreatedTransport.SentMessages.Count;
+
+            var ex = Assert.Throws<AblyException>(() => client.Channels.Release(TestChannelName));
+
+            ex.ErrorInfo.Code.Should().Be(ErrorCodes.ChannelReleaseInvalidState);
+            ex.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            channel.State.Should().Be(ChannelState.Attached);
+            client.Channels.Get(TestChannelName).Should().BeSameAs(channel);
+            LastCreatedTransport.SentMessages.Should().HaveCount(sentMessageCount);
+        }
+
+        [Fact]
+        [Trait("spec", "RTS4d")]
+        public async Task ReleaseAll_WhenAllChannelsReleasable_ShouldRemoveThem()
+        {
+            var (client, failedChannel) = await GetClientAndChannel();
+            failedChannel.Attach();
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error, TestChannelName));
+            await failedChannel.WaitForState(ChannelState.Failed);
+            client.Channels.Get("initialized");
+
+            client.Channels.ReleaseAll();
+
             client.Channels.Should().BeEmpty();
         }
 
         [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task ReleaseAll_ShouldDetachChannel()
+        [Trait("spec", "RTS4e")]
+        public async Task ReleaseAll_WhenAnyChannelAttached_ShouldThrowAndReleaseNothing()
         {
-            // Arrange
-            var (client, channel) = await GetClientAndChannel();
+            var (client, attachedChannel) = await GetClientAndChannel();
+            await AttachChannel(client, attachedChannel);
+            var initializedChannel = client.Channels.Get("initialized");
 
-            channel.Attach();
+            var ex = Assert.Throws<AblyException>(() => client.Channels.ReleaseAll());
 
-            // Act
-            client.Channels.ReleaseAll();
-
-            // Assert
-            channel.State.Should().Be(ChannelState.Detaching);
+            ex.ErrorInfo.Code.Should().Be(ErrorCodes.ChannelReleaseInvalidState);
+            ex.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            client.Channels.Should().BeEquivalentTo(new[] { attachedChannel, initializedChannel });
         }
 
-        [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task ReleaseAll_ShouldNotRemoveChannelBeforeDetached()
+        private static async Task AttachChannel(PubSubRealtimeClient client, IRealtimeChannel channel)
         {
-            // Arrange
-            var (client, channel) = await GetClientAndChannel();
             channel.Attach();
-
-            // Act
-            client.Channels.ReleaseAll();
-
-            // Assert
-            Assert.Same(channel, client.Channels.Single());
-        }
-
-        [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task ReleaseAll_ShouldRemoveChannelWhenDetached()
-        {
-            // Arrange
-            var (client, channel) = await GetClientAndChannel();
-            channel.Attach();
-            client.Channels.ReleaseAll();
-
-            // Act
-            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached, TestChannelName));
-
-            await new ChannelAwaiter(channel, ChannelState.Detached).WaitAsync();
-
-            // Assert
-            client.Channels.Should().BeEmpty();
-        }
-
-        [Fact]
-        [Trait("spec", "RTS4a")]
-        public async Task ReleaseAll_ShouldRemoveChannelWhenFailed()
-        {
-            // Arrange
-            var (client, channel) = await GetClientAndChannel();
-
-            channel.Attach();
-            client.Channels.ReleaseAll();
-
-            // Act
-            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error, "test"));
-
-            await client.ProcessCommands();
-
-            // Assert
-            client.Channels.Should().BeEmpty();
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached, channel.Name));
+            await channel.WaitForState(ChannelState.Attached);
         }
 
         [Fact]

@@ -94,69 +94,73 @@ namespace Ably.PubSub.Realtime
         public IRealtimeChannel this[string name] => Get(name);
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// A realtime channel can only be released when it is in the <see cref="ChannelState.Initialized"/>,
+        /// <see cref="ChannelState.Detached"/>, or <see cref="ChannelState.Failed"/> state.
+        /// </remarks>
+        /// <exception cref="AblyException">Thrown with error code 90011 if the channel is in any other state.</exception>
         public bool Release(string name)
         {
-            bool IsChannelStateOkForImmediateRelease(RealtimeChannel realtimeChannel)
-            {
-                var state = realtimeChannel.State;
-
-                return state == ChannelState.Initialized || state == ChannelState.Detached ||
-                       state == ChannelState.Failed;
-            }
-
-            bool RemoveChannel()
-            {
-                if (Channels.TryRemove(name, out RealtimeChannel removedChannel))
-                {
-                    removedChannel.RemoveAllListeners();
-                    _orderedChannels.Remove(removedChannel);
-                    return true;
-                }
-
-                return false;
-            }
-
             if (Logger.IsDebug)
             {
                 Logger.Debug($"Releasing channel #{name}");
             }
 
+            // RTS4c
             if (!Channels.TryGetValue(name, out RealtimeChannel channel))
             {
                 return false;
             }
 
-            void DetachedCallback(bool detached, ErrorInfo error)
-            {
-                if (Logger.IsDebug)
-                {
-                    Logger.Debug(
-                        error is null
-                            ? $"Channel #{name} was removed from Channel list. Detached successfully: {detached}."
-                            : $"Failed to cleanly detach channel #{name} before removing it from Channel list. Detach error: {error}.");
-                }
+            // RTS4e
+            ThrowIfNotReleasable(channel);
 
-                RemoveChannel();
-            }
-
-            if (IsChannelStateOkForImmediateRelease(channel))
-            {
-                return RemoveChannel();
-            }
-
-            channel.Detach(DetachedCallback);
-
-            return true;
+            // RTS4d
+            return RemoveChannel(name);
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// Channels can only be released when they are in the <see cref="ChannelState.Initialized"/>,
+        /// <see cref="ChannelState.Detached"/>, or <see cref="ChannelState.Failed"/> state.
+        /// </remarks>
+        /// <exception cref="AblyException">Thrown with error code 90011, without releasing any channel, if any channel is in any other state.</exception>
         public void ReleaseAll()
         {
-            var channelList = Channels.Keys.ToArray();
-            foreach (var channelName in channelList)
+            var channels = Channels.Values.ToArray();
+            foreach (var channel in channels)
             {
-                Release(channelName);
+                ThrowIfNotReleasable(channel);
             }
+
+            foreach (var channel in channels)
+            {
+                RemoveChannel(channel.Name);
+            }
+        }
+
+        private static void ThrowIfNotReleasable(RealtimeChannel channel)
+        {
+            var state = channel.State;
+            if (state != ChannelState.Initialized && state != ChannelState.Detached && state != ChannelState.Failed)
+            {
+                throw new AblyException(new ErrorInfo(
+                    $"Can only release a channel in a state where there is no possibility of further updates from the server being received (Initialized, Detached, or Failed). The current state of channel '{channel.Name}' is {state}.",
+                    ErrorCodes.ChannelReleaseInvalidState,
+                    HttpStatusCode.BadRequest));
+            }
+        }
+
+        private bool RemoveChannel(string name)
+        {
+            if (Channels.TryRemove(name, out RealtimeChannel removedChannel))
+            {
+                removedChannel.RemoveAllListeners();
+                _orderedChannels.Remove(removedChannel);
+                return true;
+            }
+
+            return false;
         }
 
         internal void CleanupChannels()
