@@ -252,7 +252,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
                     case CompleteWorkflowCommand _:
                         _heartbeatMonitorCancellationTokenSource.Cancel();
-                        Channels.ReleaseAll();
+                        Channels.CleanupChannels();
                         ConnectionManager.Transport?.Dispose();
                         CommandChannel.Writer.TryComplete();
                         State.Connection.CurrentStateObject?.AbortTimer();

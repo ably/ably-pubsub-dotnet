@@ -97,6 +97,20 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
 
+## Release a realtime channel only once it is detached
+
+In 1.x, `Channels.Release(name)` and `Channels.ReleaseAll()` on a realtime channel that was not in the `Initialized`, `Detached` or `Failed` state detached it and removed it once the detach completed. 1.x logs a deprecation warning when this happens. In 2.0 they instead throw an `AblyException` with error code 90011 and status code 400, and leave the channel as it was. `ReleaseAll()` checks every channel first, and releases none of them if any one is in another state. Detach the channel and wait for the detach to complete before releasing it:
+
+```csharp
+// 1.x
+realtime.Channels.Release("my-channel");
+
+// 2.0
+var channel = realtime.Channels.Get("my-channel");
+await channel.DetachAsync();
+realtime.Channels.Release("my-channel");
+```
+
 ## Do not mix 1.x and 2.0 in one project
 
 With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.
