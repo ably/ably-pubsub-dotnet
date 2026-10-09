@@ -145,6 +145,57 @@ namespace IO.Ably.Tests.Realtime
             client.Channels.Should().BeEmpty();
         }
 
+        [Theory]
+        [InlineData("Channels.Release()")]
+        [InlineData("Channels.ReleaseAll()")]
+        [Trait("spec", "RTS4b")]
+        public async Task Release_WhenChannelAttached_ShouldLogDeprecationWarning(string apiName)
+        {
+            var testLogger = new TestLogger($"Calling `{apiName}` on a channel in the Attached state is deprecated");
+            var (client, channel) = await GetClientAndChannel(options => options.Logger = testLogger);
+            channel.Attach();
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached, TestChannelName));
+            await channel.WaitForState(ChannelState.Attached);
+
+            CallRelease(client, apiName);
+
+            testLogger.MessageSeen.Should().BeTrue();
+            testLogger.FullMessage.Should().EndWith($"before calling `{apiName}`.");
+        }
+
+        [Theory]
+        [InlineData("Channels.Release()")]
+        [InlineData("Channels.ReleaseAll()")]
+        [Trait("spec", "RTS4b")]
+        public async Task Release_WhenChannelDetached_ShouldNotLogDeprecationWarning(string apiName)
+        {
+            var testLogger = new TestLogger($"Calling `{apiName}`");
+            var (client, channel) = await GetClientAndChannel(options => options.Logger = testLogger);
+            channel.Attach();
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached, TestChannelName));
+            await channel.WaitForState(ChannelState.Attached);
+            channel.Detach();
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached, TestChannelName));
+            await channel.WaitForState(ChannelState.Detached);
+
+            CallRelease(client, apiName);
+
+            testLogger.MessageSeen.Should().BeFalse();
+            client.Channels.Should().BeEmpty();
+        }
+
+        private static void CallRelease(AblyRealtime client, string apiName)
+        {
+            if (apiName == "Channels.ReleaseAll()")
+            {
+                client.Channels.ReleaseAll();
+            }
+            else
+            {
+                client.Channels.Release(TestChannelName);
+            }
+        }
+
         [Fact]
         [Trait("spec", "RTS4a")]
         public async Task ReleaseAll_ShouldDetachChannel()

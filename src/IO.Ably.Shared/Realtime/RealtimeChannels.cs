@@ -94,7 +94,17 @@ namespace IO.Ably.Realtime
         public IRealtimeChannel this[string name] => Get(name);
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// A realtime channel should only be released when it is in the <see cref="ChannelState.Initialized"/>,
+        /// <see cref="ChannelState.Detached"/>, or <see cref="ChannelState.Failed"/> state; releasing a realtime
+        /// channel in any other state is deprecated and will throw an error in the next major version.
+        /// </remarks>
         public bool Release(string name)
+        {
+            return Release(name, "Channels.Release()");
+        }
+
+        private bool Release(string name, string apiName)
         {
             bool IsChannelStateOkForImmediateRelease(RealtimeChannel realtimeChannel)
             {
@@ -144,6 +154,9 @@ namespace IO.Ably.Realtime
                 return RemoveChannel();
             }
 
+            // RTS4b
+            Logger.Warning($"Calling `{apiName}` on a channel in the {channel.State} state is deprecated, and will throw an error in the next major version. Detach the channel and wait for the detach to complete before calling `{apiName}`.");
+
             channel.Detach(DetachedCallback);
 
             return true;
@@ -155,7 +168,7 @@ namespace IO.Ably.Realtime
             var channelList = Channels.Keys.ToArray();
             foreach (var channelName in channelList)
             {
-                Release(channelName);
+                Release(channelName, "Channels.ReleaseAll()");
             }
         }
 
