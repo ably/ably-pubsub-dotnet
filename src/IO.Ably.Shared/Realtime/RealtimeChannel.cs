@@ -459,6 +459,61 @@ namespace IO.Ably.Realtime
             }
         }
 
+        /// <summary>
+        /// RTL5k - "If the channel receives an ATTACHED message while in the DETACHING or DETACHED
+        /// state, it should send a new DETACH message and remain in (or transition to) the DETACHING
+        /// state".
+        /// </summary>
+        internal void DetachForUnexpectedAttached()
+        {
+            // State is read once: a concurrent Attach() on the caller's thread may already have moved
+            // the channel on, in which case the ATTACHED is no longer unexpected.
+            var state = State;
+            if (state != ChannelState.Detaching && state != ChannelState.Detached)
+            {
+                return;
+            }
+
+            switch (ConnectionState)
+            {
+                case ConnectionState.Connected:
+                    Logger.Debug($"#{Name}: ATTACHED received in {state} state; sending DETACH (RTL5k)");
+
+                    if (state == ChannelState.Detaching && DetachedAwaiter.Waiting)
+                    {
+                        // The detach in progress already owns the RTL5f timer, so only the DETACH
+                        // is resent.
+                        SendMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Detach, Name));
+                    }
+                    else
+                    {
+                        // The ordinary detach path transitions to DETACHING, starts the RTL5f timer,
+                        // which returns the channel to its previous state if no DETACHED arrives, and
+                        // sends the DETACH.
+                        Detach(null, force: true, emitUpdate: false);
+                    }
+
+                    break;
+
+                case ConnectionState.Connecting:
+                case ConnectionState.Disconnected:
+                    // A DETACHING channel has its DETACH sent, and its RTL5f timer started, once the
+                    // connection becomes CONNECTED (RTN19b).
+                    Logger.Debug($"#{Name}: ATTACHED received in {state} state while connection is {ConnectionState}; DETACH will be sent once connected (RTL5k)");
+
+                    if (state == ChannelState.Detached)
+                    {
+                        SetChannelState(ChannelState.Detaching);
+                    }
+
+                    break;
+
+                default:
+                    Logger.Debug($"#{Name}: ATTACHED received in {state} state while connection is {ConnectionState}; not sending DETACH");
+                    break;
+            }
+        }
+
         public async Task<Result> DetachAsync()
         {
             return await TaskWrapper.Wrap(Detach);

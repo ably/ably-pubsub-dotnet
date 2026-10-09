@@ -837,6 +837,319 @@ namespace IO.Ably.Tests.Realtime
                 channel.State.Should().Be(ChannelState.Detached);
             }
 
+            [Theory]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachingOrDetached_ShouldSendDetachAndBeDetaching(ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, state);
+                var sentBefore = LastCreatedTransport.SentMessages.Count;
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                LastCreatedTransport.SentMessages.Count.Should().Be(sentBefore + 1);
+                LastCreatedTransport.LastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Detach);
+                LastCreatedTransport.LastMessageSend.Channel.Should().Be(channel.Name);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL5d")]
+            public async Task WhenAttachedReceivedWhileDetached_ShouldEmitDetachingAndThenDetachedOnceDetachedIsReceived()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detached);
+
+                var stateChanges = new ConcurrentQueue<ChannelStateChange>();
+                channel.On(stateChange => stateChanges.Enqueue(stateChange));
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                (await WaitUntil(() => stateChanges.Count >= 2)).Should().BeTrue();
+                stateChanges.Select(x => x.Event).Should().Equal(ChannelEvent.Detaching, ChannelEvent.Detached);
+                stateChanges.First().Previous.Should().Be(ChannelState.Detached);
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL15b2")]
+            [Trait("spec", "RTL4c1")]
+            public async Task WhenAttachedReceivedWhileDetachingOrDetached_ShouldNotUpdateTheChannel(ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+                var realtimeChannel = (RealtimeChannel)channel;
+                SetChannelState(channel, state);
+
+                var stateChanges = new ConcurrentQueue<ChannelStateChange>();
+                channel.On(stateChange => stateChanges.Enqueue(stateChange));
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = "unexpected-attached-serial",
+                    Flags = (int)(ProtocolMessage.Flag.Resumed | ProtocolMessage.Flag.HasPresence | ProtocolMessage.Flag.Subscribe),
+                    Params = new ChannelParams { { "rewind", "1" } },
+                });
+                await client.ProcessCommands();
+
+                realtimeChannel.Properties.ChannelSerial.Should().BeNull();
+                realtimeChannel.Properties.AttachSerial.Should().BeNull();
+                channel.Modes.Should().BeEmpty();
+                channel.Params.Should().BeEmpty();
+                realtimeChannel.Presence.SyncInProgress.Should().BeFalse();
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Detached);
+
+                channel.Attach();
+                await client.ProcessCommands();
+
+                var attachMessage = LastCreatedTransport.LastMessageSend;
+                attachMessage.Action.Should().Be(ProtocolMessage.MessageAction.Attach);
+                attachMessage.ChannelSerial.Should().BeNull();
+                stateChanges.Select(x => x.Event).Should().NotContain(new[] { ChannelEvent.Attached, ChannelEvent.Update });
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL5f")]
+            public async Task WhenAttachedReceivedWhileDetached_AndDetachedIsNotReceivedWithinTimeout_ShouldReturnToDetached()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(500);
+                SetChannelState(channel, ChannelState.Detached);
+
+                var stateChanges = new ConcurrentQueue<ChannelStateChange>();
+                var detached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                channel.On(stateChange =>
+                {
+                    stateChanges.Enqueue(stateChange);
+                    if (stateChange.Event == ChannelEvent.Detached)
+                    {
+                        detached.TrySetResult(true);
+                    }
+                });
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                (await Task.WhenAny(detached.Task, Task.Delay(5000))).Should().Be(detached.Task);
+
+                stateChanges.Select(x => x.Event).Should().Equal(ChannelEvent.Detaching, ChannelEvent.Detached);
+                stateChanges.Last().Error.Code.Should().Be(ErrorCodes.InternalError);
+                channel.State.Should().Be(ChannelState.Detached);
+                channel.ErrorReason.Code.Should().Be(ErrorCodes.InternalError);
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(1);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL5e")]
+            public async Task WhenDetachIsAnsweredWithAttached_ShouldSendDetachAgainAndCompleteOnceDetachedIsReceived()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Attached);
+
+                var detachResult = channel.DetachAsync();
+                await client.ProcessCommands();
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(1);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detaching);
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(2);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                (await detachResult).IsSuccess.Should().BeTrue();
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessages(ProtocolMessage.MessageAction.Attach).Should().Be(0);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL13a")]
+            public async Task WhenDetachIsCalledBeforeAttached_LateAttachedShouldNotReattachTheChannel()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                channel.Attach();
+                await client.ProcessCommands();
+                channel.Detach();
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessages(ProtocolMessage.MessageAction.Attach).Should().Be(1);
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(2);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTN19b")]
+            public async Task WhenAttachedReceivedWhileDetachedAndConnecting_ShouldBeDetachingAndSendDetachOnceConnected()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detached);
+
+                // From CONNECTED, DISCONNECTED retries immediately, leaving the connection CONNECTING.
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Connecting);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detaching);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(0);
+
+                client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(1);
+                LastCreatedTransport.LastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Detach);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTN19b")]
+            public async Task WhenAttachedReceivedWhileDetaching_AndTransportIsReconnected_ShouldSendDetachAgainOnTheNewTransport()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Attached);
+
+                channel.Detach();
+                await client.ProcessCommands();
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                var firstTransport = LastCreatedTransport;
+                firstTransport.SentMessages.Count(x => x.Original.Action == ProtocolMessage.MessageAction.Detach).Should().Be(2);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                // From CONNECTED, DISCONNECTED retries immediately on a new transport.
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Connecting);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                LastCreatedTransport.Should().NotBeSameAs(firstTransport);
+                LastCreatedTransport.SentMessages.Count(x => x.Original.Action == ProtocolMessage.MessageAction.Detach).Should().Be(1);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Attach).Should().Be(0);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachingAndDisconnected_ShouldNotSendDetachUntilConnected()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detaching);
+
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Connecting);
+
+                // From CONNECTING, DISCONNECTED waits for disconnectedRetryTimeout before retrying.
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Disconnected);
+                await client.ProcessCommands();
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                client.Connection.State.Should().Be(ConnectionState.Disconnected);
+                channel.State.Should().Be(ChannelState.Detaching);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(0);
+                client.State.PendingMessages.Should().NotContain(x => x.Message.Action == ProtocolMessage.MessageAction.Detach);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachedAndConnectionSuspended_ShouldNotChangeState()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detached);
+
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(0);
+                client.State.PendingMessages.Should().NotContain(x => x.Message.Action == ProtocolMessage.MessageAction.Detach);
+            }
+
             [Fact]
             [Trait("spec", "RTL5f")]
             public async Task ShouldReturnToPreviousStateIfDetachedMessageWasNotReceivedWithinDefaultTimeout()
@@ -951,6 +1264,28 @@ namespace IO.Ably.Tests.Realtime
                 detachTask.Result.IsFailure.Should().BeTrue();
                 detachTask.Result.Error.Should().NotBeNull();
             }
+
+            private static async Task<bool> WaitUntil(Func<bool> condition)
+            {
+                var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+                while (!condition())
+                {
+                    if (DateTimeOffset.UtcNow > deadline)
+                    {
+                        return false;
+                    }
+
+                    await Task.Delay(10);
+                }
+
+                return true;
+            }
+
+            private int CountSentMessages(ProtocolMessage.MessageAction action) =>
+                LastCreatedTransport.SentMessages.Count(x => x.Original.Action == action);
+
+            private int CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction action) =>
+                CreatedTransports.Sum(t => t.SentMessages.Count(x => x.Original.Action == action));
 
             private Task ReceiveDetachedMessage(AblyRealtime client)
             {
