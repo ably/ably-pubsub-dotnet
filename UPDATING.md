@@ -78,7 +78,7 @@ Because v1 keeps `IO.Ably.*` and v2 lives under `Ably.PubSub.*`, the two no long
 | `AblyRealtime.RestClient` (property) | `PubSubRealtimeClient.HttpClient` |
 | `PushRest` (the `AblyRest.Push` type) | `PushHttp` (the `PubSubHttpClient.Push` type) |
 
-Names that refer to Ably's REST API service or wire options are unchanged (`ClientOptions.RestHost`, `ClientOptions.IdempotentRestPublishing`, and so on).
+Names that refer to Ably's REST API service or wire options are unchanged (`ClientOptions.IdempotentRestPublishing`, and so on).
 
 ## Deprecated API removed
 
@@ -96,6 +96,49 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 | `HistoryRequestParams` | `PaginatedRequestParams` |
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
+| `ClientOptions.Environment`, `ClientOptions.RestHost`, `ClientOptions.RealtimeHost` | `ClientOptions.Endpoint` — see [Choose the host with `Endpoint`](#choose-the-host-with-endpoint) |
+| `ClientOptions.FullRestHost()` / `ClientOptions.FullRealtimeHost()` / `ClientOptions.GetFallbackHosts()` | Nothing — `Connection.Host` reports the host the realtime connection is using |
+
+## Choose the host with `Endpoint`
+
+2.0 replaces `ClientOptions.Environment`, `RestHost` and `RealtimeHost` with a single `ClientOptions.Endpoint` option. REST requests and the realtime connection now always use the same host.
+
+| 1.x | 2.0 |
+|-----|-----|
+| No host options | No change; traffic moves to `main.realtime.ably.net` (see below) |
+| `Environment = "sandbox"` | `Endpoint = "nonprod:sandbox"` |
+| `Environment = "acme"` (dedicated cluster) | `Endpoint = "acme"` |
+| `RestHost` / `RealtimeHost = "localhost"` | `Endpoint = "localhost"` |
+| `RestHost` and `RealtimeHost` set to the same custom host | `Endpoint = "<that host>"` |
+| `RestHost` and `RealtimeHost` set to different hosts | Not supported; use one host that serves both, or contact Ably |
+| Custom `FallbackHosts` | Unchanged |
+
+How `Endpoint` resolves:
+
+| `Endpoint` | Primary host | Default fallback hosts |
+|------------|--------------|------------------------|
+| Unset | `main.realtime.ably.net` | `main.[a-e].fallback.ably-realtime.com` |
+| A routing policy name, e.g. `acme` | `acme.realtime.ably.net` | `acme.[a-e].fallback.ably-realtime.com` |
+| `nonprod:` plus a name, e.g. `nonprod:sandbox` | `sandbox.realtime.ably-nonprod.net` | `sandbox.[a-e].fallback.ably-realtime-nonprod.com` |
+| A hostname (contains `.` or `::`, or is `localhost`) | The value as given | None |
+
+An explicit `FallbackHosts` always replaces the default fallback hosts. A custom `Port` or `TlsPort` no longer disables the default fallback hosts.
+
+**Before (1.x):**
+
+```csharp
+var options = new ClientOptions("xVLyHw.MHOCLg:...") { Environment = "sandbox" };
+var realtime = new AblyRealtime(options);
+```
+
+**After (2.0):**
+
+```csharp
+var options = new ClientOptions("xVLyHw.MHOCLg:...") { Endpoint = "nonprod:sandbox" };
+var realtime = PubSubServer.CreateRealtimeClient(options);
+```
+
+**Firewalls and proxies.** 1.x connected to `rest.ably.io`, `realtime.ably.io` and `[a-e].ably-realtime.com` by default. If your network restricts outbound traffic, allow `*.realtime.ably.net` and `*.fallback.ably-realtime.com` before upgrading.
 
 ## Publish results and new message APIs
 

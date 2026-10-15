@@ -15,6 +15,8 @@ namespace Ably.PubSub.Tests
 {
     public class HttpSpecs : MockHttpRestSpecs
     {
+        private const string DefaultPrimaryHost = "main.realtime.ably.net";
+
         public class WhenInitialisingRestClient
         {
             [Fact]
@@ -247,7 +249,7 @@ namespace Ably.PubSub.Tests
             }
         }
 
-        [Trait("spec", "RSC11")]
+        [Trait("spec", "RSC25")]
         public sealed class HostSpecs : AblySpecs, IDisposable
         {
             private readonly FakeHttpMessageHandler _handler;
@@ -268,11 +270,12 @@ namespace Ably.PubSub.Tests
             }
 
             [Fact]
-            public async Task WithoutHostSpecific_ShouldUseDefaultHost()
+            [Trait("spec", "REC1a")]
+            public async Task WithoutEndpoint_ShouldUseDefaultPrimaryDomain()
             {
                 var client = CreateClient(options => { });
                 await MakeAnyRequest(client);
-                _handler.LastRequest.RequestUri.Host.Should().Be(Defaults.RestHost);
+                _handler.LastRequest.RequestUri.Host.Should().Be(DefaultPrimaryHost);
             }
 
             [Fact]
@@ -302,34 +305,30 @@ namespace Ably.PubSub.Tests
             }
 
             [Fact]
-            [Trait("spec", "RSC12")]
-            public async Task WithHostSpecifiedInOption_ShouldUseCustomHost()
+            [Trait("spec", "REC1b2")]
+            public async Task WithHostnameEndpoint_ShouldUseItAsGiven()
             {
-                var client = CreateClient(options => { options.RestHost = "www.test.com"; });
+                var client = CreateClient(options => { options.Endpoint = "www.test.com"; });
                 await MakeAnyRequest(client);
                 _handler.LastRequest.RequestUri.Host.Should().Be("www.test.com");
-            }
-
-            [Theory]
-            [InlineData("sandbox")]
-            public async Task WithEnvironmentAndNoCustomHost_ShouldPrefixEnvironment(string environment)
-            {
-                var client = CreateClient(options => { options.Environment = environment; });
-                await MakeAnyRequest(client);
-                var expected = environment.ToLower() + "-" + Defaults.RestHost;
-                _handler.LastRequest.RequestUri.Host.Should().Be(expected);
             }
 
             [Fact]
-            public async Task WithEnvironmentAndCustomHost_ShouldUseCustomHostAsIs()
+            [Trait("spec", "REC1b4")]
+            public async Task WithRoutingPolicyEndpoint_ShouldUseIt()
             {
-                var client = CreateClient(options =>
-                {
-                    options.Environment = "sandbox";
-                    options.RestHost = "www.test.com";
-                });
+                var client = CreateClient(options => { options.Endpoint = "acme"; });
                 await MakeAnyRequest(client);
-                _handler.LastRequest.RequestUri.Host.Should().Be("www.test.com");
+                _handler.LastRequest.RequestUri.Host.Should().Be("acme.realtime.ably.net");
+            }
+
+            [Fact]
+            [Trait("spec", "REC1b3")]
+            public async Task WithNonprodEndpoint_ShouldUseIt()
+            {
+                var client = CreateClient(options => { options.Endpoint = "nonprod:sandbox"; });
+                await MakeAnyRequest(client);
+                _handler.LastRequest.RequestUri.Host.Should().Be("sandbox.realtime.ably-nonprod.net");
             }
 
             [Fact]
@@ -503,11 +502,12 @@ namespace Ably.PubSub.Tests
             }
 
             [Fact]
-            [Trait("spec", "RSC15b")]
-            public async Task WithOverriddenRestHost_DoesNotRetryAndFailsImmediately()
+            [Trait("spec", "REC2c2")]
+            [Trait("spec", "RSC15m")]
+            public async Task WithHostnameEndpoint_DoesNotRetryAndFailsImmediately()
             {
                 _response.StatusCode = HttpStatusCode.BadGateway;
-                var client = CreateClient(options => options.RestHost = "boo.com");
+                var client = CreateClient(options => options.Endpoint = "boo.com");
 
                 var ex = await Assert.ThrowsAsync<AblyException>(() => MakeAnyRequest(client));
                 ex.ErrorInfo.StatusCode.Should().Be(_response.StatusCode);
@@ -515,7 +515,7 @@ namespace Ably.PubSub.Tests
             }
 
             [Fact]
-            [Trait("spec", "RSC15b")]
+            [Trait("spec", "RSC15a")]
             public async Task ShouldRetryRequestANumberOfTimes()
             {
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -527,7 +527,7 @@ namespace Ably.PubSub.Tests
             }
 
             [Fact]
-            [Trait("spec", "RSC15e")]
+            [Trait("spec", "RSC25")]
             public async Task ShouldAttemptHttpRequestsAgainstTheDefaultHost()
             {
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -535,7 +535,7 @@ namespace Ably.PubSub.Tests
 
                 await Assert.ThrowsAsync<AblyException>(() => MakeAnyRequest(client));
 
-                _handler.Requests.First().RequestUri.Host.Should().Be(Defaults.RestHost);
+                _handler.Requests.First().RequestUri.Host.Should().Be(DefaultPrimaryHost);
             }
 
             [Fact]
@@ -584,12 +584,13 @@ namespace Ably.PubSub.Tests
 
                 await Assert.ThrowsAsync<AblyException>(() => MakeAnyRequest(client));
 
-                _handler.Requests.Count.Should().Be(Defaults.FallbackHosts.Length + 1); // First attempt is with rest.ably.io
+                _handler.Requests.Count.Should().Be(Defaults.FallbackHosts.Length + 1); // First attempt is with the primary domain
             }
 
             [Fact]
             [Trait("spec", "RSC15a")]
             [Trait("spec", "TO3k6")]
+            [Trait("spec", "REC2a2")]
             public async Task ShouldUseCustomFallbackHostIfProvided()
             {
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -600,13 +601,14 @@ namespace Ably.PubSub.Tests
                 attemptedList.AddRange(_handler.Requests.Select(x => x.RequestUri.Host).ToList());
 
                 attemptedList.Count.Should().Be(2);
-                attemptedList[0].Should().Be("rest.ably.io");
+                attemptedList[0].Should().Be(DefaultPrimaryHost);
                 attemptedList[1].Should().Be("www.example.com");
             }
 
             [Fact]
             [Trait("spec", "RSC15a")]
             [Trait("spec", "TO3k6")]
+            [Trait("spec", "REC2a2")]
             public async Task ShouldUseProvidedCustomFallbackHostsIrrespectiveOfPrimaryHost()
             {
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -636,11 +638,11 @@ namespace Ably.PubSub.Tests
                     options.FallbackHosts = fallbackHosts;
                     options.HttpMaxRetryCount = 5;
                 });
-                await CheckForAttemptedFallbackHosts(clientWithDefaultPrimaryHost, "rest.ably.io");
+                await CheckForAttemptedFallbackHosts(clientWithDefaultPrimaryHost, DefaultPrimaryHost);
 
                 var clientWithCustomPrimaryHost = CreateClient(options =>
                 {
-                    options.RestHost = "www.primaryhost.com";
+                    options.Endpoint = "www.primaryhost.com";
                     options.FallbackHosts = fallbackHosts;
                     options.HttpMaxRetryCount = 5;
                 });
@@ -650,6 +652,7 @@ namespace Ably.PubSub.Tests
             [Fact]
             [Trait("spec", "RSC15a")]
             [Trait("spec", "TO3k6")]
+            [Trait("spec", "RSC15m")]
             public async Task ShouldNotUseAnyFallbackHostsIfEmptyArrayProvided()
             {
                 _response.StatusCode = HttpStatusCode.BadGateway;
@@ -660,12 +663,13 @@ namespace Ably.PubSub.Tests
                 attemptedList.AddRange(_handler.Requests.Select(x => x.RequestUri.Host).ToList());
 
                 attemptedList.Count.Should().Be(1);
-                attemptedList[0].Should().Be("rest.ably.io");
+                attemptedList[0].Should().Be(DefaultPrimaryHost);
             }
 
             [Fact]
             [Trait("spec", "RSC15a")]
             [Trait("spec", "TO3k6")]
+            [Trait("spec", "REC2c1")]
             public async Task ShouldUseDefaultFallbackHostsIfNullArrayProvided()
             {
                 List<string> attemptedList = new List<string>();
@@ -682,7 +686,7 @@ namespace Ably.PubSub.Tests
                 attemptedList.AddRange(handler.Requests.Select(x => x.RequestUri.Host).ToList());
 
                 attemptedList.Count.Should().Be(4); // 1 primary host + 3 fallback hosts
-                attemptedList[0].Should().Be("rest.ably.io"); // primary host
+                attemptedList[0].Should().Be(DefaultPrimaryHost); // primary host
                 attemptedList.Skip(1).IsSubsetOf(Defaults.FallbackHosts).Should().BeTrue();
             }
 
@@ -710,7 +714,7 @@ namespace Ably.PubSub.Tests
 
                 _ = await Assert.ThrowsAsync<AblyException>(() => MakeAnyRequest(client));
 
-                handler.Requests.Count.Should().Be(3); // First attempt is with rest.ably.io
+                handler.Requests.Count.Should().Be(3); // First attempt is with the primary domain
             }
 
             [Fact]
@@ -756,12 +760,12 @@ namespace Ably.PubSub.Tests
                 MakeAnyRequest(client); // This will generate 1 request which should be using fallback host
                 MakeAnyRequest(client); // This will generate 1 request which should be back to the default host
 
-                handler.Requests.Count.Should().Be(4); // First attempt is with rest.ably.io
+                handler.Requests.Count.Should().Be(4); // First attempt is with the primary domain
                 var attemptedHosts = handler.Requests.Select(x => x.RequestUri.Host).ToList();
-                attemptedHosts[0].Should().Be(Defaults.RestHost);
+                attemptedHosts[0].Should().Be(DefaultPrimaryHost);
                 attemptedHosts[1].Should().BeOneOf(Defaults.FallbackHosts);
                 attemptedHosts[2].Should().BeOneOf(Defaults.FallbackHosts);
-                attemptedHosts[3].Should().Be(Defaults.RestHost);
+                attemptedHosts[3].Should().Be(DefaultPrimaryHost);
             }
 
             [Fact]
@@ -802,13 +806,13 @@ namespace Ably.PubSub.Tests
                 MakeAnyRequest(client); // This will generate 2 request one to fallback host and the next one to the default host
                 MakeAnyRequest(client); // This will generate 1 request which should be back to the default host
 
-                handler.Requests.Count.Should().Be(5); // First attempt is with rest.ably.io
+                handler.Requests.Count.Should().Be(5); // First attempt is with the primary domain
                 var attemptedHosts = handler.Requests.Select(x => x.RequestUri.Host).ToList();
-                attemptedHosts[0].Should().Be(Defaults.RestHost);
+                attemptedHosts[0].Should().Be(DefaultPrimaryHost);
                 attemptedHosts[1].Should().BeOneOf(Defaults.FallbackHosts);
                 attemptedHosts[2].Should().BeOneOf(Defaults.FallbackHosts);
-                attemptedHosts[3].Should().Be(Defaults.RestHost);
-                attemptedHosts[4].Should().Be(Defaults.RestHost);
+                attemptedHosts[3].Should().Be(DefaultPrimaryHost);
+                attemptedHosts[4].Should().Be(DefaultPrimaryHost);
             }
 
             private static async Task MakeAnyRequest(PubSubHttpClient client)

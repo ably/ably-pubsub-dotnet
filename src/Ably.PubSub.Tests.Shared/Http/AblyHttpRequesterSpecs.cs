@@ -20,19 +20,19 @@ namespace Ably.PubSub.Tests
             var url = client.GetRequestUrl(new AblyRequest("/test", HttpMethod.Get));
 
             url.Scheme.Should().Be("https");
-            url.Host.Should().Be(Defaults.RestHost);
+            url.Host.Should().Be("main.realtime.ably.net");
         }
 
         [Fact]
         [Trait("spec", "RSC7")]
-        public void WithSecureFalse_CreatesNonSecureRestUrlsWithDefaultRestHost()
+        public void WithSecureFalse_CreatesNonSecureRestUrlsWithDefaultPrimaryDomain()
         {
             var client = new AblyHttpRequester(new AblyHttpOptions { IsSecure = false });
 
             var url = client.GetRequestUrl(new AblyRequest("/test", HttpMethod.Get));
 
             url.Scheme.Should().Be("http");
-            url.Host.Should().Be(Defaults.RestHost);
+            url.Host.Should().Be("main.realtime.ably.net");
         }
 
         [Theory]

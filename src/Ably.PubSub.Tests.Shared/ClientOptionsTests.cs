@@ -6,13 +6,13 @@ namespace Ably.PubSub.Tests.Shared
     public class ClientOptionsTests
     {
         [Fact]
-        [Trait("spec", "RSC15e")]
-        [Trait("spec", "RSC15g3")]
+        [Trait("spec", "REC1a")]
+        [Trait("spec", "REC2c1")]
         public void DefaultOptions()
         {
             var options = new ClientOptions();
-            options.FullRealtimeHost().Should().Be("realtime.ably.io");
-            options.FullRestHost().Should().Be("rest.ably.io");
+            options.Endpoint.Should().BeNull();
+            Defaults.GetPrimaryDomain(options.Endpoint).Should().Be("main.realtime.ably.net");
             options.Port.Should().Be(80);
             options.TlsPort.Should().Be(443);
             Assert.Equal(Defaults.FallbackHosts, options.GetFallbackHosts());
@@ -20,92 +20,105 @@ namespace Ably.PubSub.Tests.Shared
         }
 
         [Fact]
-        [Trait("spec", "RSC15h")]
-        public void Options_WithProductionEnvironment()
+        [Trait("spec", "TO3k6")]
+        [Trait("spec", "RSC15m")]
+        public void Options_WithEmptyFallbackHosts_DisablesFallback()
         {
             var options = new ClientOptions
             {
-                Environment = "production"
+                FallbackHosts = new string[0]
             };
-            options.FullRealtimeHost().Should().Be("realtime.ably.io");
-            options.FullRestHost().Should().Be("rest.ably.io");
-            options.Port.Should().Be(80);
-            options.TlsPort.Should().Be(443);
-            Assert.Equal(Defaults.FallbackHosts, options.GetFallbackHosts());
-            options.Tls.Should().BeTrue();
+
+            Assert.Empty(options.GetFallbackHosts());
         }
 
         [Fact]
-        [Trait("spec", "RSC15g2")]
-        [Trait("spec", "RTC1e")]
-        public void Options_WithCustomEnvironment()
+        [Trait("spec", "REC2a2")]
+        public void Options_WithCustomFallbackHosts_UsesThem()
         {
             var options = new ClientOptions
             {
-                Environment = "sandbox"
+                FallbackHosts = new[] { "custom-fallback1.ably.com", "custom-fallback2.ably.com" }
             };
-            options.FullRealtimeHost().Should().Be("sandbox-realtime.ably.io");
-            options.FullRestHost().Should().Be("sandbox-rest.ably.io");
-            options.Port.Should().Be(80);
-            options.TlsPort.Should().Be(443);
-            Assert.Equal(Defaults.GetEnvironmentFallbackHosts("sandbox"), options.GetFallbackHosts());
-            options.Tls.Should().BeTrue();
+
+            Defaults.GetPrimaryDomain(options.Endpoint).Should().Be("main.realtime.ably.net");
+            Assert.Equal(new[] { "custom-fallback1.ably.com", "custom-fallback2.ably.com" }, options.GetFallbackHosts());
         }
 
         [Fact]
-        [Trait("spec", "RSC11b")]
-        [Trait("spec", "RTN17b")]
-        [Trait("spec", "RTC1e")]
-        public void Options_WithCustomEnvironment_And_NonDefaultPorts()
+        [Trait("spec", "REC1b4")]
+        [Trait("spec", "REC2c4")]
+        public void Options_WithRoutingPolicyEndpoint()
         {
             var options = new ClientOptions
             {
-                Environment = "local",
+                Endpoint = "acme"
+            };
+
+            Defaults.GetPrimaryDomain(options.Endpoint).Should().Be("acme.realtime.ably.net");
+            Assert.Equal(Defaults.GetEndpointFallbackHosts("acme"), options.GetFallbackHosts());
+        }
+
+        [Fact]
+        [Trait("spec", "REC1b3")]
+        [Trait("spec", "REC2c3")]
+        public void Options_WithNonprodEndpoint()
+        {
+            var options = new ClientOptions
+            {
+                Endpoint = "nonprod:sandbox"
+            };
+
+            Defaults.GetPrimaryDomain(options.Endpoint).Should().Be("sandbox.realtime.ably-nonprod.net");
+            options.GetFallbackHosts().Should().BeEquivalentTo(
+                "sandbox.a.fallback.ably-realtime-nonprod.com",
+                "sandbox.b.fallback.ably-realtime-nonprod.com",
+                "sandbox.c.fallback.ably-realtime-nonprod.com",
+                "sandbox.d.fallback.ably-realtime-nonprod.com",
+                "sandbox.e.fallback.ably-realtime-nonprod.com");
+        }
+
+        [Fact]
+        [Trait("spec", "REC1b2")]
+        [Trait("spec", "REC2c2")]
+        public void Options_WithHostnameEndpoint_HasNoFallbacks()
+        {
+            var options = new ClientOptions
+            {
+                Endpoint = "overridden.ably.io"
+            };
+
+            Defaults.GetPrimaryDomain(options.Endpoint).Should().Be("overridden.ably.io");
+            Assert.Empty(options.GetFallbackHosts());
+        }
+
+        [Fact]
+        [Trait("spec", "REC2a2")]
+        public void Options_WithHostnameEndpointAndFallbackHosts_UsesCustomFallbacks()
+        {
+            var options = new ClientOptions
+            {
+                Endpoint = "custom.ably.com",
+                FallbackHosts = new[] { "custom-fallback.ably.com" }
+            };
+
+            Defaults.GetPrimaryDomain(options.Endpoint).Should().Be("custom.ably.com");
+            Assert.Equal(new[] { "custom-fallback.ably.com" }, options.GetFallbackHosts());
+        }
+
+        [Fact]
+        [Trait("spec", "REC2c1")]
+        public void Options_WithNonDefaultPorts_StillUseDefaultFallbacks()
+        {
+            // The pre-endpoint rule only checked the port in use, and Tls defaults to true, so
+            // TlsPort must be set for this to have failed under that rule.
+            var options = new ClientOptions
+            {
                 Port = 8080,
                 TlsPort = 8081
             };
 
-            options.FullRealtimeHost().Should().Be("local-realtime.ably.io");
-            options.FullRestHost().Should().Be("local-rest.ably.io");
-            options.Port.Should().Be(8080);
-            options.TlsPort.Should().Be(8081);
-            Assert.Empty(options.GetFallbackHosts());
-            options.Tls.Should().BeTrue();
-        }
-
-        [Fact]
-        [Trait("spec", "RSC11")]
-        public void Options_WithCustomRestHost()
-        {
-            var options = new ClientOptions
-            {
-                RestHost = "test.org"
-            };
-
-            options.FullRestHost().Should().Be("test.org");
-            options.FullRealtimeHost().Should().Be("test.org");
-            options.Port.Should().Be(80);
-            options.TlsPort.Should().Be(443);
-            Assert.Empty(options.GetFallbackHosts());
-            options.Tls.Should().BeTrue();
-        }
-
-        [Fact]
-        [Trait("spec", "RSC11")]
-        public void Options_WithCustomRestHost_And_RealtimeHost()
-        {
-            var options = new ClientOptions
-            {
-                RestHost = "test.org",
-                RealtimeHost = "ws.test.org"
-            };
-
-            options.FullRestHost().Should().Be("test.org");
-            options.FullRealtimeHost().Should().Be("ws.test.org");
-            options.Port.Should().Be(80);
-            options.TlsPort.Should().Be(443);
-            Assert.Empty(options.GetFallbackHosts());
-            options.Tls.Should().BeTrue();
+            Assert.Equal(Defaults.FallbackHosts, options.GetFallbackHosts());
         }
     }
 }

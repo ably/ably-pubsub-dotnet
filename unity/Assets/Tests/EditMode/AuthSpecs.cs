@@ -626,9 +626,9 @@ namespace Assets.Tests.EditMode
 
                 var options = await _sandboxFixture.GetSettings();
                 var httpTokenAbly =
-                    new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = false });
+                    new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = options.Endpoint, Tls = false });
                 var httpsTokenAbly =
-                    new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = true });
+                    new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = options.Endpoint, Tls = true });
 
                 // If it doesn't throw we are good :)
                 await httpTokenAbly.Channels.Get("foo").PublishAsync("test", "true");
@@ -670,7 +670,7 @@ namespace Assets.Tests.EditMode
 
                 var token = ably.Auth.RequestTokenAsync(CreateTokenParams(capability), null).Result;
 
-                var tokenAbly = new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = "sandbox" });
+                var tokenAbly = new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = ably.Options.Endpoint });
 
                 var error =
                     await E7Assert.ThrowsAsync<AblyException>(tokenAbly.Channels.Get("boo").PublishAsync("test", "true"));
@@ -729,7 +729,7 @@ namespace Assets.Tests.EditMode
                 var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -754,7 +754,7 @@ namespace Assets.Tests.EditMode
                 var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -775,7 +775,7 @@ namespace Assets.Tests.EditMode
                 var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -800,7 +800,7 @@ namespace Assets.Tests.EditMode
                 var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -826,7 +826,7 @@ namespace Assets.Tests.EditMode
                 var authUrlClient = new PubSubHttpClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -852,7 +852,7 @@ namespace Assets.Tests.EditMode
                 var authUrlClient = new PubSubHttpClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol,
                     HttpRequestTimeout = new TimeSpan(0, 0, 20)
                 });
@@ -880,7 +880,7 @@ namespace Assets.Tests.EditMode
                 var client = new PubSubRealtimeClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol,
                     HttpRequestTimeout = new TimeSpan(0, 0, 20),
                     AutomaticNetworkStateMonitoring = false
@@ -905,7 +905,7 @@ namespace Assets.Tests.EditMode
                 var client = new PubSubRealtimeClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol,
                     HttpRequestTimeout = new TimeSpan(0, 0, 20),
                     AutomaticNetworkStateMonitoring = false
@@ -938,7 +938,7 @@ namespace Assets.Tests.EditMode
                 {
                     options.AuthCallback = tokenParams =>
                         tokenClient.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" }).Convert();
-                    options.Environment = settings.Environment;
+                    options.Endpoint = settings.Endpoint;
                     options.UseBinaryProtocol = protocol == Defaults.Protocol;
                 });
 
@@ -964,7 +964,7 @@ namespace Assets.Tests.EditMode
                 {
                     options.AuthCallback = async tokenParams =>
                         await tokenClient.Auth.CreateTokenRequestAsync(new TokenParams { ClientId = "*" });
-                    options.Environment = settings.Environment;
+                    options.Endpoint = settings.Endpoint;
                     options.UseBinaryProtocol = protocol == Defaults.Protocol;
                 });
 

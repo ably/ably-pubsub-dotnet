@@ -17,28 +17,28 @@ namespace Ably.PubSub.Tests
 
         private static readonly Dictionary<string, TestEnvironmentSettings> Settings = new Dictionary<string, TestEnvironmentSettings>();
 
-        public static async Task<TestEnvironmentSettings> GetSettings(string environment = null)
+        public static async Task<TestEnvironmentSettings> GetSettings(string endpoint = null)
         {
-            environment = environment ?? "sandbox";
-            if (Settings.ContainsKey(environment))
+            endpoint = endpoint ?? TestEnvironmentSettings.DefaultEndpoint;
+            if (Settings.ContainsKey(endpoint))
             {
-                return Settings[environment];
+                return Settings[endpoint];
             }
 
-            Settings[environment] = await Initialise();
-            return Settings[environment];
+            Settings[endpoint] = await Initialise();
+            return Settings[endpoint];
         }
 
-        private static async Task<TestEnvironmentSettings> Initialise(string environment = "sandbox")
+        private static async Task<TestEnvironmentSettings> Initialise(string endpoint = null)
         {
             var settings = new TestEnvironmentSettings
             {
                 Tls = true,
             };
 
-            if (environment != null)
+            if (endpoint != null)
             {
-                settings.Environment = environment;
+                settings.Endpoint = endpoint;
             }
 
             JObject testAppSpec = JObject.Parse(ResourceHelper.GetResource("test-app-setup.json"));
@@ -57,7 +57,7 @@ namespace Ably.PubSub.Tests
                 CipherMode.CBC,
                 ((string)cipher["iv"]).FromBase64());
 
-            AblyHttpRequester client = settings.GetHttpClient(environment);
+            AblyHttpRequester client = settings.GetHttpClient(endpoint);
             AblyRequest request = new AblyRequest("/apps", HttpMethod.Post);
             request.Headers.Add("Accept", "application/json");
             request.Headers.Add("Content-Type", "application/json");

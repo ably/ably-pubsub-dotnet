@@ -470,7 +470,7 @@ namespace Ably.PubSub
             }
 
             string protocol = Options.IsSecure ? "https://" : "http://";
-            return new Uri($"{protocol}{host}{(Options.Port.HasValue ? ":" + Options.Port.Value : string.Empty)}{request.Url}{GetQuery(request)}");
+            return new Uri($"{protocol}{HttpUtility.HostForUrl(host)}{(Options.Port.HasValue ? ":" + Options.Port.Value : string.Empty)}{request.Url}{GetQuery(request)}");
         }
 
         private static string GetQuery(AblyRequest request)

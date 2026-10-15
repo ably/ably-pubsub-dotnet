@@ -44,13 +44,16 @@ namespace Ably.PubSub
         public const string InternetCheckUrl = "https://internet-up.ably-realtime.com/is-the-internet-up.txt";
         public const string InternetCheckOkMessage = "yes";
 
-        public const string RestHost = "rest.ably.io";
-        public const string RealtimeHost = "realtime.ably.io";
+        // REC1a: the endpoint used when ClientOptions.Endpoint is unset
+        public const string Endpoint = "main";
 
         public const int Port = 80;
         public const int TlsPort = 443;
 
-        public static readonly string[] FallbackHosts;
+        private const string NonprodPrefix = "nonprod:";
+
+        // REC2c1: the fallback domains for the default endpoint
+        public static readonly string[] FallbackHosts = GetEndpointFallbackHosts(Endpoint);
         public static readonly TimeSpan DefaultTokenTtl = TimeSpan.FromHours(1);
         public static readonly Capability DefaultTokenCapability = Capability.AllowAll;
 
@@ -92,28 +95,75 @@ namespace Ably.PubSub
 
 #endif
 
-        static Defaults()
+        /// <summary>
+        /// Resolves the primary domain that both REST requests and realtime connections use.
+        /// Spec: REC1.
+        /// </summary>
+        /// <param name="endpoint">The configured endpoint, or null for the default.</param>
+        /// <returns>The primary domain.</returns>
+        internal static string GetPrimaryDomain(string endpoint)
         {
-            FallbackHosts = new[]
+            if (endpoint == null)
             {
-                "a.ably-realtime.com",
-                "b.ably-realtime.com",
-                "c.ably-realtime.com",
-                "d.ably-realtime.com",
-                "e.ably-realtime.com",
-            };
+                endpoint = Endpoint;
+            }
+
+            // REC1b2
+            if (IsHostname(endpoint))
+            {
+                return endpoint;
+            }
+
+            // REC1b3
+            if (endpoint.StartsWith(NonprodPrefix, StringComparison.Ordinal))
+            {
+                return endpoint.Substring(NonprodPrefix.Length) + ".realtime.ably-nonprod.net";
+            }
+
+            // REC1b4
+            return endpoint + ".realtime.ably.net";
         }
 
-        internal static string[] GetEnvironmentFallbackHosts(string environment)
+        /// <summary>
+        /// Resolves the default fallback domains for an endpoint, used when ClientOptions.FallbackHosts is unset.
+        /// Spec: REC2c.
+        /// </summary>
+        /// <param name="endpoint">The configured endpoint, or null for the default.</param>
+        /// <returns>The fallback domains; empty when the endpoint is a hostname.</returns>
+        internal static string[] GetEndpointFallbackHosts(string endpoint)
         {
-            return new[]
+            if (endpoint == null)
             {
-                $"{environment}-a-fallback.ably-realtime.com",
-                $"{environment}-b-fallback.ably-realtime.com",
-                $"{environment}-c-fallback.ably-realtime.com",
-                $"{environment}-d-fallback.ably-realtime.com",
-                $"{environment}-e-fallback.ably-realtime.com",
-            };
+                endpoint = Endpoint;
+            }
+
+            // REC2c2
+            if (IsHostname(endpoint))
+            {
+                return new string[0];
+            }
+
+            // REC2c3
+            if (endpoint.StartsWith(NonprodPrefix, StringComparison.Ordinal))
+            {
+                return BuildFallbackHosts(endpoint.Substring(NonprodPrefix.Length), "ably-realtime-nonprod.com");
+            }
+
+            // REC2c1, REC2c4
+            return BuildFallbackHosts(endpoint, "ably-realtime.com");
         }
+
+        // REC1b2: an endpoint is a hostname if it contains '.' or '::', or is "localhost"
+        private static bool IsHostname(string endpoint) =>
+            endpoint.Contains(".") || endpoint.Contains("::") || endpoint == "localhost";
+
+        private static string[] BuildFallbackHosts(string routingPolicyId, string domain) => new[]
+        {
+            $"{routingPolicyId}.a.fallback.{domain}",
+            $"{routingPolicyId}.b.fallback.{domain}",
+            $"{routingPolicyId}.c.fallback.{domain}",
+            $"{routingPolicyId}.d.fallback.{domain}",
+            $"{routingPolicyId}.e.fallback.{domain}",
+        };
     }
 }

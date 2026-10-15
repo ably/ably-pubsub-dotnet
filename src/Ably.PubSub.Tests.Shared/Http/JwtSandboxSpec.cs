@@ -128,7 +128,7 @@ namespace Ably.PubSub.Tests.Http
 
             var authParams = new Dictionary<string, string>
             {
-                ["environment"] = "sandbox",
+                ["environment"] = defaultOptions.Endpoint.Replace("nonprod:", string.Empty),
                 ["keyName"] = key,
                 ["keySecret"] = secret,
                 ["returnType"] = "jwt"
@@ -209,7 +209,7 @@ namespace Ably.PubSub.Tests.Http
             query["capability"] = capability;
             query["jwtType"] = jwtType;
             query["encrypted"] = encrypted.ToString();
-            query["environment"] = "sandbox";
+            query["environment"] = defaultOptions.Endpoint.Replace("nonprod:", string.Empty);
             builder.Query = query.ToQueryString();
 
             var jwtStr = await _httpClient.GetStringAsync(builder.Uri);

@@ -696,15 +696,15 @@ namespace Ably.PubSub.Realtime.Workflow
         /// </remarks>
         private async Task<string> ChooseHostForNextAttempt()
         {
-            var defaultRealtimeHost = Client.Options.FullRealtimeHost();
-            var candidateHost = AttemptsHelpers.GetHost(State, defaultRealtimeHost);
+            var primaryDomain = Defaults.GetPrimaryDomain(Client.Options.Endpoint);
+            var candidateHost = AttemptsHelpers.GetHost(State, primaryDomain);
 
-            if (candidateHost == defaultRealtimeHost)
+            if (candidateHost == primaryDomain)
             {
-                return defaultRealtimeHost;
+                return primaryDomain;
             }
 
-            return await Client.HttpClient.CanConnectToAbly() ? candidateHost : defaultRealtimeHost;
+            return await Client.HttpClient.CanConnectToAbly() ? candidateHost : primaryDomain;
         }
 
         private void SetNewHostInState(string newHost)

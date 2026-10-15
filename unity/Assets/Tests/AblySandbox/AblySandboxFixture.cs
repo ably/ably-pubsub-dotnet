@@ -14,28 +14,28 @@ namespace Assets.Tests.AblySandbox
 
         private static Dictionary<string, TestEnvironmentSettings> _settings = new Dictionary<string, TestEnvironmentSettings>();
 
-        public async Task<TestEnvironmentSettings> GetSettings(string environment = null)
+        public async Task<TestEnvironmentSettings> GetSettings(string endpoint = null)
         {
-            environment = environment ?? "sandbox";
-            if (_settings.ContainsKey(environment))
+            endpoint = endpoint ?? TestEnvironmentSettings.DefaultEndpoint;
+            if (_settings.ContainsKey(endpoint))
             {
-                return _settings[environment];
+                return _settings[endpoint];
             }
 
-            _settings[environment] = await Initialise("sandbox");
-            return _settings[environment];
+            _settings[endpoint] = await Initialise(TestEnvironmentSettings.DefaultEndpoint);
+            return _settings[endpoint];
         }
 
-        private static async Task<TestEnvironmentSettings> Initialise(string environment)
+        private static async Task<TestEnvironmentSettings> Initialise(string endpoint)
         {
             var settings = new TestEnvironmentSettings
             {
                 Tls = true,
             };
 
-            if (environment != null)
+            if (endpoint != null)
             {
-                settings.Environment = environment;
+                settings.Endpoint = endpoint;
             }
 
             JObject testAppSpec = JObject.Parse(TestAppSetup._testAppSetup);
@@ -53,7 +53,7 @@ namespace Assets.Tests.AblySandbox
             request.RequestBody = testAppSpec["post_apps"].ToString().GetBytes();
             request.Protocol = Protocol.Json;
 
-            AblyHttpRequester client = settings.GetHttpClient(environment);
+            AblyHttpRequester client = settings.GetHttpClient(endpoint);
             var response = await RetryExecute(() => client.Execute(request));
 
             var json = JObject.Parse(response.TextResponse);

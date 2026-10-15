@@ -80,9 +80,9 @@ namespace Ably.PubSub.Tests
             }
         }
 
-        protected async Task<PubSubHttpClient> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string environment = null)
+        protected async Task<PubSubHttpClient> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string endpoint = null)
         {
-            var settings = await AblySandboxFixture.GetSettings(environment);
+            var settings = await AblySandboxFixture.GetSettings(endpoint);
             var defaultOptions = settings.CreateDefaultOptions();
             defaultOptions.UseBinaryProtocol = protocol == Defaults.Protocol;
             optionsAction?.Invoke(defaultOptions);

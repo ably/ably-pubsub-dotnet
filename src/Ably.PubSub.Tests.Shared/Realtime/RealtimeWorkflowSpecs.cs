@@ -82,7 +82,7 @@ namespace Ably.PubSub.Tests.NETFramework.Realtime
 
                 var client = GetClientWithFakeTransport(opts =>
                 {
-                    opts.RealtimeHost = "non-default.ably.io";
+                    opts.Endpoint = "non-default.ably.io";
                     opts.RealtimeRequestTimeout = TimeSpan.FromMinutes(1);
                 });
 

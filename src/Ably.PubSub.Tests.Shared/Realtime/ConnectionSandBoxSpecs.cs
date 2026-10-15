@@ -874,7 +874,7 @@ namespace Ably.PubSub.Tests.Realtime
             var authUrlClient = new PubSubRealtimeClient(new ClientOptions
             {
                 AuthUrl = new Uri(authUrl),
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol
             });
 

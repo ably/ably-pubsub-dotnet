@@ -27,6 +27,15 @@ namespace Ably.PubSub
 
             return new HttpValueCollection(query, true);
         }
+
+        /// <summary>
+        /// Formats a host for the authority component of a URL, bracketing an IPv6 literal
+        /// (RFC 3986 section 3.2.2) so that its colons are not mistaken for the port separator.
+        /// </summary>
+        /// <param name="host">A hostname, IPv4 address, or IPv6 address, bracketed or not.</param>
+        /// <returns>The host, safe to place between a scheme and a port.</returns>
+        internal static string HostForUrl(string host) =>
+            host.IndexOf(':') >= 0 && !host.StartsWith("[", StringComparison.Ordinal) ? "[" + host + "]" : host;
     }
 
     /// <summary>
