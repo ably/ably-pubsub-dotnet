@@ -15,7 +15,7 @@ namespace Ably.PubSub
     /// PubSubRealtimeClient
     /// The top-level class for the Ably Realtime library.
     /// </summary>
-    public class PubSubRealtimeClient : IPubSubRealtimeClient, IDisposable
+    public sealed class PubSubRealtimeClient : IPubSubRealtimeClient, IDisposable
     {
         private SynchronizationContext _synchronizationContext;
 
@@ -24,7 +24,7 @@ namespace Ably.PubSub
         internal RealtimeWorkflow Workflow { get; private set; }
 
         internal volatile bool Disposed;
-        private static readonly Func<ClientOptions, IMobileDevice, PubSubHttpClient> CreateRestFunc = (clientOptions, mobileDevice) => new PubSubHttpClient(clientOptions, mobileDevice);
+        private static readonly Func<ClientOptions, IMobileDevice, PubSubHttpClient> CreateHttpClientFunc = (clientOptions, mobileDevice) => new PubSubHttpClient(clientOptions, mobileDevice);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PubSubRealtimeClient"/> class with an ably key.
@@ -48,16 +48,16 @@ namespace Ably.PubSub
         /// </summary>
         /// <param name="options"><see cref="ClientOptions"/>.</param>
         internal PubSubRealtimeClient(ClientOptions options)
-            : this(options, CreateRestFunc, IoC.MobileDevice)
+            : this(options, CreateHttpClientFunc, IoC.MobileDevice)
         {
         }
 
         internal PubSubRealtimeClient(ClientOptions options, IMobileDevice mobileDevice)
-            : this(options, CreateRestFunc, mobileDevice)
+            : this(options, CreateHttpClientFunc, mobileDevice)
         {
         }
 
-        internal PubSubRealtimeClient(ClientOptions options, Func<ClientOptions, IMobileDevice, PubSubHttpClient> createRestFunc, IMobileDevice mobileDevice = null)
+        internal PubSubRealtimeClient(ClientOptions options, Func<ClientOptions, IMobileDevice, PubSubHttpClient> createHttpClientFunc, IMobileDevice mobileDevice = null)
         {
             if (options.Logger != null)
             {
@@ -72,7 +72,7 @@ namespace Ably.PubSub
             }
 
             CaptureSynchronizationContext(options);
-            HttpClient = createRestFunc != null ? createRestFunc.Invoke(options, mobileDevice) : new PubSubHttpClient(options, mobileDevice);
+            HttpClient = createHttpClientFunc != null ? createHttpClientFunc.Invoke(options, mobileDevice) : new PubSubHttpClient(options, mobileDevice);
             Push = new PushRealtime(HttpClient, Logger);
 
             Connection = new Connection(this, options.NowFunc, Logger);
@@ -234,7 +234,7 @@ namespace Ably.PubSub
         /// Once disposed, it closes the connection and the library can't be used again.
         /// </summary>
         /// <param name="disposing">Whether the dispose method triggered it directly.</param>
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (Disposed)
             {

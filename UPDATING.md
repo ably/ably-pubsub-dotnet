@@ -82,7 +82,7 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 
 ## Deprecated API removed
 
-2.0 drops every member 1.x had marked `[Obsolete]`, and hides the client constructors behind the door factories.
+2.0 drops every member 1.x had marked `[Obsolete]`. Separately, it hides the client constructors behind the `PubSubDevice` / `PubSubServer` door factories; those constructors were never marked `[Obsolete]` in 1.x, but they are listed here because they are no longer part of the public API.
 
 | Removed | Use instead |
 |---------|-------------|

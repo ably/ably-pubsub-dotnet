@@ -393,11 +393,6 @@ namespace Ably.PubSub
         /// Retrieves the stats for the application based on a custom query. It should be used with <see cref="PaginatedRequestParams"/>.
         /// It is mainly because of the way a PaginatedResource defines its queries. For retrieving Stats with special parameters use <see cref="StatsAsync(StatsRequestParams)"/>.
         /// </summary>
-        /// <example>
-        /// var client = new PubSubHttpClient("validkey");
-        /// var stats = client..StatsAsync();
-        /// var nextPage = client..StatsAsync(stats.NextQuery);.
-        /// </example>
         /// <param name="query"><see cref="PaginatedRequestParams"/> and <see cref="StatsRequestParams"/>.</param>
         /// <returns>returns a PaginatedResult of Stats.</returns>
         public Task<PaginatedResult<Stats>> StatsAsync(PaginatedRequestParams query)
