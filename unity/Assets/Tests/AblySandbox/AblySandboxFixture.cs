@@ -22,7 +22,7 @@ namespace Assets.Tests.AblySandbox
                 return _settings[endpoint];
             }
 
-            _settings[endpoint] = await Initialise(TestEnvironmentSettings.DefaultEndpoint);
+            _settings[endpoint] = await Initialise(endpoint);
             return _settings[endpoint];
         }
 

@@ -138,7 +138,7 @@ var options = new ClientOptions("xVLyHw.MHOCLg:...") { Endpoint = "nonprod:sandb
 var realtime = PubSubServer.CreateRealtimeClient(options);
 ```
 
-**Firewalls and proxies.** 1.x connected to `rest.ably.io`, `realtime.ably.io` and `[a-e].ably-realtime.com` by default. If your network restricts outbound traffic, allow `*.realtime.ably.net` and `*.fallback.ably-realtime.com` before upgrading.
+**Firewalls and proxies.** 1.x connected to `rest.ably.io`, `realtime.ably.io` and `[a-e].ably-realtime.com` by default. If your network restricts outbound traffic, allow `*.realtime.ably.net` and `*.fallback.ably-realtime.com` before upgrading. If you use a non-production endpoint (`nonprod:…`), also allow `*.realtime.ably-nonprod.net` and `*.fallback.ably-realtime-nonprod.com`.
 
 ## Publish results and new message APIs
 

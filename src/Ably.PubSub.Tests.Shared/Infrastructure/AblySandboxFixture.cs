@@ -25,7 +25,7 @@ namespace Ably.PubSub.Tests
                 return Settings[endpoint];
             }
 
-            Settings[endpoint] = await Initialise();
+            Settings[endpoint] = await Initialise(endpoint);
             return Settings[endpoint];
         }
 
