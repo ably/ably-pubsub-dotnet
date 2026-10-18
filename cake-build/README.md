@@ -84,6 +84,25 @@ Additional `--framework` flag can be supplied to test for target framework `net6
 ./build.sh --target=Test.NetStandard.Unit --framework=net7.0  # Run tests for .NET 7.0 runtime
 ```
 
+### Test UTS
+
+UTS tests carry `[Trait("uts", "unit|integration|proxy")]` and run only from these targets; the
+unit and integration targets above exclude them. Pick one tier with `--uts-tier`. There is no
+`.WithRetry` variant: a failing test fails the target, and so does a run that selects zero tests.
+
+```bash
+./build.sh --target=Test.NetStandard.Uts --framework=net6.0 --uts-tier=unit  # All UTS tests of a tier (generated + infra)
+./build.sh --target=Test.NetStandard.UtsInfra --framework=net6.0 --uts-tier=unit  # Infra self-tests: the tier's plus the common ones
+```
+```cmd
+.\build.cmd --target=Test.NetFramework.Uts --uts-tier=unit
+.\build.cmd --target=Test.NetFramework.UtsInfra --uts-tier=unit
+```
+
+The `integration` and `proxy` tiers use the Ably sandbox (`ABLY_ENDPOINT`, default `nonprod:sandbox`).
+The `proxy` tier downloads the pinned uts-proxy itself (Linux and macOS); on Windows set
+`UTS_PROXY_LOCAL_PATH` to a locally built binary, otherwise the proxy tests fail.
+
 ## Create NuGet Packages
 
 `Ably.PubSub.Core`, `Ably.PubSub.Device` and `Ably.PubSub.Server` are packed and
