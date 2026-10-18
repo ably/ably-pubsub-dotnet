@@ -184,7 +184,7 @@ namespace Ably.PubSub.Transport
 
             if (wait)
             {
-                var waiter = new ConnectionChangeAwaiter(Connection);
+                var waiter = new ConnectionChangeAwaiter(Connection, Options.TimerScheduler);
 
                 try
                 {

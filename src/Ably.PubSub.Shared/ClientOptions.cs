@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
 using Newtonsoft.Json;
 
 namespace Ably.PubSub
@@ -400,6 +401,21 @@ namespace Ably.PubSub
         internal bool SkipInternetCheck { get; set; }
 
         /// <summary>
+        /// Where the realtime client's timers and delays come from. Test-only: the UTS unit tests install
+        /// a fake clock here (with <see cref="NowFunc"/>) so they can advance time instead of waiting.
+        /// </summary>
+        [JsonIgnore]
+        internal ITimerScheduler TimerScheduler { get; set; } = SystemTimerScheduler.Instance;
+
+        /// <summary>
+        /// Replaces the vcdiff codec used to apply deltas: <c>(base, delta) =&gt; result</c>. Test-only: null,
+        /// the default, uses the built-in codec. The UTS unit tests install the mock decoder of
+        /// <c>mock_vcdiff.md</c> here.
+        /// </summary>
+        [JsonIgnore]
+        internal Func<byte[], byte[], byte[]> DeltaDecoder { get; set; }
+
+        /// <summary>
         /// Default constructor for ClientOptions.
         /// </summary>
         public ClientOptions()
@@ -487,6 +503,8 @@ namespace Ably.PubSub
                 Logger = Logger,
                 SkipInternetCheck = SkipInternetCheck,
                 RealtimeRequestTimeout = RealtimeRequestTimeout,
+                TimerScheduler = TimerScheduler,
+                DeltaDecoder = DeltaDecoder,
             };
 
             // Write-only / private-field members, only reachable from inside the class.

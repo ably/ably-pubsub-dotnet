@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Ably.PubSub.Transport.States.Connection;
 
 namespace Ably.PubSub
 {
@@ -40,11 +41,23 @@ namespace Ably.PubSub
         /// <param name="timeout">The period after which the timeout will occur.</param>
         /// <param name="timeoutResult">The value returned if the timeout occurs.</param>
         /// <returns>will either return the actual result if the tasks executes in time or the value provided by <paramref name="timeoutResult"/>.</returns>
-        internal static async Task<T> TimeoutAfter<T>(this Task<T> task, TimeSpan timeout, T timeoutResult)
+        internal static Task<T> TimeoutAfter<T>(this Task<T> task, TimeSpan timeout, T timeoutResult)
+            => task.TimeoutAfter(timeout, timeoutResult, SystemTimerScheduler.Instance);
+
+        /// <summary>
+        /// Helps timeout an async execution after a specified period, timed by <paramref name="scheduler"/>.
+        /// </summary>
+        /// <typeparam name="T">Type of Task.</typeparam>
+        /// <param name="task">The task we want to timeout.</param>
+        /// <param name="timeout">The period after which the timeout will occur.</param>
+        /// <param name="timeoutResult">The value returned if the timeout occurs.</param>
+        /// <param name="scheduler">Where the timeout's delay comes from.</param>
+        /// <returns>will either return the actual result if the tasks executes in time or the value provided by <paramref name="timeoutResult"/>.</returns>
+        internal static async Task<T> TimeoutAfter<T>(this Task<T> task, TimeSpan timeout, T timeoutResult, ITimerScheduler scheduler)
         {
             using (var cts = new CancellationTokenSource())
             {
-                var delayTask = Task.Delay(timeout, cts.Token);
+                var delayTask = scheduler.Delay(timeout, cts.Token);
 
                 var resultTask = await Task.WhenAny(task, delayTask);
                 if (resultTask == delayTask)

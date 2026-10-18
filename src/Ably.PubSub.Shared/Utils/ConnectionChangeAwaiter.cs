@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Ably.PubSub.Realtime;
+using Ably.PubSub.Transport.States.Connection;
 
 namespace Ably.PubSub.Utils
 {
@@ -9,11 +10,13 @@ namespace Ably.PubSub.Utils
         private ConnectionState _currentState;
 
         private readonly Connection _connection;
+        private readonly ITimerScheduler _scheduler;
         private readonly string _id = Guid.NewGuid().ToString("D").Split('-')[0];
 
-        public ConnectionChangeAwaiter(Connection connection)
+        public ConnectionChangeAwaiter(Connection connection, ITimerScheduler scheduler = null)
         {
             _connection = connection;
+            _scheduler = scheduler ?? SystemTimerScheduler.Instance;
             _currentState = _connection.State;
         }
 
@@ -31,7 +34,7 @@ namespace Ably.PubSub.Utils
             {
                 _connection.InternalStateChanged += ChangeListener;
                 var tResult = taskCompletionSource.Task;
-                return await tResult.TimeoutAfter(timeout, (false, null));
+                return await tResult.TimeoutAfter(timeout, (false, null), _scheduler);
             }
             finally
             {

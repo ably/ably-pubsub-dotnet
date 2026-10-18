@@ -116,7 +116,7 @@ namespace Ably.PubSub.Realtime.Workflow
                         while (true)
                         {
                             QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("PubSubRealtimeClient.HeartbeatMonitor()"));
-                            await Task.Delay(Client.Options.HeartbeatMonitorDelay, monitorToken);
+                            await Client.Options.TimerScheduler.Delay(TimeSpan.FromMilliseconds(Client.Options.HeartbeatMonitorDelay), monitorToken);
                         }
                     }
                     catch (OperationCanceledException)
@@ -217,7 +217,7 @@ namespace Ably.PubSub.Realtime.Workflow
         }
 
         private void DelayCommandHandler(TimeSpan delay, RealtimeCommand cmd) =>
-            Task.Delay(delay).ContinueWith(_ => QueueCommand(cmd));
+            Client.Options.TimerScheduler.Delay(delay).ContinueWith(_ => QueueCommand(cmd));
 
         internal async Task<IEnumerable<RealtimeCommand>> ProcessCommand(RealtimeCommand command)
         {
@@ -876,7 +876,7 @@ namespace Ably.PubSub.Realtime.Workflow
                             var connectingHost = await ChooseHostForNextAttempt();
                             SetNewHostInState(connectingHost);
 
-                            var connectingState = new ConnectionConnectingState(ConnectionManager, Logger);
+                            var connectingState = new ConnectionConnectingState(ConnectionManager, new CountdownTimer("Connecting state timer", Logger, Client.Options.TimerScheduler), Logger);
                             SetState(connectingState);
 
                             if (cmd.RetryAuth)
@@ -969,7 +969,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
                         var retryInstantly = CheckInstantRetryFlag();
 
-                        var disconnectedState = new ConnectionDisconnectedState(ConnectionManager, cmd.Error, Logger)
+                        var disconnectedState = new ConnectionDisconnectedState(ConnectionManager, cmd.Error, new CountdownTimer("Disconnected state timer", Logger, Client.Options.TimerScheduler), Logger)
                         {
                             RetryInstantly = retryInstantly,
                             Exception = cmd.Exception,
@@ -1076,7 +1076,7 @@ namespace Ably.PubSub.Realtime.Workflow
                         var transport = ConnectionManager.Transport;
                         var connectedTransport = transport?.State == TransportState.Connected;
 
-                        var closingState = new ConnectionClosingState(ConnectionManager, connectedTransport, Logger);
+                        var closingState = new ConnectionClosingState(ConnectionManager, null, connectedTransport, new CountdownTimer("Closing state timer", Logger, Client.Options.TimerScheduler), Logger);
                         State.Connection.ClearKeyAndId(); // RTN8d, RTN9d - before the emit
                         SetState(closingState);
 
@@ -1091,7 +1091,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
                     case SetSuspendedStateCommand cmd:
 
-                        var suspendedState = new ConnectionSuspendedState(ConnectionManager, cmd.Error, Logger);
+                        var suspendedState = new ConnectionSuspendedState(ConnectionManager, cmd.Error, new CountdownTimer("Suspended state timer", Logger, Client.Options.TimerScheduler), Logger);
 
                         // RTN7e and the teardown - see the note on the FAILED case.
                         try

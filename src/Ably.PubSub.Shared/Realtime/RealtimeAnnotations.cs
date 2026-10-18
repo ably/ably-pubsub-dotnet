@@ -222,7 +222,7 @@ namespace Ably.PubSub.Realtime
             _channel.PublishAnnotation(outbound, tw.Callback);
 
             var failResult = Result.Fail(new ErrorInfo("Annotation publish timeout expired. The annotation was not confirmed by the server"));
-            return await tw.Task.TimeoutAfter(_channel.RealtimeClient.Options.RealtimeRequestTimeout, failResult);
+            return await tw.Task.TimeoutAfter(_channel.RealtimeClient.Options.RealtimeRequestTimeout, failResult, _channel.RealtimeClient.Options.TimerScheduler);
         }
     }
 }

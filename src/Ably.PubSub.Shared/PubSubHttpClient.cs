@@ -460,7 +460,7 @@ namespace Ably.PubSub
             {
                 // We don't want to retry the internet check url.
                 var request = new AblyRequest(Defaults.InternetCheckUrl, HttpMethod.Get) { SkipRetry = true };
-                var response = await ExecuteHttpRequest(request).TimeoutAfter(Defaults.MaxHttpOpenTimeout, AblyResponse.EmptyResponse);
+                var response = await ExecuteHttpRequest(request).TimeoutAfter(Defaults.MaxHttpOpenTimeout, AblyResponse.EmptyResponse, Options.TimerScheduler);
                 var success = response.TextResponse.SafeTrim().EqualsTo(Defaults.InternetCheckOkMessage);
                 if (success == false)
                 {
