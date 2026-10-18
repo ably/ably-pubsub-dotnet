@@ -15,14 +15,8 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Integration
     /// <summary>
     /// The direct-sandbox smoke test (guide 2.7 "Direct sandbox"): the integration infra provisions an app, connects
     /// a client, round-trips messages and reads them back over REST, with every wait wall-clock and bounded.
-    ///
-    /// <para>Guide item "it runs once per protocol variant": not applicable. This build compiles msgpack out
-    /// (<c>ClientOptions.UseBinaryProtocol</c> is a no-op; decision log #6), so JSON is the only variant and each test
-    /// runs once.</para>
-    ///
-    /// <para>Guide item "every wait is wall-clock and bounded": by construction. Every wait goes through
-    /// <see cref="UtsWait"/> (a <c>Stopwatch</c> deadline, never the SDK's clock) with an explicit bound; no client
-    /// here has a fake clock; and each test has an xUnit timeout as the suite bound (guide 5.6).</para>
+    /// JSON only (msgpack is compiled out of this build), so each test runs once; every wait goes through
+    /// <see cref="UtsWait"/> with an explicit wall-clock bound.
     /// </summary>
     [Collection(UtsSandboxCollection.Name)]
     [Trait("uts", "integration")]

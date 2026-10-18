@@ -13,33 +13,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
     /// <summary>
     /// The specs' <c>MockWebSocket</c> (<c>uts/realtime/unit/helpers/mock_websocket.md</c>), installed through
     /// the public <c>ClientOptions.TransportFactory</c> seam: it is the factory, and every connection attempt
-    /// gets a fresh <see cref="MockTransport"/>. One mock serves a client's whole life and keeps one
-    /// timeline (<see cref="Events"/>) across all its connections, so a reconnect is a second attempt.
-    ///
-    /// <para><b>Connection attempts</b> are answered by, in this order: a waiter registered by
-    /// <see cref="AwaitConnectionAttempt"/> before the attempt (it takes precedence; the handler isn't
-    /// called); or <see cref="OnConnectionAttempt"/>. An attempt with no handler, or one the handler leaves
-    /// unanswered, is parked and handed to the next <see cref="AwaitConnectionAttempt"/>, so awaiting after
-    /// <c>connect()</c> never races; until the test answers it the client stays CONNECTING (its connect
-    /// timer still runs). A parked attempt that was answered meanwhile (e.g. by a handler's scheduled
-    /// answer) or abandoned by the client (its transport closed or disposed first, e.g. when the connect
-    /// timer fired) is skipped, so the await gets the next live attempt.</para>
-    ///
-    /// <para><b>Messages from the client</b> are recorded, then every handler runs
-    /// (<see cref="OnTextDataFrame"/>, <see cref="OnMessageFromClient"/>, then those added by
-    /// <see cref="OnMessage(int, JObject)"/> / <see cref="OnClientMessage"/>), then waiters see the message
-    /// too: handlers and awaits mix freely for messages and an await never consumes an event a handler
-    /// needs. <see cref="AwaitNextMessageFromClient"/> sees only messages sent after the call;
-    /// <see cref="AwaitClientMessage"/> also returns one sent before it that no earlier
-    /// <see cref="AwaitClientMessage"/> returned.</para>
-    ///
-    /// <para><b>Threads.</b> Handlers run synchronously on the SDK's workflow thread (inside
-    /// <c>ITransport.Connect</c> / <c>Send</c>), so they must not block or await; anything they send to the
-    /// client is delivered asynchronously, in order. A handler's exception is recorded in
-    /// <see cref="HandlerErrors"/> and rethrown into the SDK. <see cref="OnBinaryDataFrame"/> exists for the
-    /// spec's shape but never fires: this SDK build speaks JSON only.</para>
-    ///
-    /// <para><b>Time.</b> Timestamps come from <see cref="Clock"/> when the unit base installs one.</para>
+    /// gets a fresh <see cref="MockTransport"/>.
+    /// Handlers run synchronously on the SDK's workflow thread, so they must not block or await.
     /// </summary>
     public sealed class MockWebSocket : ITransportFactory
     {
@@ -77,7 +52,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             OnBinaryDataFrame = onBinaryDataFrame;
         }
 
-        /// <summary>The specs' <c>onConnectionAttempt</c>; reassignable mid-test (<c>mock_ws.onConnectionAttempt = ...</c>).</summary>
+        /// <summary>
+        /// The specs' <c>onConnectionAttempt</c>; reassignable mid-test (<c>mock_ws.onConnectionAttempt =
+        /// ...</c>).
+        /// </summary>
         public Action<PendingWebSocketConnection> OnConnectionAttempt { get; set; }
 
         /// <summary>The specs' <c>onMessageFromClient</c>: every decoded message the client sends.</summary>
@@ -166,21 +144,27 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         public void CloseFromServer([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0)
             => RequireActive(callerFilePath, callerLineNumber).CloseFromServer();
 
-        /// <summary><c>send_ping_frame()</c> on <see cref="ActiveConnection"/>; records PING_FRAME only (see <see cref="MockConnection.SendPingFrame"/>).</summary>
+        /// <summary>
+        /// <c>send_ping_frame()</c> on <see cref="ActiveConnection"/>; records PING_FRAME only (see <see
+        /// cref="MockConnection.SendPingFrame"/>).
+        /// </summary>
         public void SendPingFrame([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0)
             => RequireActive(callerFilePath, callerLineNumber).SendPingFrame();
 
         /// <summary>The alternative API's <c>on_connect(handler)</c>: sets <see cref="OnConnectionAttempt"/>.</summary>
         public void OnConnect(Action<PendingWebSocketConnection> handler) => OnConnectionAttempt = handler;
 
-        /// <summary>The alternative API's <c>on_connect(respond_with: msg)</c>: every attempt succeeds and gets a copy of <paramref name="respondWith"/>.</summary>
+        /// <summary>
+        /// The alternative API's <c>on_connect(respond_with: msg)</c>: every attempt succeeds and gets a copy of
+        /// <paramref name="respondWith"/>.
+        /// </summary>
         public void OnConnect(JObject respondWith)
             => OnConnectionAttempt = connection => connection.RespondWithSuccess((JObject)respondWith.DeepClone());
 
         /// <summary>
-        /// The alternative API's <c>on_message(action:, respond_with: msg)</c>: adds a handler that answers
-        /// every client message with that action by sending a copy of <paramref name="respondWith"/> on the
-        /// connection it came from.
+        /// The alternative API's <c>on_message(action:, respond_with: msg)</c>: adds a handler that answers every
+        /// client message with that action by sending a copy of <paramref name="respondWith"/> on the connection
+        /// it came from.
         /// </summary>
         public void OnMessage(int action, JObject respondWith)
             => AddClientMessageHandler((message, connection) =>
@@ -191,7 +175,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 }
             });
 
-        /// <summary>The alternative API's <c>on_message(action:, handler)</c>: adds a handler for client messages with that action.</summary>
+        /// <summary>
+        /// The alternative API's <c>on_message(action:, handler)</c>: adds a handler for client messages with
+        /// that action.
+        /// </summary>
         public void OnMessage(int action, Action<ProtocolMessage> handler)
             => AddClientMessageHandler((message, connection) =>
             {
@@ -201,15 +188,13 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 }
             });
 
-        /// <summary>The alternative API's <c>on_client_message(handler)</c>: adds a handler for every client message (added handlers run after <see cref="OnMessageFromClient"/>).</summary>
+        /// <summary>
+        /// The alternative API's <c>on_client_message(handler)</c>: adds a handler for every client message
+        /// (added handlers run after <see cref="OnMessageFromClient"/>).
+        /// </summary>
         public void OnClientMessage(Action<ProtocolMessage> handler) => AddClientMessageHandler((message, connection) => handler(message));
 
-        /// <summary>
-        /// The specs' <c>await_connection_attempt(timeout?)</c>. Returns the oldest parked attempt that is still
-        /// live (unanswered and not abandoned by the client; stale ones are dropped) if there is one, else
-        /// registers for the next attempt at the call: set up the await for the next attempt before
-        /// answering the current one.
-        /// </summary>
+        /// <summary>The specs' <c>await_connection_attempt(timeout?)</c>.</summary>
         public Task<PendingWebSocketConnection> AwaitConnectionAttempt(
             TimeSpan? timeout = null,
             [CallerFilePath] string callerFilePath = "",
@@ -250,9 +235,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// The alternative API's <c>await_client_message(action:)</c>: the oldest client message with this
-        /// action that no earlier call returned, waiting for one if there is none yet. Includes messages sent
-        /// before the call, so a spec that triggers the send and then awaits never races it.
+        /// The alternative API's <c>await_client_message(action:)</c>: the oldest client message with this action
+        /// that no earlier call returned, waiting for one if there is none yet.
         /// </summary>
         public Task<ProtocolMessage> AwaitClientMessage(
             int action,
@@ -297,8 +281,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// Polls until the client has sent at least <paramref name="count"/> messages with this action (in
-        /// total, since the last reset) and returns all of them.
+        /// Polls until the client has sent at least <paramref name="count"/> messages with this action (in total,
+        /// since the last reset) and returns all of them.
         /// </summary>
         public Task<List<ProtocolMessage>> AwaitProtocolMessages(
             int action,
@@ -319,8 +303,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 callerLineNumber);
 
         /// <summary>
-        /// The specs' <c>reset()</c>: clears the timeline, waiters, parked attempts and added handlers
-        /// (<see cref="OnMessage(int, JObject)"/>, <see cref="OnClientMessage"/>). The handler properties stay.
+        /// The specs' <c>reset()</c>: clears the timeline, waiters, parked attempts and added handlers (<see
+        /// cref="OnMessage(int, JObject)"/>, <see cref="OnClientMessage"/>).
         /// </summary>
         public void Reset()
         {

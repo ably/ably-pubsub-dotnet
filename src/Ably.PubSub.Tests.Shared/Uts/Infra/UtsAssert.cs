@@ -7,22 +7,15 @@ using Xunit.Sdk;
 namespace Ably.PubSub.Tests.Uts.Infra
 {
     /// <summary>
-    /// Assertions the pseudocode needs and FluentAssertions doesn't have, plus the caller-attributed
-    /// failure every UTS helper raises.
+    /// Assertions the pseudocode needs and FluentAssertions doesn't have, plus the caller-attributed failure
+    /// every UTS helper raises.
     /// </summary>
     public static class UtsAssert
     {
         /// <summary>
         /// The specs' <c>ASSERT observed CONTAINS_IN_ORDER [a, b, c]</c>: every expected item appears in
-        /// <paramref name="observed"/>, in this order, with anything else allowed in between. A
-        /// subsequence, not a contiguous run and not an exact filtered list: an expected item that
-        /// occurs twice in <paramref name="observed"/> is fine.
+        /// <paramref name="observed"/>, in this order, with anything else allowed in between.
         /// </summary>
-        /// <typeparam name="T">The item type.</typeparam>
-        /// <param name="observed">What was recorded.</param>
-        /// <param name="expected">The subsequence that must appear.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
         public static void ContainsInOrder<T>(
             IEnumerable<T> observed,
             IEnumerable<T> expected,
@@ -51,9 +44,6 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>The specs' <c>FAIL("msg")</c>, attributed to the caller.</summary>
-        /// <param name="message">Why the test fails.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
         public static void Fail(
             string message,
             [CallerFilePath] string callerFilePath = "",
@@ -63,9 +53,9 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>
-        /// Builds the exception every UTS helper throws: an xUnit failure whose message starts with the
-        /// calling test's <c>file:line</c>, so a timeout inside a helper points at the test line that
-        /// asked for the wait, not at the helper.
+        /// Builds the exception every UTS helper throws: an xUnit failure whose message starts with the calling
+        /// test's <c>file:line</c>, so a timeout inside a helper points at the test line that asked for the wait,
+        /// not at the helper.
         /// </summary>
         internal static XunitException Failure(
             string message,

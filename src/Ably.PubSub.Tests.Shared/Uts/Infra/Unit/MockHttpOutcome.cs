@@ -7,11 +7,7 @@ using Newtonsoft.Json;
 
 namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
-    /// <summary>
-    /// How <see cref="MockHttpClient"/> answers one attempt. Tests never build one: they call
-    /// <c>RespondWith(...)</c>, <c>RespondWithRefused()</c> and the rest on the pending connection or
-    /// request, which build it.
-    /// </summary>
+    /// <summary>How <see cref="MockHttpClient"/> answers one attempt.</summary>
     internal sealed class MockHttpOutcome
     {
         private MockHttpOutcome()
@@ -25,11 +21,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>A delay before the response is returned (<c>respond_with_delay</c>).</summary>
         internal TimeSpan Delay { get; private set; }
 
-        /// <summary>
-        /// The spec's <c>respond_with_timeout()</c>. <see cref="MockHttpClient"/> turns it into a
-        /// <see cref="System.Threading.Tasks.TaskCanceledException"/> once the client's request timeout has
-        /// passed on the fake clock (at once without one).
-        /// </summary>
+        /// <summary>The spec's <c>respond_with_timeout()</c>.</summary>
         internal bool IsTimeout { get; private set; }
 
         internal static MockHttpOutcome Success(HttpResponseMessage response, TimeSpan delay = default)
@@ -42,10 +34,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             => new MockHttpOutcome { IsTimeout = true };
 
         /// <summary>
-        /// A TCP-level refusal, shaped as the SDK recognises it: <c>AblyHttpRequester.IsRetryableError</c>
-        /// treats an <see cref="HttpRequestException"/> as retryable only when its inner exception is a
-        /// <see cref="WebException"/> with one of a known set of statuses, so a bare
-        /// HttpRequestException would make the SDK give up instead of falling back.
+        /// A TCP-level refusal, shaped as the SDK recognises it: <c>AblyHttpRequester.IsRetryableError</c> treats
+        /// an <see cref="HttpRequestException"/> as retryable only when its inner exception is a <see
+        /// cref="WebException"/> with one of a known set of statuses, so a bare HttpRequestException would make
+        /// the SDK give up instead of falling back.
         /// </summary>
         internal static MockHttpOutcome ConnectionRefused(string host)
             => Failed(new HttpRequestException(
@@ -58,13 +50,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 $"DNS resolution failed for {host}",
                 new WebException($"The remote name could not be resolved: '{host}'", WebExceptionStatus.NameResolutionFailure)));
 
-        /// <summary>
-        /// Builds the response for <c>respond_with(status, body, headers)</c>. A <c>byte[]</c> body is sent
-        /// as is; a string is sent as UTF-8 (default content type <c>application/json</c>); anything else
-        /// (the spec's <c>{...}</c> / <c>[...]</c> literal as an anonymous object, a JObject, a dictionary)
-        /// is serialised to JSON, the only wire format this SDK build speaks. <c>Content-*</c> headers go on
-        /// the content, the rest on the response.
-        /// </summary>
+        /// <summary>Builds the response for <c>respond_with(status, body, headers)</c>.</summary>
         internal static HttpResponseMessage BuildResponse(
             int status,
             object body,

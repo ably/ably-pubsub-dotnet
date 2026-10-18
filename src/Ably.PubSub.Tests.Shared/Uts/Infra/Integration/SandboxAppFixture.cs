@@ -8,9 +8,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
 {
     /// <summary>
     /// The specs' <c>BEFORE ALL TESTS</c> / <c>AFTER ALL TESTS</c> sandbox provisioning as an xUnit collection
-    /// fixture (guide 5.4): one <see cref="SandboxApp"/> per collection, created before the collection's first test
-    /// and deleted (best-effort) after its last. A failed provisioning fails every test of the collection; nothing
-    /// is skipped.
+    /// fixture (guide 5.4): one <see cref="SandboxApp"/> per collection, created before the collection's first
+    /// test and deleted (best-effort) after its last.
     /// </summary>
     public sealed class SandboxAppFixture : IAsyncLifetime
     {
@@ -19,7 +18,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
 
         /// <summary>
         /// Creates the fixture. xUnit passes its diagnostic sink, which reports the app's creation and its
-        /// <c>DELETE</c> status (shown with <c>-- xUnit.DiagnosticMessages=true</c>, or in the runner's diagnostics).
+        /// <c>DELETE</c> status (shown with <c>-- xUnit.DiagnosticMessages=true</c>, or in the runner's
+        /// diagnostics).
         /// </summary>
         /// <param name="diagnostics">xUnit's diagnostic message sink; null when the fixture is built by hand.</param>
         public SandboxAppFixture(IMessageSink diagnostics = null)
@@ -59,8 +59,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
     }
 
     /// <summary>
-    /// The direct-sandbox collection: every UTS integration class joins it with <c>[Collection("UTS Sandbox")]</c>,
-    /// so the classes share one app and run one after another.
+    /// The direct-sandbox collection: every UTS integration class joins it with <c>[Collection("UTS
+    /// Sandbox")]</c>, so the classes share one app and run one after another.
     /// </summary>
     [CollectionDefinition(Name)]
     public class UtsSandboxCollection : ICollectionFixture<SandboxAppFixture>

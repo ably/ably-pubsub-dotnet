@@ -13,10 +13,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
     /// <summary>
     /// The specs' <c>MockVCDiffEncoder</c> (<c>mock_vcdiff.md</c>): a deterministic, inspectable stand-in for a
-    /// vcdiff encoder. String form: <c>encode_uri_component(base) + "/" + encode_uri_component(value)</c>
-    /// (JavaScript's <c>encodeURIComponent</c> rules, so <c>"hello world"</c> gives <c>hello%20world</c> and
-    /// <c>"msg/1"</c> gives <c>msg%2F1</c>). Binary form: the UTF-8 bytes of
-    /// <c>base64url(base) + "/" + base64url(value)</c>, unpadded.
+    /// vcdiff encoder.
     /// </summary>
     public sealed class MockVCDiffEncoder
     {
@@ -28,19 +25,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
     }
 
     /// <summary>
-    /// The specs' <c>MockVCDiffDecoder</c> (<c>mock_vcdiff.md</c>, VD2a): decodes a delta made by
-    /// <see cref="MockVCDiffEncoder"/>, after checking the delta was made against the base the SDK passes
-    /// (catching base-payload storage bugs). Records every call: <see cref="NumberOfCalls"/>,
-    /// <see cref="LastBase"/>, <see cref="LastDelta"/>, and the spec's <c>onDecode(delta, base)</c> callback.
-    ///
-    /// <para>Installed with the unit base's <c>InstallMock(decoder)</c> (the specs'
-    /// <c>plugins: {vcdiff: decoder}</c>), which sets the client's internal <c>DeltaDecoder</c> (hook H2).
-    /// The SDK always passes bytes (PC3a): a string base is UTF-8 encoded, and a string delta reaches the
-    /// decoder as its UTF-8 bytes (or base64-decoded bytes for a <c>vcdiff/base64</c> payload). So the
-    /// binary decoder accepts both of the encoder's forms: it splits <c>utf8_decode(delta)</c> at the
-    /// <c>/</c>, and returns the value of whichever form (base64url, or URI component with the base compared
-    /// as UTF-8) reproduces the base exactly; if neither does it throws <c>Base mismatch</c>, and a delta
-    /// without exactly one <c>/</c> throws <c>Invalid delta format</c>.</para>
+    /// The specs' <c>MockVCDiffDecoder</c> (<c>mock_vcdiff.md</c>, VD2a): decodes a delta made by <see
+    /// cref="MockVCDiffEncoder"/>, after checking the delta was made against the base the SDK passes (catching
+    /// base-payload storage bugs).
     /// </summary>
     public sealed class MockVCDiffDecoder : IMockDeltaDecoder
     {
@@ -113,8 +100,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
     }
 
     /// <summary>
-    /// The specs' <c>FailingMockVCDiffDecoder</c> (RTL18): every decode throws
-    /// <c>Simulated vcdiff decode failure</c>. Records calls like <see cref="MockVCDiffDecoder"/>.
+    /// The specs' <c>FailingMockVCDiffDecoder</c> (RTL18): every decode throws <c>Simulated vcdiff decode
+    /// failure</c>.
     /// </summary>
     public sealed class FailingMockVCDiffDecoder : IMockDeltaDecoder
     {
@@ -162,7 +149,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             throw new InvalidOperationException("Base mismatch: expected base does not match delta");
         }
 
-        /// <summary>JavaScript's <c>encodeURIComponent</c>: UTF-8, every byte but A-Z a-z 0-9 <c>-_.!~*'()</c> as <c>%XX</c>.</summary>
+        /// <summary>
+        /// JavaScript's <c>encodeURIComponent</c>: UTF-8, every byte but A-Z a-z 0-9 <c>-_.!~*'()</c> as
+        /// <c>%XX</c>.
+        /// </summary>
         internal static string EncodeUriComponent(string value)
         {
             var builder = new StringBuilder();

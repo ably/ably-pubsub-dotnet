@@ -10,44 +10,14 @@ using Ably.PubSub.Transport.States.Connection;
 namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
-    /// The specs' <c>MockHttpClient</c> (<c>uts/rest/unit/helpers/mock_http.md</c>), an
-    /// <see cref="HttpMessageHandler"/> installed through the public <c>ClientOptions.HttpClient</c> seam
-    /// (the unit base wraps it in <c>new HttpClient(mock, disposeHandler: false)</c>). It sits below the
-    /// SDK's host selection and retries: each request that reaches it is one attempt against the host
-    /// <c>AblyHttpRequester</c> chose, which is what the fallback specs observe.
-    ///
-    /// <para><b>Per attempt</b> the mock raises a connection attempt (<see cref="PendingHttpConnection"/>),
-    /// then, if that succeeds, a request (<see cref="PendingHttpRequest"/>). Each is answered by, in this
-    /// order: a waiter already registered by <see cref="AwaitConnectionAttempt"/> /
-    /// <see cref="AwaitRequest"/> (a waiter takes precedence and the handler isn't called); for a request,
-    /// a queued response (the legacy <c>queue_*</c> API); the handler (<see cref="OnConnectionAttempt"/> /
-    /// <see cref="OnRequest"/>). With no handler a connection succeeds by default. Anything the handler
-    /// leaves unanswered is parked and handed to the next <c>Await*</c> call, so a test that starts the
-    /// SDK call and only then awaits never races it. An attempt nothing answers fails loudly after
-    /// <see cref="UnansweredTimeout"/> of real time instead of hanging to the test's timeout.</para>
-    ///
-    /// <para><b>Handlers</b> run synchronously on the SDK's calling thread (inside
-    /// <c>HttpClient.SendAsync</c>), so they must not block or await. An exception a handler throws is
-    /// recorded in <see cref="HandlerErrors"/> and rethrown into the SDK, so the attempt fails rather than
-    /// hanging.</para>
-    ///
-    /// <para><b>Time.</b> With a <see cref="Clock"/> (set by the unit base's factory when fake timers are
-    /// enabled) timestamps are fake time, <c>respond_with_delay</c> waits on the fake clock, and the mock
-    /// enforces the client's <c>HttpRequestTimeout</c> (<see cref="RequestTimeout"/>, set by the factory)
-    /// itself on the fake clock: the factory sets the client's internal <c>HttpClient.Timeout</c> to
-    /// infinite so the real clock never cuts a request short. A request still unanswered, a
-    /// <c>respond_with_timeout()</c>, or a delay longer than the timeout all fail with
-    /// <see cref="TaskCanceledException"/> once the timeout has passed in fake time, which is the
-    /// exception <c>HttpClient</c> raises on its own timeout and the SDK treats as retryable. Without a fake
-    /// clock the real <c>HttpClient.Timeout</c> applies, and <c>respond_with_timeout()</c> fails at once
-    /// (an infra stand-in, so no unit test waits for a real timeout).</para>
+    /// The specs' <c>MockHttpClient</c> (<c>uts/rest/unit/helpers/mock_http.md</c>), an <see
+    /// cref="HttpMessageHandler"/> installed through the public <c>ClientOptions.HttpClient</c> seam (the unit
+    /// base wraps it in <c>new HttpClient(mock, disposeHandler: false)</c>).
+    /// Handlers run synchronously on the SDK's calling thread, so they must not block or await.
     /// </summary>
     public sealed class MockHttpClient : HttpMessageHandler
     {
-        /// <summary>
-        /// How long (real time) an attempt may wait for an answer before the mock fails it. Shorter than the
-        /// SDK's default ten-second request timeout, so the mock's explanation wins.
-        /// </summary>
+        /// <summary>How long (real time) an attempt may wait for an answer before the mock fails it.</summary>
         public static readonly TimeSpan DefaultUnansweredTimeout = TimeSpan.FromSeconds(5);
 
         private static readonly Uri InternetCheckUri = new Uri(Defaults.InternetCheckUrl);
@@ -85,10 +55,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The fake clock, or null for the real one. Set by the unit base's factory.</summary>
         public FakeClock Clock { get; set; }
 
-        /// <summary>
-        /// The client's <c>HttpRequestTimeout</c>, enforced on the fake clock. Set by the unit base's factory
-        /// from the options (the last client built wins if one mock serves several).
-        /// </summary>
+        /// <summary>The client's <c>HttpRequestTimeout</c>, enforced on the fake clock.</summary>
         public TimeSpan RequestTimeout { get; set; } = Defaults.MaxHttpRequestTimeout;
 
         /// <summary>See <see cref="DefaultUnansweredTimeout"/>; <c>Timeout.InfiniteTimeSpan</c> turns the guard off.</summary>
@@ -103,20 +70,18 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>Every connection attempt, in order.</summary>
         public IReadOnlyList<PendingHttpConnection> ConnectionAttempts => Copy(_connectionAttempts);
 
-        /// <summary>Every request that got past its connection attempt, in order: the legacy <c>mock_http.captured_requests</c>.</summary>
+        /// <summary>
+        /// Every request that got past its connection attempt, in order: the legacy
+        /// <c>mock_http.captured_requests</c>.
+        /// </summary>
         public IReadOnlyList<PendingHttpRequest> CapturedRequests => Copy(_capturedRequests);
 
         /// <summary>Whatever a handler threw, in order (also rethrown into the SDK).</summary>
         public IReadOnlyList<Exception> HandlerErrors => Copy(_handlerErrors);
 
         /// <summary>
-        /// True when no request is being processed: every in-flight request is waiting for the test (an
-        /// answer) or for the fake clock (a delay or the timeout), and nothing it waits on has completed yet.
-        /// An answer the test just gave makes its request busy at once (before the mock's continuation has even
-        /// run), and it stays busy until <c>SendAsync</c> has returned the response to the SDK.
-        /// <c>process_pending_events()</c> and <c>ADVANCE_TIME</c> drain until this holds, so a response the test
-        /// just gave reaches the SDK. What the SDK does with the response after <c>SendAsync</c> returns is only
-        /// visible to the drain if it runs inside a workflow command.
+        /// True when no request is being processed: every in-flight request is waiting for the test (an answer)
+        /// or for the fake clock (a delay or the timeout), and nothing it waits on has completed yet.
         /// </summary>
         public bool IsIdle
         {
@@ -143,10 +108,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// The default the unit base installs when a test installs no mock: it answers the connectivity
-        /// check (<c>Defaults.InternetCheckUrl</c>) with 200 <c>yes</c>, and every other request with a 500
-        /// whose error message names the request, recording it in <see cref="UnexpectedRequests"/>. A unit
-        /// test therefore never reaches the network, and a request nobody planned for is loud.
+        /// The default the unit base installs when a test installs no mock: it answers the connectivity check
+        /// (<c>Defaults.InternetCheckUrl</c>) with 200 <c>yes</c>, and every other request with a 500 whose error
+        /// message names the request, recording it in <see cref="UnexpectedRequests"/>.
         /// </summary>
         public static MockHttpClient Strict()
         {
@@ -176,11 +140,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>An <see cref="HttpClient"/> over this handler that doesn't dispose it.</summary>
         public HttpClient AsHttpClient() => new HttpClient(this, disposeHandler: false);
 
-        /// <summary>
-        /// The specs' <c>await_connection_attempt(timeout?)</c>. Returns a parked (unanswered) attempt if
-        /// there is one, else registers a waiter for the next attempt at the call, so a test can set up
-        /// the wait for the next attempt before answering the current one.
-        /// </summary>
+        /// <summary>The specs' <c>await_connection_attempt(timeout?)</c>.</summary>
         public Task<PendingHttpConnection> AwaitConnectionAttempt(
             TimeSpan? timeout = null,
             [CallerFilePath] string callerFilePath = "",
@@ -225,7 +185,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             }
         }
 
-        /// <summary>Legacy <c>queue_timeout()</c>: the next request times out (see <see cref="PendingHttpRequest.RespondWithTimeout"/>).</summary>
+        /// <summary>
+        /// Legacy <c>queue_timeout()</c>: the next request times out (see <see
+        /// cref="PendingHttpRequest.RespondWithTimeout"/>).
+        /// </summary>
         public void QueueTimeout() => Enqueue(_ => MockHttpOutcome.Timeout(), null);
 
         /// <summary>Legacy <c>queue_delayed_response(delay, status, body)</c>.</summary>
@@ -238,7 +201,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 _ => MockHttpOutcome.Success(MockHttpOutcome.BuildResponse(status, body, headers)),
                 request => string.Equals(request.Url.Host, host, StringComparison.OrdinalIgnoreCase));
 
-        /// <summary>Legacy <c>queue_response_for_url(fragment, ...)</c>: answers the next request whose URL contains it.</summary>
+        /// <summary>
+        /// Legacy <c>queue_response_for_url(fragment, ...)</c>: answers the next request whose URL contains it.
+        /// </summary>
         public void QueueResponseForUrl(string urlContains, int status, object body = null, IDictionary<string, string> headers = null)
             => Enqueue(
                 _ => MockHttpOutcome.Success(MockHttpOutcome.BuildResponse(status, body, headers)),
@@ -319,12 +284,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             return headers;
         }
 
-        /// <summary>
-        /// Awaits whichever of <paramref name="wakeOn"/> completes first, with the flight parked meanwhile. The
-        /// flight stops counting as parked the moment any of them completes, not when the await resumes: an
-        /// answer is a <c>RunContinuationsAsynchronously</c> completion, so <c>WhenAny</c> (and this method's
-        /// continuation) runs later on the pool, and until the SDK has the response the mock must read as busy.
-        /// </summary>
+        /// <summary>Awaits whichever of <paramref name="wakeOn"/> completes first, with the flight parked meanwhile.</summary>
         private static async Task<Task> ParkUntilAny(InFlight flight, params Task[] wakeOn)
         {
             var any = Task.WhenAny(wakeOn);
@@ -523,8 +483,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// Parks an attempt nothing answered for the next Await call, or hands it straight to a waiter
-        /// that registered while the handler was running (it found the parked queue empty).
+        /// Parks an attempt nothing answered for the next Await call, or hands it straight to a waiter that
+        /// registered while the handler was running (it found the parked queue empty).
         /// </summary>
         private void ParkUnanswered<T>(T item, Queue<TaskCompletionSource<T>> waiters, Queue<T> parked)
         {
@@ -625,8 +585,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// One SendAsync call; parked while it waits on something only the test or the fake clock completes
-        /// (an answer, a fake-clock delay or timeout). Busy otherwise: running, or woken but not yet resumed.
+        /// One SendAsync call; parked while it waits on something only the test or the fake clock completes (an
+        /// answer, a fake-clock delay or timeout).
         /// </summary>
         private sealed class InFlight
         {

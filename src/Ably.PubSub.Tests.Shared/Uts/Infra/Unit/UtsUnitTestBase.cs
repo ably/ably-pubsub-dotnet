@@ -18,36 +18,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
     /// The base of every UTS unit test: the pseudocode's <c>install_mock(...)</c>, <c>enable_fake_timers()</c>,
     /// <c>ADVANCE_TIME(ms)</c>, <c>process_pending_events()</c> and the <c>Rest(options: ...)</c> /
     /// <c>Realtime(options: ...)</c> constructors, with teardown of every realtime client it built.
-    ///
-    /// <para><b>The factories</b> (<see cref="Rest"/>, <see cref="Realtime"/>) build the client with the
-    /// internal core constructors after wiring the options in place:</para>
-    /// <list type="bullet">
-    /// <item>the installed <see cref="MockHttpClient"/> as <c>HttpClient = new HttpClient(mock, disposeHandler: false)</c>;
-    /// with none installed (and no <c>HttpClient</c> in the options), a strict default
-    /// (<see cref="MockHttpClient.Strict"/>: 200 <c>yes</c> for the connectivity check, a loud 500 for
-    /// anything else, recorded in <see cref="UnexpectedRequests"/>), so no unit test reaches the network;</item>
-    /// <item>for realtime, the installed <see cref="MockWebSocket"/> as <c>TransportFactory</c>; with none
-    /// installed (and none in the options), a default that refuses every attempt
-    /// (<see cref="DefaultWebSocket"/>);</item>
-    /// <item>the clock: <c>NowFunc</c> and the internal <c>TimerScheduler</c> (hook H1) read the fake clock
-    /// whenever one is enabled, even if <see cref="EnableFakeTimers"/> is called after the client was built
-    /// (timers already running stay on the real clock); with a fake clock the client's internal
-    /// <c>HttpClient.Timeout</c> is made infinite and <see cref="MockHttpClient"/> enforces
-    /// <c>HttpRequestTimeout</c> on fake time;</item>
-    /// <item>an installed mock delta decoder as the internal <c>DeltaDecoder</c> (hook H2);</item>
-    /// <item><c>AutomaticNetworkStateMonitoring = false</c>, and the connection is taken off the SDK's static OS
-    /// network-state list right after construction (<see cref="UtsTestBase.DetachFromOsNetworkEvents"/>), so neither
-    /// the host's network changes nor another test's <c>Connection.NotifyOperatingSystemNetworkState</c> reach a unit client;</item>
-    /// <item>its own logger (<c>InternalLogger</c> with the options' <c>LogLevel</c> and <c>LogHandler</c>), because the
-    /// SDK writes the level and sink into whatever logger it is given and the default is process-wide;</item>
-    /// <item>its own <c>LocalDevice</c> and <c>FakeMobileDevice</c>, so it never reads the process-wide
-    /// <c>LocalDevice.Instance</c> / <c>IoC.MobileDevice</c> that native push tests change (an auth clientId change
-    /// dereferences <c>Device</c> whenever the static device is initialised; see PubSubHttpClient.OnAuthClientIdChanged).</item>
-    /// </list>
-    /// <para><b>Teardown</b> (after the base disposes every realtime client) fails the test if the strict HTTP
-    /// default answered a request nobody expected, or any mock recorded a handler error.</para>
-    /// <para>Nothing else is defaulted: <c>AutoConnect</c>, fallback hosts and <c>SkipInternetCheck</c> are used
-    /// exactly as the spec's options give them, so the pseudocode's <c>autoConnect: false</c> must be translated.</para>
     /// </summary>
     public abstract class UtsUnitTestBase : UtsTestBase
     {
@@ -82,7 +52,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The strict HTTP default, once a client was built without an installed <see cref="MockHttpClient"/>.</summary>
         public MockHttpClient DefaultHttp { get; private set; }
 
-        /// <summary>The refusing WebSocket default, once a realtime client was built without an installed <see cref="MockWebSocket"/>.</summary>
+        /// <summary>
+        /// The refusing WebSocket default, once a realtime client was built without an installed <see
+        /// cref="MockWebSocket"/>.
+        /// </summary>
         public MockWebSocket DefaultWebSocket { get; private set; }
 
         /// <summary>Requests the strict HTTP default answered with a 500 because the test installed no mock.</summary>
@@ -101,13 +74,19 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The specs' <c>install_mock(listener)</c>: binds it to every realtime client built afterwards.</summary>
         public void InstallMock(MockNetworkListener listener) => _installedNetworkListener = listener;
 
-        /// <summary>The specs' <c>plugins: {vcdiff: decoder}</c>: a mock or failing decoder for every client built afterwards.</summary>
+        /// <summary>
+        /// The specs' <c>plugins: {vcdiff: decoder}</c>: a mock or failing decoder for every client built
+        /// afterwards.
+        /// </summary>
         public void InstallMock(IMockDeltaDecoder decoder) => InstallDeltaDecoder(decoder.AsDeltaDecoder());
 
         /// <summary>Any <c>(base, delta) =&gt; result</c> delta decoder, through hook H2.</summary>
         public void InstallDeltaDecoder(Func<byte[], byte[], byte[]> decoder) => _installedDeltaDecoder = decoder;
 
-        /// <summary>The specs' <c>uninstall_mock()</c>: clients built afterwards get the defaults. Built clients keep theirs.</summary>
+        /// <summary>
+        /// The specs' <c>uninstall_mock()</c>: clients built afterwards get the defaults. Built clients keep
+        /// theirs.
+        /// </summary>
         public void UninstallMocks()
         {
             _installedHttp = null;
@@ -116,10 +95,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             _installedDeltaDecoder = null;
         }
 
-        /// <summary>
-        /// The specs' <c>enable_fake_timers()</c>. Creates the test's <see cref="FakeClock"/> (idempotent) and
-        /// switches every client and mock, built or not, to it.
-        /// </summary>
+        /// <summary>The specs' <c>enable_fake_timers()</c>.</summary>
         public FakeClock EnableFakeTimers(DateTimeOffset? start = null)
         {
             List<Func<bool>> checks;
@@ -176,13 +152,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>
         /// The specs' <c>process_pending_events()</c>: queues an empty command on every live realtime client's
         /// workflow, then yields (no real delay) until every workflow is idle and every mock has handed its
-        /// posted deliveries and answered requests to the SDK, on two consecutive checks. With fake timers
-        /// enabled it drains as <c>ADVANCE_TIME</c> does (<see cref="UtsWait.DrainOrParked"/>): a workflow parked
-        /// on a fake delay started since the queues were last idle (an authCallback's <c>TimeoutAfter</c>, an
-        /// unanswered token request's timeout) counts as settled after <c>FakeClock.ParkedWindow</c> of real
-        /// time, because nothing but an advance can move it; without a fake clock nothing can be parked on fake
-        /// time, so it is the plain <see cref="UtsWait.Drain"/>. Either way a queue that stays busy otherwise
-        /// fails after 10 s.
+        /// posted deliveries and answered requests to the SDK, on two consecutive checks.
         /// </summary>
         public Task ProcessPendingEvents(
             [CallerFilePath] string callerFilePath = "",
@@ -208,7 +178,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 : UtsWait.Drain(checks, null, callerFilePath, callerLineNumber);
         }
 
-        /// <summary>The specs' <c>Rest(options: ...)</c>, wired as the class summary describes. The options are changed in place.</summary>
+        /// <summary>
+        /// The specs' <c>Rest(options: ...)</c>, wired as described in Infra/README.md. The options are changed in
+        /// place.
+        /// </summary>
         public PubSubHttpClient Rest(ClientOptions options)
         {
             var http = Prepare(options, realtime: false);
@@ -219,7 +192,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// The specs' <c>Realtime(options: ...)</c>, wired as the class summary describes, and torn down after
+        /// The specs' <c>Realtime(options: ...)</c>, wired as described in Infra/README.md, and torn down after
         /// the test. The options are changed in place.
         /// </summary>
         public PubSubRealtimeClient Realtime(ClientOptions options)
@@ -262,8 +235,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
         /// <summary>
         /// Makes the client's internal HttpClient never time out on the real clock, so the mock's fake-clock
-        /// timeout is the only one. Before the first request the timeout can be set; after it (a client built
-        /// before <c>enable_fake_timers()</c>) the requester gets a fresh HttpClient over the same handler.
+        /// timeout is the only one.
         /// </summary>
         private static void UseFakeHttpTimeouts(PubSubHttpClient rest, MockHttpClient handler)
         {
@@ -404,8 +376,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
         /// <summary>
         /// The teardown verification: fails the test if the strict HTTP default answered a request nobody
-        /// expected, or any mock recorded a handler error (a handler that threw, or a delivery the SDK threw
-        /// on). Each problem is also written to the test output.
+        /// expected, or any mock recorded a handler error (a handler that threw, or a delivery the SDK threw on).
         /// </summary>
         private void VerifyMocks()
         {

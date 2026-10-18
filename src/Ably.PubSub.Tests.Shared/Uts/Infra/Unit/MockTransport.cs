@@ -9,22 +9,8 @@ using Newtonsoft.Json.Linq;
 namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
-    /// The <see cref="ITransport"/> a <see cref="MockWebSocket"/> hands the SDK, one per connection attempt
-    /// (the SDK builds a fresh transport for every attempt). Tests act on its server side,
-    /// <see cref="MockConnection"/>, never on this.
-    ///
-    /// <para><b>Ordered asynchronous chain.</b> Every call into the SDK's <see cref="ITransportListener"/>
-    /// (the Connected and Closed transport events, every message to the client) is posted to one ordered
-    /// chain per transport and never made inline: each runs after the previous one, on the thread pool,
-    /// and the listener is read when it runs (the SDK nulls it before disposing a transport, so a delivery
-    /// after teardown is dropped, as with a real socket). This gives the ordering
-    /// <c>mock_websocket.md</c> prescribes: <c>RespondWithSuccess</c> completes the connection (state
-    /// Connected, CONNECTION_SUCCESS recorded) and only then delivers CONNECTED asynchronously, and
-    /// <c>Close(false)</c> calls the listener's Closed asynchronously. Events are recorded on the timeline
-    /// synchronously, when the test acts.</para>
-    ///
-    /// <para><see cref="IsIdle"/> is true when everything posted has been handed to the SDK; the unit base
-    /// drains it in <c>process_pending_events()</c> and between fake-clock timers.</para>
+    /// The <see cref="ITransport"/> a <see cref="MockWebSocket"/> hands the SDK, one per connection attempt (the
+    /// SDK builds a fresh transport for every attempt).
     /// </summary>
     public sealed class MockTransport : ITransport
     {
@@ -80,10 +66,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             _owner.RaiseConnectionAttempt(this);
         }
 
-        /// <summary>
-        /// Called by the SDK (it passes the default, <c>true</c>). Records CLIENT_CLOSE; with
-        /// <paramref name="suppressClosedEvent"/> false, the listener's Closed event follows asynchronously.
-        /// </summary>
+        /// <summary>Called by the SDK (it passes the default, <c>true</c>).</summary>
         public void Close(bool suppressClosedEvent = true)
         {
             if (!MarkClosedByClient(new ClientCloseEvent(suppressClosedEvent, viaDispose: false)))
@@ -170,12 +153,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             Post(() => Listener?.OnTransportDataReceived(new RealtimeTransportData(json)));
         }
 
-        /// <summary>
-        /// The server closing the connection. <paramref name="clean"/> separates the two cases of
-        /// <c>mock_websocket.md</c>: a normal closure (after DISCONNECTED, a connection-level ERROR, or
-        /// <c>close_from_server()</c>) reaches the SDK with a null exception, as from the real transport;
-        /// a transport failure (<c>simulate_disconnect</c>) carries one, built from the error if given.
-        /// </summary>
+        /// <summary>The server closing the connection.</summary>
         internal void ServerDisconnect(ErrorInfo error, bool clean)
         {
             lock (_lock)
@@ -250,10 +228,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             }
         }
 
-        /// <summary>
-        /// Marks the client side closed. Records CLIENT_CLOSE only for a socket that was open or opening:
-        /// disposing a transport the server already closed, or whose attempt failed, closes nothing.
-        /// </summary>
+        /// <summary>Marks the client side closed.</summary>
         private bool MarkClosedByClient(ClientCloseEvent closeEvent)
         {
             bool wasOpen;

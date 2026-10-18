@@ -10,19 +10,14 @@ using Ably.PubSub.Tests.Uts.Infra.Unit;
 namespace Ably.PubSub.Tests.Uts.Infra
 {
     /// <summary>
-    /// The pseudocode's waits: <c>AWAIT_STATE</c>, <c>poll_until</c>, <c>poll_until_success</c>, a
-    /// wall-clock bound for any task, and the queue drain behind <c>process_pending_events()</c>.
-    ///
-    /// Every deadline here is measured with <see cref="Stopwatch"/>, a monotonic real clock, never with
-    /// the SDK's clock: a fake clock installed for the unit tier cannot freeze or skip a deadline.
-    /// Every failure is attributed to the calling test's line.
+    /// The pseudocode's waits: <c>AWAIT_STATE</c>, <c>poll_until</c>, <c>poll_until_success</c>, a wall-clock
+    /// bound for any task, and the queue drain behind <c>process_pending_events()</c>.
     /// </summary>
     public static class UtsWait
     {
         /// <summary>
-        /// The bound on a state wait or a poll when the spec gives none: 10 seconds, the bottom of the
-        /// 10-15 s range <c>integration-testing.md</c> gives state waits. In the unit tier it is only a
-        /// safety net; nothing there should come close to it.
+        /// The bound on a state wait or a poll when the spec gives none: 10 seconds, the bottom of the 10-15 s
+        /// range <c>integration-testing.md</c> gives state waits.
         /// </summary>
         public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
 
@@ -30,11 +25,8 @@ namespace Ably.PubSub.Tests.Uts.Infra
         public static readonly TimeSpan DefaultPollInterval = TimeSpan.FromMilliseconds(50);
 
         /// <summary>
-        /// The specs' <c>AWAIT_STATE connection.state == state</c>. Subscribes first, then checks the
-        /// current state, and completes exactly once, whichever wins. Fails at once, with the error
-        /// reason, if the connection enters FAILED while waiting for another state. A connection that
-        /// is already FAILED when the wait starts is not a failure: the test may just have asked it to
-        /// leave FAILED, so the next transition is latched instead.
+        /// The specs' <c>AWAIT_STATE connection.state == state</c>. Subscribes first, then checks the current
+        /// state, and completes exactly once, whichever wins.
         /// </summary>
         public static Task AwaitConnectionState(
             Connection connection,
@@ -114,8 +106,8 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>
-        /// The specs' <c>poll_until(condition, interval, timeout)</c> for a boolean condition. An
-        /// exception from the condition aborts the poll at once.
+        /// The specs' <c>poll_until(condition, interval, timeout)</c> for a boolean condition. An exception from
+        /// the condition aborts the poll at once.
         /// </summary>
         public static async Task PollUntil(
             Func<bool> condition,
@@ -153,8 +145,8 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>
-        /// The value-returning <c>x = poll_until(...)</c>: polls until the condition returns non-null and
-        /// returns that value, so later assertions use the settled read rather than a second one.
+        /// The value-returning <c>x = poll_until(...)</c>: polls until the condition returns non-null and returns
+        /// that value, so later assertions use the settled read rather than a second one.
         /// </summary>
         public static Task<T> PollUntil<T>(
             Func<T> condition,
@@ -212,9 +204,9 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>
-        /// The specs' <c>poll_until_success(condition)</c>: an exception means "not ready yet" and the
-        /// poll carries on; on timeout the most recent exception is rethrown (as the failure's cause), so
-        /// the failure says what was still going wrong.
+        /// The specs' <c>poll_until_success(condition)</c>: an exception means "not ready yet" and the poll
+        /// carries on; on timeout the most recent exception is rethrown (as the failure's cause), so the failure
+        /// says what was still going wrong.
         /// </summary>
         public static async Task<T> PollUntilSuccess<T>(
             Func<Task<T>> condition,
@@ -272,8 +264,8 @@ namespace Ably.PubSub.Tests.Uts.Infra
                 callerLineNumber);
 
         /// <summary>
-        /// Bounds any task by wall-clock time: the specs' <c>WITH timeout: N seconds</c> on a bare
-        /// <c>AWAIT</c>, and the guard on every integration await. Unaffected by a fake clock.
+        /// Bounds any task by wall-clock time: the specs' <c>WITH timeout: N seconds</c> on a bare <c>AWAIT</c>,
+        /// and the guard on every integration await.
         /// </summary>
         public static async Task<T> WithTimeout<T>(
             Task<T> task,
@@ -308,31 +300,14 @@ namespace Ably.PubSub.Tests.Uts.Infra
 
         /// <summary>
         /// The drain used while a fake clock is enabled (by <c>ADVANCE_TIME</c> before, between and after timers,
-        /// and by <c>process_pending_events()</c>): <see cref="Drain"/>, except that a queue parked on a fake delay
-        /// counts as settled. That is the SDK awaiting a fake-clock wait (a <c>TimeoutAfter</c> around an
-        /// authCallback that never returns, an unanswered mock request's timeout): only an advance can unblock it,
-        /// so waiting for idle would deadlock.
-        ///
-        /// <para>"Parked" is tied to what the queue can be waiting on, not to how long it has been busy alone.
-        /// Every pass that sees all checks idle records the clock's <see cref="FakeClock.NextSequence"/> (read
-        /// before the checks) as the last idle point (<see cref="FakeClock.MarkIdle"/>). A busy streak counts as
-        /// parked only when it has lasted <paramref name="stallWindow"/> AND the clock holds a pending
-        /// <c>ITimerScheduler.Delay</c> created at or after that point (<see cref="FakeClock.HasDelaySinceIdle"/>):
-        /// a delay started since the system was last idle, which the busy work may be awaiting. A queue that is
-        /// busy while the only pending entries are <c>Schedule</c> timers or delays that were already pending at an
-        /// idle moment (the heartbeat monitor's) is just slow (JIT, GC, a starved pool), so the drain keeps waiting
-        /// and fails at <paramref name="timeout"/>, as <see cref="Drain"/> does.</para>
-        ///
-        /// <para>Residual risk: a command that starts a fresh delay without awaiting it, then stalls for the
-        /// window, still reads as parked; and before the first idle pass any pending delay is fresh.</para>
+        /// and by <c>process_pending_events()</c>): <see cref="Drain"/>, except that a queue parked on a fake
+        /// delay counts as settled.
+        /// Waiting for idle would deadlock: only an advance can unblock a queue parked on a fake delay.
         /// </summary>
         /// <param name="idleChecks">Each returns true when its queue is empty and nothing is being processed.</param>
         /// <param name="clock">The fake clock: its fresh delays decide "parked", and idle passes are reported to it.</param>
         /// <param name="stallWindow">How long a queue must stay busy, with a fresh delay pending, to count as parked.</param>
-        /// <param name="timeout">The bound on a queue that stays busy and isn't parked.</param>
         /// <param name="what">The step named in a failure (<c>ADVANCE_TIME</c>, <c>process_pending_events</c>).</param>
-        /// <param name="callerFilePath">Filled in by the caller.</param>
-        /// <param name="callerLineNumber">Filled in by the caller.</param>
         /// <returns>True if the queues went idle; false if they were parked on a fresh fake delay.</returns>
         internal static async Task<bool> DrainOrParked(
             IReadOnlyCollection<Func<bool>> idleChecks,
@@ -387,15 +362,11 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>
-        /// The mechanism behind <c>process_pending_events()</c>: yields until every idle check reports
-        /// idle on two consecutive passes, so work that queues more work (a command that queues a
-        /// command, a transport delivery that becomes a command) is drained too. No real delay is
-        /// waited for anything to happen; the bound only catches a queue that never empties.
+        /// The mechanism behind <c>process_pending_events()</c>: yields until every idle check reports idle on
+        /// two consecutive passes, so work that queues more work (a command that queues a command, a transport
+        /// delivery that becomes a command) is drained too.
         /// </summary>
         /// <param name="idleChecks">Each returns true when its queue is empty and nothing is being processed.</param>
-        /// <param name="timeout">The safety bound.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
         public static async Task Drain(
             IReadOnlyCollection<Func<bool>> idleChecks,
             TimeSpan? timeout = null,

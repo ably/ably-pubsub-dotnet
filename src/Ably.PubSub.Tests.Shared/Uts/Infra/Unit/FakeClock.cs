@@ -9,32 +9,16 @@ using Ably.PubSub.Transport.States.Connection;
 namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
-    /// The specs' fake timers: <c>enable_fake_timers()</c>, <c>ADVANCE_TIME(ms)</c> and the fake
-    /// <c>NOW()</c>. One clock serves every client a test builds after enabling it, through two hooks:
-    /// <c>ClientOptions.NowFunc</c> for every clock read, and <c>ClientOptions.TimerScheduler</c> for every
-    /// timer and delay the SDK starts (connection-state timers, channel attach/detach timers, the heartbeat
-    /// monitor, the ping timeout, RTL13b reattach, every <c>TimeoutAfter</c>). The mocks take it too, so
-    /// a <c>respond_with_delay</c> or an HTTP timeout runs on fake time.
-    ///
-    /// Nothing scheduled here ever waits on the real clock: a timer fires only when
-    /// <see cref="AdvanceAsync"/> moves time past it. An advance fires due timers in time order, drains
-    /// the SDK's queues after each one (so work a timer queues runs, and timers it starts are seen), and
-    /// repeats until nothing is due within the advance: cascaded work runs to quiescence. A queue that
-    /// stays busy on a fake delay started since the queues were last idle counts as parked on it, so the
-    /// advance can fire it (see <see cref="UtsWait.DrainOrParked"/>).
-    ///
-    /// <para>A <c>Schedule</c> with <c>Timeout.InfiniteTimeSpan</c> never fires (no entry is added), as with
-    /// the real <c>System.Threading.Timer</c>; any other negative delay is due at once. A callback that throws
-    /// doesn't stop the advance: it is recorded in <see cref="CallbackErrors"/> and the advance fails at the
-    /// caller's line once everything due has fired.</para>
+    /// The specs' fake timers: <c>enable_fake_timers()</c>, <c>ADVANCE_TIME(ms)</c> and the fake <c>NOW()</c>.
+    /// Nothing scheduled here waits on the real clock; a queue busy on a fresh fake delay counts as parked
+    /// (see <see cref="UtsWait.DrainOrParked"/>).
     /// </summary>
     public sealed class FakeClock : ITimerScheduler
     {
         /// <summary>
-        /// How long a queue must stay busy, with a fresh fake delay pending (see <see cref="HasDelaySinceIdle"/>),
-        /// before a drain treats it as parked on that delay. Real SDK work drains in microseconds; the window only
-        /// has to outlast a JIT or GC stall that happens to coincide with a fresh delay, and every timer an
-        /// advance fires while the SDK is truly parked costs one window of real time, so it stays short.
+        /// How long a queue must stay busy, with a fresh fake delay pending (see <see
+        /// cref="HasDelaySinceIdle"/>), before a drain treats it as parked on that delay.
+        /// Short on purpose: every timer an advance fires while the SDK is truly parked costs one window of real time.
         /// </summary>
         internal static readonly TimeSpan ParkedWindow = TimeSpan.FromMilliseconds(250);
 
@@ -82,10 +66,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The <c>ClientOptions.NowFunc</c> value.</summary>
         public Func<DateTimeOffset> NowFunc => () => Now;
 
-        /// <summary>
-        /// Every exception a fired callback threw, in order. An advance keeps firing after one throws, then
-        /// fails at the caller's <c>ADVANCE_TIME</c> line with the first of them (see <see cref="AdvanceAsync(TimeSpan, string, int)"/>).
-        /// </summary>
+        /// <summary>Every exception a fired callback threw, in order.</summary>
         public IReadOnlyList<Exception> CallbackErrors
         {
             get
@@ -97,10 +78,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             }
         }
 
-        /// <summary>
-        /// The sequence number the next timer or delay will get. A drain reads it before it checks the queues, so
-        /// a delay created while the checks run still counts as "since idle" (<see cref="MarkIdle"/>).
-        /// </summary>
+        /// <summary>The sequence number the next timer or delay will get.</summary>
         internal long NextSequence
         {
             get
@@ -115,9 +93,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>
         /// True while the clock holds a pending <see cref="ITimerScheduler.Delay"/> (not a <c>Schedule</c>
         /// callback) created since a drain last saw every queue idle: the only kind of entry a busy queue can be
-        /// awaiting (a <c>TimeoutAfter</c>, a mock HTTP request timeout or <c>respond_with_delay</c>). The heartbeat
-        /// monitor's long-lived delay, and any delay already pending the last time everything was idle, don't
-        /// count: a queue that is busy while only those are pending is busy, not parked.
+        /// awaiting (a <c>TimeoutAfter</c>, a mock HTTP request timeout or <c>respond_with_delay</c>).
         /// </summary>
         internal bool HasDelaySinceIdle
         {
@@ -131,11 +107,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             }
         }
 
-        /// <summary>
-        /// The specs' <c>ADVANCE_TIME(ms)</c>. Fires every timer due within the advance, in order, with
-        /// fake "now" set to each timer's due time as it fires, then drains; ends with "now" at the target.
-        /// Await it before asserting.
-        /// </summary>
+        /// <summary>The specs' <c>ADVANCE_TIME(ms)</c>.</summary>
         public async Task AdvanceAsync(
             TimeSpan by,
             [CallerFilePath] string callerFilePath = "",
@@ -223,8 +195,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             => AdvanceAsync(TimeSpan.FromMilliseconds(milliseconds), callerFilePath, callerLineNumber);
 
         /// <summary>
-        /// The specs' <c>SCHEDULE_AFTER(delay): …</c> inside a mock handler: run the block once fake time
-        /// has advanced by <paramref name="delay"/>.
+        /// The specs' <c>SCHEDULE_AFTER(delay): …</c> inside a mock handler: run the block once fake time has
+        /// advanced by <paramref name="delay"/>.
         /// </summary>
         public void ScheduleAfter(TimeSpan delay, Action action) => Schedule(delay, action, isDelay: false);
 
@@ -256,8 +228,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// Registers a queue the clock drains between timers: a client's workflow, a mock transport's
-        /// delivery chain. The unit base does this for everything it builds.
+        /// Registers a queue the clock drains between timers: a client's workflow, a mock transport's delivery
+        /// chain.
         /// </summary>
         internal void AddIdleCheck(Func<bool> isIdle)
         {
@@ -269,14 +241,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
         /// <summary>
         /// Drains every registered queue (before, between and after timers in an advance, and for
-        /// <c>process_pending_events()</c> while the clock is enabled). A queue that stays busy for
-        /// <see cref="ParkedWindow"/> while <see cref="HasDelaySinceIdle"/> holds counts as parked on that delay
-        /// (the SDK awaiting a fake-clock <c>TimeoutAfter</c>, or a mock request timeout), since only an advance can
-        /// unblock it; see <see cref="UtsWait.DrainOrParked"/>.
+        /// <c>process_pending_events()</c> while the clock is enabled).
         /// </summary>
         /// <param name="what">The step named in a failure: <c>ADVANCE_TIME</c> or <c>process_pending_events</c>.</param>
-        /// <param name="callerFilePath">Filled in by the caller.</param>
-        /// <param name="callerLineNumber">Filled in by the caller.</param>
         /// <returns>True if the queues went idle; false if they were parked on a fresh fake delay.</returns>
         internal Task<bool> DrainAsync(string what, string callerFilePath, int callerLineNumber)
         {

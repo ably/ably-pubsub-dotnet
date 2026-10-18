@@ -1,6 +1,6 @@
 ---
 name: uts-to-csharp
-description: "Translates the UTS pseudocode test specs in an ably/specification module directory (uts/rest or uts/realtime) into runnable C# xUnit tests in the ably-pubsub-dotnet UTS test tree. Use when asked to translate, port, derive or generate tests from a UTS module, or to evaluate UTS-derived tests against the .NET SDK and record deviations. Validates the directory, resolves target directories, asks for a tier (unit, integration, proxy), the specs and translate-only or evaluate, then derives, compiles, optionally runs and audits a C# test per spec. Not for uts/objects (the SDK has no LiveObjects API), creating or upgrading this skill or its UTS infra (use uts-to-lang-skill-creator), writing UTS specs, or native non-UTS tests."
+description: "Translates the UTS pseudocode test specs in an ably/specification module directory (uts/rest or uts/realtime) into runnable C# xUnit tests in the ably-pubsub-dotnet UTS test tree. Use when asked to translate, port, derive or generate tests from a UTS module, or to evaluate UTS-derived tests against the .NET SDK and record deviations. Validates the directory, resolves target directories, asks for a tier (unit, integration, proxy), the specs and translate-only or evaluate, then derives, compiles, optionally runs and audits a C# test per spec. Not for uts/objects (the SDK has no LiveObjects API), creating or upgrading this skill or its UTS infra, writing UTS specs, or native non-UTS tests."
 license: "Apache-2.0"
 allowed-tools: Bash Read Edit Write
 metadata:
@@ -9,8 +9,6 @@ metadata:
   version: "2.0.0"
   tags: "testing, uts, csharp, dotnet, ably-pubsub-dotnet, test-translation"
   marketplace: "false"
-  generated-by: "uts-to-lang-skill-creator 1.0.0 @ 0e52e656"
-  records: ".claude/skills/uts-to-csharp/generation"
   aligned-to: "uts-to-swift 2.0.0 (ALIGN-1)"
 ---
 

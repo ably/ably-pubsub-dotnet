@@ -8,7 +8,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
     /// The specs' <c>PendingConnection</c> for the realtime tier (<c>mock_websocket.md</c>): one WebSocket
-    /// connection attempt. The first <c>RespondWith*</c> call wins; later ones are ignored.
+    /// connection attempt.
     /// </summary>
     public sealed class PendingWebSocketConnection
     {
@@ -44,9 +44,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
         /// <summary>
         /// The specs' <c>respond_with_success(connected_message?)</c>: completes the connection first (state
-        /// Connected, CONNECTION_SUCCESS recorded, the Connected transport event posted), then delivers
-        /// <paramref name="connectedMessage"/>, if given, asynchronously after it. With no message the
-        /// client stays CONNECTING until the test sends CONNECTED (or its connect timer fires).
+        /// Connected, CONNECTION_SUCCESS recorded, the Connected transport event posted), then delivers <paramref
+        /// name="connectedMessage"/>, if given, asynchronously after it.
         /// </summary>
         public void RespondWithSuccess(JObject connectedMessage = null)
         {
@@ -62,7 +61,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             }
         }
 
-        /// <summary>The corpus' <c>respond_with_connected()</c>: success with <see cref="ProtocolMessages.ConnectedMessage()"/>.</summary>
+        /// <summary>
+        /// The corpus' <c>respond_with_connected()</c>: success with <see
+        /// cref="ProtocolMessages.ConnectedMessage()"/>.
+        /// </summary>
         public void RespondWithConnected() => RespondWithSuccess(ProtocolMessages.ConnectedMessage());
 
         /// <summary>Connection refused: the transport closes with a <see cref="SocketException"/> (WSAECONNREFUSED).</summary>
@@ -71,11 +73,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>DNS failure: the transport closes with a <see cref="SocketException"/> (WSAHOST_NOT_FOUND).</summary>
         public void RespondWithDnsError() => Fail(new SocketException(11001));
 
-        /// <summary>
-        /// The specs' <c>respond_with_timeout()</c>: the attempt never completes. A CONNECTION_FAILURE is
-        /// recorded, but the SDK hears nothing; its own connect timer (on the fake clock when installed)
-        /// decides what happens, as with an unresponsive server.
-        /// </summary>
+        /// <summary>The specs' <c>respond_with_timeout()</c>: the attempt never completes.</summary>
         public void RespondWithTimeout()
         {
             if (TryAnswer())
@@ -85,8 +83,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         }
 
         /// <summary>
-        /// The specs' <c>respond_with_error(error_message, then_close = true)</c>: the WebSocket connects,
-        /// the server sends <paramref name="errorMessage"/> (an ERROR), then closes normally unless told not to.
+        /// The specs' <c>respond_with_error(error_message, then_close = true)</c>: the WebSocket connects, the
+        /// server sends <paramref name="errorMessage"/> (an ERROR), then closes normally unless told not to.
         /// </summary>
         public void RespondWithError(JObject errorMessage, bool thenClose = true)
         {

@@ -41,21 +41,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
     /// <summary>
     /// The specs' sandbox provisioning (<c>integration-testing.md</c> "Sandbox Setup"): an app created from
     /// <c>ably-common/test-resources/test-app-setup.json</c> and deleted afterwards.
-    ///
-    /// <para><b>No retry of <c>POST /apps</c>.</b> The create request is sent exactly once (guide 2.3): when its
-    /// response is lost, a retry would create a second app nobody deletes. The HTTP status is checked before the
-    /// body is parsed, and the request is bounded at 30 s. The app setup itself is the embedded copy of
-    /// <c>test-app-setup.json</c> (found by name suffix: the heads embed it under different prefixes), so there is no fetch to
-    /// retry. The only other request, <c>DELETE /apps/{id}</c>, is idempotent: it may be retried, is best-effort and
-    /// never throws (sandbox apps expire on their own).</para>
-    ///
-    /// <para><b>Host.</b> <c>https://</c> + <c>Defaults.GetPrimaryDomain(endpoint)</c>, where the endpoint is
-    /// <c>ABLY_ENDPOINT</c> (trimmed; the variable the native sandbox suite reads) or <c>nonprod:sandbox</c>, so
-    /// by default <c>sandbox.realtime.ably-nonprod.net</c>.</para>
-    ///
-    /// <para><b>Test seam.</b> <see cref="CreateAsync(string, HttpMessageHandler, CancellationToken)"/> takes an
-    /// optional <see cref="HttpMessageHandler"/>, used for every request this app sends (create and delete), so a
-    /// self-test can prove the no-retry rule without the network.</para>
     /// </summary>
     public sealed class SandboxApp
     {
@@ -65,11 +50,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         /// <summary>The variable that overrides <see cref="SandboxEndpoint"/>, shared with the native sandbox suite.</summary>
         public const string EndpointVariable = "ABLY_ENDPOINT";
 
-        /// <summary>
-        /// The namespace the specs' mutable-message suites use (<c>mutable:</c> channels). The specs say the app
-        /// setup configures it; the vendored ably-common copy predates that, so it is added when missing, exactly as
-        /// the native <c>AblySandboxFixture</c> does.
-        /// </summary>
+        /// <summary>The namespace the specs' mutable-message suites use (<c>mutable:</c> channels).</summary>
         public const string MutableMessagesNamespace = "mutable";
 
         /// <summary>The bound on each provisioning request (<c>integration-testing.md</c> "Timeout Strategy").</summary>
@@ -88,7 +69,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             _handler = handler;
         }
 
-        /// <summary>The endpoint every UTS integration client targets: <c>ABLY_ENDPOINT</c> or <see cref="SandboxEndpoint"/>.</summary>
+        /// <summary>
+        /// The endpoint every UTS integration client targets: <c>ABLY_ENDPOINT</c> or <see
+        /// cref="SandboxEndpoint"/>.
+        /// </summary>
         public static string DefaultEndpoint
         {
             get
@@ -117,23 +101,17 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         public bool Deleted { get; private set; }
 
         /// <summary>
-        /// The status of the last <c>DELETE /apps/{id}</c> response, or null if none arrived (not tried yet, or the
-        /// request failed). Kept for diagnostics, because <see cref="DeleteAsync"/> never throws.
+        /// The status of the last <c>DELETE /apps/{id}</c> response, or null if none arrived (not tried yet, or
+        /// the request failed).
         /// </summary>
         public int? LastDeleteStatus { get; private set; }
 
         /// <summary>The last error <see cref="DeleteAsync"/> swallowed, if any.</summary>
         public Exception LastDeleteError { get; private set; }
 
-        /// <summary>
-        /// The specs' <c>BEFORE ALL TESTS: POST https://…/apps WITH body from test-app-setup.json</c>. Sent once,
-        /// never retried, bounded at <see cref="RequestTimeout"/>.
-        /// </summary>
+        /// <summary>The specs' <c>BEFORE ALL TESTS: POST https://…/apps WITH body from test-app-setup.json</c>.</summary>
         /// <param name="endpoint">The endpoint to provision on; null means <see cref="DefaultEndpoint"/>.</param>
-        /// <param name="handler">The test seam: every request of this app goes through it. Null means a plain
-        /// <see cref="HttpClientHandler"/>.</param>
-        /// <param name="cancellationToken">Cancels the create request.</param>
-        /// <returns>The provisioned app.</returns>
+        /// <param name="handler">The test seam: every request of this app goes through it.</param>
         public static async Task<SandboxApp> CreateAsync(
             string endpoint = null,
             HttpMessageHandler handler = null,
@@ -151,7 +129,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-                // Exactly one SendAsync: no retry loop, whatever the failure (see the class summary).
+                // Exactly one SendAsync: no retry loop, whatever the failure.
                 HttpResponseMessage response;
                 try
                 {
@@ -182,10 +160,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         }
 
         /// <summary>
-        /// The <c>post_apps</c> body of the embedded <c>test-app-setup.json</c>, with the <see cref="MutableMessagesNamespace"/>
-        /// namespace added when it is missing.
+        /// The <c>post_apps</c> body of the embedded <c>test-app-setup.json</c>, with the <see
+        /// cref="MutableMessagesNamespace"/> namespace added when it is missing.
         /// </summary>
-        /// <returns>A fresh copy each call.</returns>
         public static JObject AppSetupBody()
         {
             var setup = JObject.Parse(ReadEmbeddedAppSetup());
@@ -212,10 +189,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
 
         /// <summary>
         /// The specs' <c>AFTER ALL TESTS: DELETE https://…/apps/{app_id} WITH Authorization: Basic {api_key}</c>.
-        /// Best-effort: never throws, returns whether the sandbox confirmed the deletion. DELETE is idempotent, so a
-        /// failed attempt is retried once; each attempt is bounded at <see cref="RequestTimeout"/>.
         /// </summary>
-        /// <returns>True if a DELETE got a 2xx answer (now or earlier).</returns>
         public async Task<bool> DeleteAsync()
         {
             if (Deleted)
@@ -299,12 +273,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             return new SandboxApp(endpoint, host, appId, keys, handler);
         }
 
-        /// <summary>
-        /// The embedded <c>test-app-setup.json</c>. Matched by suffix rather than through the native
-        /// <c>ResourceHelper</c>, which prefixes the assembly name: Tests.DotNET embeds it as
-        /// <c>Ably.PubSub.Tests.DotNET.test-app-setup.json</c>, but Tests.NETFramework (RootNamespace
-        /// <c>Ably.PubSub.Tests</c>) as <c>Ably.PubSub.Tests.test-app-setup.json</c>.
-        /// </summary>
+        /// <summary>The embedded <c>test-app-setup.json</c>.</summary>
         private static string ReadEmbeddedAppSetup()
         {
             var assembly = typeof(SandboxApp).Assembly;

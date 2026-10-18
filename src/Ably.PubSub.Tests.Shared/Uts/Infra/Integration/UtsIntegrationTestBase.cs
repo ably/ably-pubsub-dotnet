@@ -16,33 +16,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
     /// The base of every UTS direct-sandbox test (and, through <c>UtsProxyTestBase</c>, every proxy test): the
     /// specs' <c>Rest(options: …)</c> / <c>Realtime(options: …)</c> pointed at the collection's sandbox app, the
     /// specs' integration helpers (<c>random_id()</c>, unique channel names, <c>extract_key_name</c>,
-    /// <c>extract_key_secret</c>, <c>generate_jwt</c>, <c>request_token_from_sandbox</c>), wall-clock state waits,
-    /// and teardown that closes every realtime client it built.
-    ///
-    /// <para>A derived class takes <c>(SandboxAppFixture fixture, ITestOutputHelper output)</c> and carries, itself
-    /// (xUnit doesn't reliably read them off a base class):
-    /// <c>[Collection(UtsSandboxCollection.Name)]</c>, <c>[Trait("uts", "integration")]</c> and
-    /// <c>[Trait("type", "integration")]</c>.</para>
-    ///
-    /// <para><b>The factories</b> change the options in place:</para>
-    /// <list type="bullet">
-    /// <item><c>Endpoint</c> = the app's endpoint (<c>ABLY_ENDPOINT</c> or <c>nonprod:sandbox</c>) unless the test set one;</item>
-    /// <item><c>Key</c> = the app's first key (the specs' <c>api_key</c>) unless the test set any auth
-    /// (<c>Key</c>, <c>Token</c>, <c>TokenDetails</c>, <c>AuthCallback</c> or <c>AuthUrl</c>);</item>
-    /// <item><c>AutomaticNetworkStateMonitoring = false</c>, and each realtime client's connection is taken off the SDK's
-    /// static OS network-state list right after construction (<see cref="UtsTestBase.DetachFromOsNetworkEvents"/>), so
-    /// neither the host's network changes nor another test's <c>Connection.NotifyOperatingSystemNetworkState</c> reach it;</item>
-    /// <item>its own logger (<c>InternalLogger</c> with the options' <c>LogLevel</c> and <c>LogHandler</c>), because the SDK
-    /// writes the level and sink into whatever logger it is given and the default is process-wide;</item>
-    /// <item>its own <c>LocalDevice</c> over a <c>FakeMobileDevice</c>, so it never reads the process-wide device
-    /// that native push tests change (the same reason as the unit base).</item>
-    /// </list>
-    /// <para>Nothing else is defaulted: <c>AutoConnect</c>, <c>Tls</c> and fallback hosts are used exactly as the
-    /// spec's options give them, so the pseudocode's <c>autoConnect: false</c> must be translated. JSON only:
-    /// <c>UseBinaryProtocol</c> is a no-op in this build (decision log #6).</para>
-    ///
-    /// <para><b>Time.</b> Every wait here is wall-clock (<see cref="UtsWait"/> measures with a monotonic real clock):
-    /// state waits default to <see cref="StateTimeout"/>; a poll must pass its own timeout (10-30 s).</para>
+    /// <c>extract_key_secret</c>, <c>generate_jwt</c>, <c>request_token_from_sandbox</c>), wall-clock state
+    /// waits, and teardown that closes every realtime client it built.
     /// </summary>
     public abstract class UtsIntegrationTestBase : UtsTestBase
     {
@@ -85,9 +60,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         /// <summary>A real round trip: longer than the unit tier's bound.</summary>
         protected override TimeSpan CloseTimeout => TimeSpan.FromSeconds(10);
 
-        /// <summary>The specs' <c>random_id()</c> / <c>base64(random_bytes(n))</c>, url-safe (base64url, unpadded) so it is valid in a channel name.</summary>
-        /// <param name="byteCount">How many random bytes to encode.</param>
-        /// <returns>The encoded bytes.</returns>
+        /// <summary>
+        /// The specs' <c>random_id()</c> / <c>base64(random_bytes(n))</c>, url-safe (base64url, unpadded) so it
+        /// is valid in a channel name.
+        /// </summary>
         public static string RandomId(int byteCount = 6)
         {
             var bytes = new byte[byteCount];
@@ -100,32 +76,19 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         }
 
         /// <summary>The specs' unique channel name: <c>test-&lt;prefix&gt;-&lt;random&gt;</c>.</summary>
-        /// <param name="prefix">The descriptive part, for example the spec point.</param>
-        /// <returns>The channel name.</returns>
         public static string UniqueChannelName(string prefix) => $"test-{prefix}-{RandomId()}";
 
         /// <summary>The specs' <c>extract_key_name(api_key)</c>: <c>appId.keyId</c>.</summary>
-        /// <param name="apiKey">A key of the form <c>appId.keyId:secret</c>.</param>
-        /// <returns>The part before the colon.</returns>
         public static string ExtractKeyName(string apiKey) => SplitKey(apiKey)[0];
 
         /// <summary>The specs' <c>extract_key_secret(api_key)</c>.</summary>
-        /// <param name="apiKey">A key of the form <c>appId.keyId:secret</c>.</param>
-        /// <returns>The part after the colon.</returns>
         public static string ExtractKeySecret(string apiKey) => SplitKey(apiKey)[1];
 
         /// <summary>
         /// The specs' <c>generate_jwt(key_name, key_secret, ttl, client_id, capability)</c>: an Ably JWT signed
-        /// locally with HS256 (header <c>kid</c> = the key name; claims <c>iat</c>, <c>exp</c>, and
-        /// <c>x-ably-clientId</c> / <c>x-ably-capability</c> when given). The spec's <c>ttl</c> is in milliseconds:
-        /// pass <c>TimeSpan.FromMilliseconds(ttl)</c>.
+        /// locally with HS256 (header <c>kid</c> = the key name; claims <c>iat</c>, <c>exp</c>, and <c>x-ably-
+        /// clientId</c> / <c>x-ably-capability</c> when given).
         /// </summary>
-        /// <param name="keyName"><c>appId.keyId</c>.</param>
-        /// <param name="keySecret">The key secret, the HMAC key.</param>
-        /// <param name="ttl">The token lifetime; 1 hour when null.</param>
-        /// <param name="clientId">The <c>x-ably-clientId</c> claim, if any.</param>
-        /// <param name="capability">The <c>x-ably-capability</c> claim (a JSON string), if any.</param>
-        /// <returns>The JWT.</returns>
         public static string GenerateJwt(
             string keyName,
             string keySecret,
@@ -169,13 +132,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         }
 
         /// <summary>
-        /// The specs' <c>request_token_from_sandbox(api_key, params)</c>: a real token from the sandbox
-        /// (<c>POST /keys/{keyName}/requestToken</c>), requested by a separate REST client that talks straight to
-        /// the sandbox over TLS with Basic auth. Nothing it sends goes through a proxy session.
+        /// The specs' <c>request_token_from_sandbox(api_key, params)</c>: a real token from the sandbox (<c>POST
+        /// /keys/{keyName}/requestToken</c>), requested by a separate REST client that talks straight to the
+        /// sandbox over TLS with Basic auth.
         /// </summary>
-        /// <param name="apiKey">The key to request the token with; the app's first key when null.</param>
-        /// <param name="tokenParams">The token params, or null.</param>
-        /// <returns>The token.</returns>
         public Task<TokenDetails> RequestTokenFromSandbox(string apiKey = null, TokenParams tokenParams = null)
         {
             var direct = BuildRest(new ClientOptions { Key = apiKey ?? ApiKey, Endpoint = SandboxEndpoint });
@@ -186,9 +146,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         /// An <c>authCallback</c> that answers every token request with <see cref="RequestTokenFromSandbox"/>
         /// (the callback's token params are passed on), so the token is a real, renewable one.
         /// </summary>
-        /// <param name="apiKey">The key the tokens are requested with; the app's first key when null.</param>
         /// <param name="onInvoked">Called on every invocation, before the token is requested (the specs' <c>auth_callback_count++</c>).</param>
-        /// <returns>The callback.</returns>
         public Func<TokenParams, Task<object>> SandboxTokenCallback(string apiKey = null, Action<TokenParams> onInvoked = null)
         {
             var key = apiKey ?? ApiKey;
@@ -199,9 +157,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             };
         }
 
-        /// <summary>The specs' <c>Rest(options: …)</c> against the sandbox, wired as the class summary describes.</summary>
-        /// <param name="options">The spec's options; changed in place. Null means none.</param>
-        /// <returns>The client.</returns>
+        /// <summary>The specs' <c>Rest(options: …)</c> against the sandbox, wired as described in Infra/README.md.</summary>
         public PubSubHttpClient Rest(ClientOptions options = null)
         {
             options = options ?? new ClientOptions();
@@ -209,9 +165,11 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             return BuildRest(options);
         }
 
-        /// <summary>The specs' <c>Realtime(options: …)</c> against the sandbox, wired as the class summary describes, and torn down after the test.</summary>
-        /// <param name="options">The spec's options; changed in place. Null means none (then the client auto-connects, as the SDK's default).</param>
-        /// <returns>The client.</returns>
+        /// <summary>
+        /// The specs' <c>Realtime(options: …)</c> against the sandbox, wired as described in Infra/README.md, and
+        /// torn down after the test.
+        /// </summary>
+        /// <param name="options">The spec's options; changed in place.</param>
         public PubSubRealtimeClient Realtime(ClientOptions options = null)
         {
             options = options ?? new ClientOptions();
@@ -219,13 +177,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             return BuildRealtime(options);
         }
 
-        /// <summary>The specs' <c>AWAIT_STATE connection.state == state</c>, bounded by <see cref="StateTimeout"/> unless the spec gives a timeout.</summary>
-        /// <param name="connection">The connection.</param>
-        /// <param name="state">The state to wait for.</param>
-        /// <param name="timeout">The spec's timeout, if any.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
-        /// <returns>A task that completes when the state is reached.</returns>
+        /// <summary>
+        /// The specs' <c>AWAIT_STATE connection.state == state</c>, bounded by <see cref="StateTimeout"/> unless
+        /// the spec gives a timeout.
+        /// </summary>
         public Task AwaitConnectionState(
             Connection connection,
             ConnectionState state,
@@ -234,13 +189,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             [CallerLineNumber] int callerLineNumber = 0)
             => UtsWait.AwaitConnectionState(connection, state, timeout ?? StateTimeout, callerFilePath, callerLineNumber);
 
-        /// <summary>The specs' <c>AWAIT_STATE channel.state == state</c>, bounded by <see cref="StateTimeout"/> unless the spec gives a timeout.</summary>
-        /// <param name="channel">The channel.</param>
-        /// <param name="state">The state to wait for.</param>
-        /// <param name="timeout">The spec's timeout, if any.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
-        /// <returns>A task that completes when the state is reached.</returns>
+        /// <summary>
+        /// The specs' <c>AWAIT_STATE channel.state == state</c>, bounded by <see cref="StateTimeout"/> unless the
+        /// spec gives a timeout.
+        /// </summary>
         public Task AwaitChannelState(
             IRealtimeChannel channel,
             ChannelState state,
@@ -250,10 +202,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
             => UtsWait.AwaitChannelState(channel, state, timeout ?? StateTimeout, callerFilePath, callerLineNumber);
 
         /// <summary>Fails the test, attributed to the caller, unless an SDK operation's <see cref="Result"/> succeeded.</summary>
-        /// <param name="result">The result of, for example, <c>AttachAsync</c> or <c>PublishAsync</c>.</param>
-        /// <param name="what">What the operation was, for the failure message.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
         public static void AssertSucceeded(
             Result result,
             string what,
@@ -272,7 +220,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         }
 
         /// <summary>True when the options already say how to authenticate.</summary>
-        /// <param name="options">The options.</param>
         /// <returns>Whether any of Key, Token, TokenDetails, AuthCallback or AuthUrl is set.</returns>
         internal static bool HasAuth(ClientOptions options)
             => !string.IsNullOrEmpty(options.Key)
@@ -283,11 +230,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
 
         /// <summary>
         /// Builds a REST client from options that already say where to go and how to authenticate, adding only
-        /// the per-client logger, device and network-monitoring defaults. Not tracked: a REST client holds no
-        /// connection to close.
+        /// the per-client logger, device and network-monitoring defaults.
         /// </summary>
-        /// <param name="options">The finished options; changed in place.</param>
-        /// <returns>The client.</returns>
         protected PubSubHttpClient BuildRest(ClientOptions options)
         {
             ApplyClientDefaults(options);
@@ -298,8 +242,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         }
 
         /// <summary>The realtime counterpart of <see cref="BuildRest"/>; the client is torn down after the test.</summary>
-        /// <param name="options">The finished options; changed in place.</param>
-        /// <returns>The client.</returns>
         protected PubSubRealtimeClient BuildRealtime(ClientOptions options)
         {
             ApplyClientDefaults(options);

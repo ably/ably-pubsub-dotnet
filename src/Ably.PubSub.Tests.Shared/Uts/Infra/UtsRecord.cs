@@ -3,10 +3,9 @@ using Ably.PubSub.Realtime;
 namespace Ably.PubSub.Tests.Uts.Infra
 {
     /// <summary>
-    /// Record-and-verify for transient states (<c>writing-test-specs.md</c> "Verifying Transient
-    /// States"): subscribe before the stimulus, let the cycle finish, then assert on the record with
-    /// <see cref="UtsAssert.ContainsInOrder{T}"/>. A DISCONNECTED that lasts one scheduling tick is
-    /// always in the record, even though no wait could catch it.
+    /// Record-and-verify for transient states (<c>writing-test-specs.md</c> "Verifying Transient States"):
+    /// subscribe before the stimulus, let the cycle finish, then assert on the record with <see
+    /// cref="UtsAssert.ContainsInOrder{T}"/>.
     /// </summary>
     public static class UtsRecord
     {

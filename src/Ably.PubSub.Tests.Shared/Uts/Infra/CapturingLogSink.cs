@@ -18,15 +18,7 @@ namespace Ably.PubSub.Tests.Uts.Infra
         public override string ToString() => $"{Level}: {Message}";
     }
 
-    /// <summary>
-    /// The specs' <c>logHandler: (level, message) =&gt; captured_logs.push(...)</c>. A spec sets it as
-    /// <c>LogHandler = new CapturingLogSink()</c>; the UTS client factories give every client its own
-    /// logger, so the sink only ever sees that client's lines and the process-wide default logger is
-    /// never touched.
-    ///
-    /// The specs' third handler argument (<c>context</c>) has no equivalent: <c>ILoggerSink.LogEvent</c>
-    /// receives a level and a message only.
-    /// </summary>
+    /// <summary>The specs' <c>logHandler: (level, message) =&gt; captured_logs.push(...)</c>.</summary>
     public sealed class CapturingLogSink : ILoggerSink
     {
         private readonly CaptureList<CapturedLog> _logs = new CaptureList<CapturedLog>();

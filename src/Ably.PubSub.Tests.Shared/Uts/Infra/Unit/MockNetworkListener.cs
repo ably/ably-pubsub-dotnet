@@ -8,16 +8,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
     /// <summary>
     /// The corpus' <c>MockNetworkListener</c> (no helper spec; <c>network_change_test.md</c>):
     /// <c>simulate_network_lost()</c> / <c>simulate_network_available()</c> for the clients it is bound to.
-    ///
-    /// <para><c>install_mock(listener)</c> (the unit base's <c>InstallMock</c>) binds it to every realtime
-    /// client the base builds while it is installed. A simulated change runs exactly what the SDK runs for
-    /// an OS notification, for those clients only: it sets the internal <c>Connection.NetworkState</c> and
-    /// calls the internal <c>ConnectionManager.HandleNetworkStateChange(state)</c>. The public static
-    /// <c>Connection.NotifyOperatingSystemNetworkState</c> isn't used: it reaches every live client in the
-    /// process, other tests' included. The unit base also turns the OS hook off
-    /// (<c>AutomaticNetworkStateMonitoring = false</c>) and takes each client off that static list
-    /// (<see cref="UtsTestBase.DetachFromOsNetworkEvents"/>), so neither the host's real network state nor
-    /// another test's notification reaches a unit client.</para>
     /// </summary>
     public sealed class MockNetworkListener
     {

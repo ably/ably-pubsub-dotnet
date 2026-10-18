@@ -22,8 +22,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         LocalOverride,
 
         /// <summary>
-        /// The verified binary already in the shared cache, reused as is: an earlier run of this or another SDK's UTS
-        /// infra (ably-java, ably-cocoa) installed it, and every installer verifies the archive before extracting.
+        /// The verified binary already in the shared cache, reused as is: an earlier run of this or another SDK's
+        /// UTS infra (ably-java, ably-cocoa) installed it, and every installer verifies the archive before
+        /// extracting.
         /// </summary>
         Cache,
 
@@ -37,34 +38,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
     // CacheDirectory(version) is the one place that decides it.
 
     /// <summary>
-    /// Downloads, verifies, caches, starts and reaps <see href="https://github.com/ably/uts-proxy">ably/uts-proxy</see>
-    /// (guide 2.4). One proxy process per test process, on a fixed control port; every proxy test class joins the
-    /// <c>"UTS Proxy"</c> collection, so the proxy tier runs in one process.
-    ///
-    /// <para><b>Pinned:</b> uts-proxy v0.3.0 (the version <c>proxy.md</c> documents). The release publishes
-    /// <c>uts-proxy_0.3.0_{darwin,linux}_{amd64,arm64}.tar.gz</c> only; each archive's SHA-256 is pinned here and
-    /// checked against the downloaded archive before anything is extracted. There is no Windows asset.</para>
-    ///
-    /// <para><b>Cache, shared with ably-java and ably-cocoa:</b> <c>~/.cache/uts-proxy/v0.3.0/uts-proxy</c>
-    /// (<see cref="CacheDirectory(string)"/>), the layout their UTS infra already uses. A binary already there is a
-    /// cache hit and is reused as is: it isn't re-downloaded, and it can't be re-hashed, since only archives are
-    /// pinned (every installer verifies the archive before extracting). Nothing besides the binary, the lock file and a
-    /// short-lived staging folder is written there.</para>
-    ///
-    /// <para><b>Install:</b> under the cross-process lock <c>uts-proxy.lock</c> beside the binary (opened with
-    /// <c>FileShare.None</c>, an advisory <c>flock</c> on Unix, retried for up to <see cref="LockTimeout"/>), the
-    /// binary's presence is checked again (a process that held the lock first may have installed it), then the archive
-    /// is downloaded into a staging folder in the binary's own directory (so the final rename stays on one file system),
-    /// its SHA-256 compared with the pinned value (on a mismatch the staging folder is deleted and nothing is extracted),
-    /// extracted there with the system <c>tar</c> (System.Formats.Tar isn't available on net462 or net6), made
-    /// executable there, and only then renamed into place. An interrupted or concurrent run never leaves a half-written
-    /// binary that would count as a cache hit; the lock only avoids duplicate downloads.</para>
-    ///
-    /// <para><b>Override:</b> <c>UTS_PROXY_LOCAL_PATH</c> points at a locally built binary (a configuration override,
-    /// not a test gate). It is started where it is, never copied into the cache. On Windows, with no release asset,
-    /// the proxy tier fails unless it is set.
-    /// <c>UTS_PROXY_CONTROL_PORT</c> moves the control port (default 9100), for running two test processes side by
-    /// side.</para>
+    /// Downloads, verifies, caches, starts and reaps <see href="https://github.com/ably/uts-proxy">ably/uts-
+    /// proxy</see> (guide 2.4).
     /// </summary>
     public static class ProxyManager
     {
@@ -122,18 +97,24 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         /// <summary>The control API base URL (no trailing slash).</summary>
         public static string ControlUrl => $"http://localhost:{ControlPort}";
 
-        /// <summary>Where the binary came from, once <see cref="EnsureBinaryAsync"/> (or <see cref="EnsureStartedAsync"/>) has run.</summary>
+        /// <summary>
+        /// Where the binary came from, once <see cref="EnsureBinaryAsync"/> (or <see cref="EnsureStartedAsync"/>)
+        /// has run.
+        /// </summary>
         public static ProxyBinarySource Source { get; private set; }
 
         /// <summary>The binary resolved by the last <see cref="EnsureBinaryAsync"/>.</summary>
         public static string BinaryPath { get; private set; }
 
-        /// <summary>The platform key (<c>darwin_arm64</c>, …) the release binary was chosen for; null with the local override.</summary>
+        /// <summary>
+        /// The platform key (<c>darwin_arm64</c>, …) the release binary was chosen for; null with the local
+        /// override.
+        /// </summary>
         public static string Platform { get; private set; }
 
         /// <summary>
-        /// Whether the last <see cref="EnsureBinaryAsync"/> found the release binary already in the cache (nothing
-        /// downloaded). False with the local override.
+        /// Whether the last <see cref="EnsureBinaryAsync"/> found the release binary already in the cache
+        /// (nothing downloaded). False with the local override.
         /// </summary>
         public static bool LastEnsureWasCacheHit { get; private set; }
 
@@ -143,21 +124,17 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         private static bool IsWindows => System.Environment.OSVersion.Platform == PlatformID.Win32NT;
 
         /// <summary>
-        /// The one place that decides the cache layout: the directory holding <c>uts-proxy</c> and
-        /// <c>uts-proxy.lock</c> for a version, <c>~/.cache/uts-proxy/v&lt;version&gt;/</c>, shared with ably-java and
+        /// The one place that decides the cache layout: the directory holding <c>uts-proxy</c> and <c>uts-
+        /// proxy.lock</c> for a version, <c>~/.cache/uts-proxy/v&lt;version&gt;/</c>, shared with ably-java and
         /// ably-cocoa.
         /// </summary>
-        /// <param name="version">The release version, for example <c>0.3.0</c>.</param>
-        /// <returns>The directory.</returns>
         public static string CacheDirectory(string version)
             => Path.Combine(HomeDirectory(), ".cache", "uts-proxy", "v" + version);
 
         /// <summary>
         /// Makes sure the binary to run is there and returns its path, without starting it: the local override as
-        /// given, or the verified release binary from the cache, downloading it first if it isn't there. Sets
-        /// <see cref="Source"/>, <see cref="BinaryPath"/> and <see cref="LastEnsureWasCacheHit"/>.
+        /// given, or the verified release binary from the cache, downloading it first if it isn't there.
         /// </summary>
-        /// <returns>The binary's path.</returns>
         public static async Task<string> EnsureBinaryAsync()
         {
             await InstallGate.WaitAsync().ConfigureAwait(false);
@@ -234,11 +211,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>
-        /// Makes sure the pinned proxy (or the local override) runs on <see cref="ControlPort"/> and reports healthy.
-        /// Idempotent and safe to call from every test; the first call installs (<see cref="EnsureBinaryAsync"/>) and
-        /// starts it. Fails, never skips: without a usable binary the proxy tier can't run.
+        /// Makes sure the pinned proxy (or the local override) runs on <see cref="ControlPort"/> and reports
+        /// healthy.
         /// </summary>
-        /// <returns>A task that completes once <c>GET /health</c> succeeds.</returns>
         public static async Task EnsureStartedAsync()
         {
             await Gate.WaitAsync().ConfigureAwait(false);
@@ -271,7 +246,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>One <c>GET /health</c> on the control API.</summary>
-        /// <param name="timeout">The bound on the request; 5 s when null.</param>
         /// <returns>True for a 2xx answer whose body, if it has an <c>ok</c> field, says true.</returns>
         public static async Task<bool> IsHealthyAsync(TimeSpan? timeout = null)
         {
@@ -304,19 +278,13 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>The release asset for a platform key.</summary>
-        /// <param name="platform">For example <c>linux_amd64</c>.</param>
-        /// <returns>The archive file name.</returns>
         internal static string AssetName(string platform) => $"uts-proxy_{Version}_{platform}.tar.gz";
 
         /// <summary>The pinned archive hash for a platform key, or null if the release has no asset for it.</summary>
-        /// <param name="platform">For example <c>linux_amd64</c>.</param>
-        /// <returns>The lower-case hex SHA-256, or null.</returns>
         internal static string PinnedSha256(string platform)
             => PinnedArchiveSha256.TryGetValue(platform, out var sha) ? sha : null;
 
         /// <summary>The lower-case hex SHA-256 of a file.</summary>
-        /// <param name="path">The file.</param>
-        /// <returns>The hash.</returns>
         internal static string Sha256Hex(string path)
         {
             using (var sha = SHA256.Create())
@@ -327,10 +295,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>
-        /// The release platform key for this machine, from <c>uname -s</c> and <c>uname -m</c> (the same on net462
-        /// under Mono and on net6, where <c>Environment.OSVersion</c> reports Unix for both macOS and Linux).
+        /// The release platform key for this machine, from <c>uname -s</c> and <c>uname -m</c> (the same on
+        /// net462 under Mono and on net6, where <c>Environment.OSVersion</c> reports Unix for both macOS and
+        /// Linux).
         /// </summary>
-        /// <returns>For example <c>darwin_arm64</c>.</returns>
         internal static string DetectPlatform()
         {
             var os = RunTool("uname", "-s").Trim().ToLowerInvariant();

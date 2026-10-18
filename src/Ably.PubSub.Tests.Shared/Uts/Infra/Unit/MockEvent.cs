@@ -25,7 +25,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The test sent a WebSocket ping frame. Data: the <see cref="MockConnection"/>.</summary>
         PingFrame,
 
-        /// <summary>The server closed the connection or the transport failed. Data: the <see cref="ErrorInfo"/>, or null.</summary>
+        /// <summary>
+        /// The server closed the connection or the transport failed. Data: the <see cref="ErrorInfo"/>, or null.
+        /// </summary>
         ServerDisconnect,
 
         /// <summary>The client closed the WebSocket. Data: the <see cref="ClientCloseEvent"/>.</summary>
@@ -59,12 +61,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         public override string ToString() => Data == null ? Type.ToString() : $"{Type} ({Data})";
     }
 
-    /// <summary>
-    /// The spec's <c>ClientCloseEvent{code, reason}</c>. <c>ITransport.Close(bool suppressClosedEvent)</c> and
-    /// <c>Dispose()</c> carry no WebSocket close code, so <see cref="Code"/> is the normal-closure code the
-    /// real transport sends (1000) and <see cref="Reason"/> is null; <see cref="SuppressClosedEvent"/> and
-    /// <see cref="ViaDispose"/> carry what the SDK actually varies.
-    /// </summary>
+    /// <summary>The spec's <c>ClientCloseEvent{code, reason}</c>.</summary>
     public sealed class ClientCloseEvent
     {
         internal ClientCloseEvent(bool suppressClosedEvent, bool viaDispose)
@@ -80,7 +77,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The argument of <c>Close(...)</c>; true for a <c>Dispose()</c>.</summary>
         public bool SuppressClosedEvent { get; }
 
-        /// <summary>True when the SDK tore the transport down with <c>Dispose()</c> (its usual path) rather than <c>Close()</c>.</summary>
+        /// <summary>
+        /// True when the SDK tore the transport down with <c>Dispose()</c> (its usual path) rather than
+        /// <c>Close()</c>.
+        /// </summary>
         public bool ViaDispose { get; }
 
         public override string ToString() => ViaDispose ? "dispose()" : $"close(suppressClosedEvent: {SuppressClosedEvent})";

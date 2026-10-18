@@ -11,26 +11,14 @@ using Newtonsoft.Json.Linq;
 namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
 {
     /// <summary>
-    /// The specs' proxy session (<c>proxy.md</c> "Proxy Session Interface"): a port the SDK talks plain HTTP/WS to,
-    /// a rule list, imperative actions and an event log, over uts-proxy's control API
-    /// (<c>POST /sessions</c>, <c>POST /sessions/{id}/rules</c>, <c>POST /sessions/{id}/actions</c>,
-    /// <c>GET /sessions/{id}/log</c>, <c>DELETE /sessions/{id}</c>).
-    ///
-    /// <para>The control API takes the upstream as <c>target { realtimeHost, restHost }</c>, not an endpoint, so
-    /// <see cref="CreateAsync"/> resolves the spec's <c>endpoint</c> client-side with the SDK's own
-    /// <c>Defaults.GetPrimaryDomain</c> (REC1b) and sends that host for both. With no endpoint (the corpus's
-    /// <c>create_proxy_session(rules: …)</c> form, guide 6.7) it is the sandbox endpoint.</para>
-    ///
-    /// <para>Every control-API failure is a test failure attributed to the calling test line. A test creates and
-    /// closes its own session; <c>UtsProxyTestBase.CreateProxySession</c> registers the close for teardown.</para>
+    /// The specs' proxy session (<c>proxy.md</c> "Proxy Session Interface"): a port the SDK talks plain HTTP/WS
+    /// to, a rule list, imperative actions and an event log, over uts-proxy's control API (<c>POST /sessions</c>,
+    /// <c>POST /sessions/{id}/rules</c>, <c>POST /sessions/{id}/actions</c>, <c>GET /sessions/{id}/log</c>,
+    /// <c>DELETE /sessions/{id}</c>).
     /// </summary>
     public sealed class ProxySession
     {
-        /// <summary>
-        /// The session's auto-cleanup timeout when the spec gives none. The proxy's own default is 30 s; a longer one
-        /// keeps a session alive through a test that idles (a long proxy delay, a slow sandbox) before reading the log.
-        /// Teardown deletes every session explicitly, so this is only the backstop for a killed test process.
-        /// </summary>
+        /// <summary>The session's auto-cleanup timeout when the spec gives none.</summary>
         public const int DefaultTimeoutMs = 120000;
 
         private static readonly HttpClient Control = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
@@ -61,17 +49,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         /// <summary>True once <see cref="CloseAsync"/> has run.</summary>
         public bool Closed { get; private set; }
 
-        /// <summary>
-        /// The specs' <c>create_proxy_session(endpoint:, port:, rules:, timeoutMs:)</c>. Starts the pinned proxy
-        /// first if this process hasn't yet (<see cref="ProxyManager.EnsureStartedAsync"/>).
-        /// </summary>
+        /// <summary>The specs' <c>create_proxy_session(endpoint:, port:, rules:, timeoutMs:)</c>.</summary>
         /// <param name="endpoint">The spec's endpoint; null means the sandbox (<see cref="SandboxApp.DefaultEndpoint"/>).</param>
-        /// <param name="rules">The initial rules (built with <see cref="ProxyRules"/>), or null.</param>
-        /// <param name="port">A fixed proxy port; null lets the proxy pick a free one.</param>
         /// <param name="timeoutMs">The session's auto-cleanup timeout; <see cref="DefaultTimeoutMs"/> when null.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
-        /// <returns>The session.</returns>
         public static async Task<ProxySession> CreateAsync(
             string endpoint = null,
             IEnumerable<JObject> rules = null,
@@ -108,14 +88,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
 
         /// <summary>
         /// The <c>POST /sessions</c> body for <see cref="CreateAsync"/>, built without the network: the endpoint
-        /// (the sandbox when null) resolved to <c>target { realtimeHost, restHost }</c>, the rules, the port and the
-        /// timeout.
+        /// (the sandbox when null) resolved to <c>target { realtimeHost, restHost }</c>, the rules, the port and
+        /// the timeout.
         /// </summary>
-        /// <param name="endpoint">The spec's endpoint, or null.</param>
-        /// <param name="rules">The rules, or null.</param>
-        /// <param name="port">A fixed proxy port, or null.</param>
-        /// <param name="timeoutMs">The timeout, or null for <see cref="DefaultTimeoutMs"/>.</param>
-        /// <returns>The request body.</returns>
         internal static JObject BuildCreateRequest(string endpoint, IEnumerable<JObject> rules, int? port, int? timeoutMs)
         {
             var host = Defaults.GetPrimaryDomain(endpoint ?? SandboxApp.DefaultEndpoint);
@@ -143,11 +118,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>The specs' <c>session.add_rules(rules, position:)</c>.</summary>
-        /// <param name="rules">The rules to add.</param>
         /// <param name="position"><see cref="ProxyRules.Append"/> (default) or <see cref="ProxyRules.Prepend"/>.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
-        /// <returns>A task that completes once the proxy accepted the rules.</returns>
         public async Task AddRulesAsync(
             IEnumerable<JObject> rules,
             string position = ProxyRules.Append,
@@ -167,14 +138,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
             await SendAsync(HttpMethod.Post, $"/sessions/{SessionId}/rules", body, callerFilePath, callerLineNumber).ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// The specs' <c>session.trigger_action(action)</c>, for example <c>ProxyRules.Disconnect()</c>. The proxy
-        /// answers 409 when no WebSocket connection is open, which fails the test with that answer.
-        /// </summary>
-        /// <param name="action">The imperative action.</param>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
-        /// <returns>A task that completes once the proxy accepted the action.</returns>
+        /// <summary>The specs' <c>session.trigger_action(action)</c>, for example <c>ProxyRules.Disconnect()</c>.</summary>
         public async Task TriggerActionAsync(
             JObject action,
             [CallerFilePath] string callerFilePath = "",
@@ -184,9 +148,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>The specs' <c>session.get_log()</c>: every event the session recorded, in order, typed.</summary>
-        /// <param name="callerFilePath">Filled in by the compiler.</param>
-        /// <param name="callerLineNumber">Filled in by the compiler.</param>
-        /// <returns>The events.</returns>
         public async Task<List<ProxyEvent>> GetLogAsync(
             [CallerFilePath] string callerFilePath = "",
             [CallerLineNumber] int callerLineNumber = 0)
@@ -199,7 +160,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         }
 
         /// <summary>Whether the control API still knows the session (<c>GET /sessions/{id}</c> answers 2xx).</summary>
-        /// <returns>True while the session exists.</returns>
         public async Task<bool> ExistsAsync()
         {
             try
@@ -215,7 +175,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
             }
         }
 
-        /// <summary>The specs' <c>session.close()</c>: <c>DELETE /sessions/{id}</c>. Best-effort, never throws, idempotent.</summary>
+        /// <summary>
+        /// The specs' <c>session.close()</c>: <c>DELETE /sessions/{id}</c>. Best-effort, never throws,
+        /// idempotent.
+        /// </summary>
         /// <returns>A task that completes when the request has been answered or has failed.</returns>
         public async Task CloseAsync()
         {

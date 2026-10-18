@@ -4,14 +4,9 @@ using System.Collections.Generic;
 namespace Ably.PubSub.Tests.Uts.Infra
 {
     /// <summary>
-    /// A list that SDK callbacks append to while the test body reads it: the specs'
-    /// <c>captured = []</c> + <c>captured.append(x)</c>.
-    ///
-    /// SDK listeners run on the realtime workflow's thread (or a timer or HTTP continuation), never on
-    /// the test's, so every access is locked and every read is a snapshot. Enumerating it, indexing it
-    /// or reading <see cref="Count"/> never sees a half-written list.
+    /// A list that SDK callbacks append to while the test body reads it: the specs' <c>captured = []</c> +
+    /// <c>captured.append(x)</c>.
     /// </summary>
-    /// <typeparam name="T">The captured item type.</typeparam>
     public sealed class CaptureList<T> : IReadOnlyList<T>
     {
         private readonly object _lock = new object();

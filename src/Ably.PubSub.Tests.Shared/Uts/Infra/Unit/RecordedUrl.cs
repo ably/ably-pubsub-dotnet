@@ -5,10 +5,8 @@ using System.Linq;
 namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
-    /// The specs' <c>request.url</c> and <c>conn.url</c>: a parsed view of the URI an HTTP request or a
-    /// WebSocket connection attempt was made against. Query parameters are a map because that is how
-    /// the specs read them (<c>request.url.query_params["limit"]</c>, <c>conn.url.queryParams</c>);
-    /// <see cref="AllQueryParams"/> keeps a repeated key for the rare spec that cares.
+    /// The specs' <c>request.url</c> and <c>conn.url</c>: a parsed view of the URI an HTTP request or a WebSocket
+    /// connection attempt was made against.
     /// </summary>
     public sealed class RecordedUrl
     {

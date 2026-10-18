@@ -8,8 +8,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
     /// The specs' <c>PendingRequest</c> (<c>mock_http.md</c>): everything a spec asserts about an outgoing
-    /// request (<c>url</c>, <c>method</c>, <c>headers</c>, <c>body</c>, <c>timestamp</c>), plus the methods
-    /// that answer it. The first answer wins; later ones are ignored.
+    /// request (<c>url</c>, <c>method</c>, <c>headers</c>, <c>body</c>, <c>timestamp</c>), plus the methods that
+    /// answer it.
     /// </summary>
     public sealed class PendingHttpRequest
     {
@@ -42,9 +42,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         public string Method { get; }
 
         /// <summary>
-        /// Request and content headers merged into one case-insensitive map (multiple values joined with
-        /// ", "), because a spec reading <c>request.headers["Content-Type"]</c> doesn't know .NET files that
-        /// one on the content. Includes the client's default headers (<c>X-Ably-Version</c>, <c>Ably-Agent</c>).
+        /// Request and content headers merged into one case-insensitive map (multiple values joined with ", "),
+        /// because a spec reading <c>request.headers["Content-Type"]</c> doesn't know .NET files that one on the
+        /// content.
         /// </summary>
         public IReadOnlyDictionary<string, string> Headers { get; }
 
@@ -64,19 +64,11 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
         internal Task<MockHttpOutcome> Answer => _answer.Task;
 
-        /// <summary>
-        /// The specs' <c>respond_with(status, body, headers?)</c>. A <c>byte[]</c> body is sent as is, a
-        /// string as UTF-8 (default content type <c>application/json</c>), anything else (an anonymous
-        /// object, a JObject, a dictionary) as JSON.
-        /// </summary>
+        /// <summary>The specs' <c>respond_with(status, body, headers?)</c>.</summary>
         public void RespondWith(int status, object body = null, IDictionary<string, string> headers = null)
             => _answer.TrySetResult(MockHttpOutcome.Success(MockHttpOutcome.BuildResponse(status, body, headers)));
 
-        /// <summary>
-        /// The specs' <c>respond_with_delay(delay, status, body, headers?)</c>. The delay runs on the fake
-        /// clock when one is installed (it completes when <c>ADVANCE_TIME</c> passes it), else on the real
-        /// clock. A delay longer than the client's <c>HttpRequestTimeout</c> surfaces as that timeout.
-        /// </summary>
+        /// <summary>The specs' <c>respond_with_delay(delay, status, body, headers?)</c>.</summary>
         public void RespondWithDelay(
             TimeSpan delay,
             int status,
@@ -94,9 +86,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 
         /// <summary>
         /// The specs' <c>respond_with_timeout()</c>: the request hangs until the client's
-        /// <c>HttpRequestTimeout</c> has passed on the fake clock, then fails with
-        /// <see cref="TaskCanceledException"/>, as <c>HttpClient</c> does on its own timeout. Without a fake
-        /// clock it fails at once (an infra stand-in, so no unit test waits for a real timeout).
+        /// <c>HttpRequestTimeout</c> has passed on the fake clock, then fails with <see
+        /// cref="TaskCanceledException"/>, as <c>HttpClient</c> does on its own timeout.
         /// </summary>
         public void RespondWithTimeout() => _answer.TrySetResult(MockHttpOutcome.Timeout());
 

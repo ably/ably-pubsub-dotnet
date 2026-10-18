@@ -7,24 +7,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
 {
-    /// <summary>
-    /// One entry of a proxy session's event log (<c>proxy.md</c> "Event Log"), typed. The field names are uts-proxy
-    /// v0.3.0's (checked against <c>proxy.md</c> and the binary's JSON tags):
-    /// <list type="bullet">
-    /// <item><c>ws_connect</c>: <see cref="Url"/>, <see cref="QueryParams"/>;</item>
-    /// <item><c>ws_frame</c>: <see cref="Direction"/> (<c>server_to_client</c> / <c>client_to_server</c>) and
-    /// <see cref="Message"/>, whose <c>action</c> is a number (<see cref="MessageAction"/>);</item>
-    /// <item><c>ws_disconnect</c>: <see cref="Initiator"/>, <see cref="CloseCode"/>;</item>
-    /// <item><c>http_request</c>: <see cref="Method"/>, <see cref="Path"/>;</item>
-    /// <item><c>http_response</c>: <see cref="Status"/> (no path: match a response to its request by position);</item>
-    /// <item><c>action</c> (not in <c>proxy.md</c>; v0.3.0 logs every <c>POST /sessions/{id}/actions</c>, even one it
-    /// answers 409): <see cref="Message"/> is the action (e.g. <c>{"type":"disconnect"}</c>), <see cref="Initiator"/> is
-    /// <c>proxy</c>.</item>
-    /// </list>
-    /// Every event may carry <see cref="RuleMatched"/>: the matching rule's <c>comment</c>, or <c>rule-N</c> without one.
-    /// The whole entry stays available as <see cref="Raw"/>. <see cref="ToString"/> is redacted
-    /// (<see cref="ProxyRedaction"/>): it never prints a credential into test output or CI logs.
-    /// </summary>
+    /// <summary>One entry of a proxy session's event log (<c>proxy.md</c> "Event Log"), typed.</summary>
     public sealed class ProxyEvent
     {
         public const string WsConnectType = "ws_connect";
@@ -62,7 +45,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         /// <summary>The entry as the control API returned it.</summary>
         public JObject Raw { get; }
 
-        /// <summary><c>ws_connect</c>, <c>ws_frame</c>, <c>ws_disconnect</c>, <c>http_request</c>, <c>http_response</c> or <c>action</c>.</summary>
+        /// <summary>
+        /// <c>ws_connect</c>, <c>ws_frame</c>, <c>ws_disconnect</c>, <c>http_request</c>, <c>http_response</c> or
+        /// <c>action</c>.
+        /// </summary>
         public string Type { get; }
 
         /// <summary>When the proxy recorded it, if the entry says.</summary>
@@ -71,7 +57,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         /// <summary><c>ws_connect</c>: the URL the client connected to.</summary>
         public string Url { get; }
 
-        /// <summary><c>ws_connect</c>: the connection's query parameters (the first value of a repeated one). Empty, never null.</summary>
+        /// <summary>
+        /// <c>ws_connect</c>: the connection's query parameters (the first value of a repeated one). Empty, never
+        /// null.
+        /// </summary>
         public IReadOnlyDictionary<string, string> QueryParams { get; }
 
         /// <summary><c>ws_frame</c>: <see cref="ServerToClient"/> or <see cref="ClientToServer"/>.</summary>
@@ -83,7 +72,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         /// <summary><c>ws_frame</c>: the protocol message's numeric <c>action</c>.</summary>
         public int? MessageAction { get; }
 
-        /// <summary><c>ws_disconnect</c>: who closed (<c>client</c>, <c>server</c>, <c>proxy</c>); <c>action</c>: <c>proxy</c>.</summary>
+        /// <summary>
+        /// <c>ws_disconnect</c>: who closed (<c>client</c>, <c>server</c>, <c>proxy</c>); <c>action</c>:
+        /// <c>proxy</c>.
+        /// </summary>
         public string Initiator { get; }
 
         /// <summary><c>ws_disconnect</c>: the close code, when the proxy logs one (v0.3.0 omits it for a server close).</summary>
@@ -105,7 +97,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
 
         public bool IsClientToServer => Type == WsFrameType && Direction == ClientToServer;
 
-        /// <summary>The entry as JSON with credentials redacted (<see cref="ProxyRedaction.Redact(JObject)"/>), for output lines.</summary>
+        /// <summary>
+        /// The entry as JSON with credentials redacted (<see cref="ProxyRedaction.Redact(JObject)"/>), for output
+        /// lines.
+        /// </summary>
         public override string ToString() => ProxyRedaction.Redact(Raw).ToString(Newtonsoft.Json.Formatting.None);
 
         internal static ProxyEvent Parse(JObject raw) => new ProxyEvent(raw ?? throw new ArgumentNullException(nameof(raw)));
@@ -167,9 +162,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
     }
 
     /// <summary>
-    /// Keeps credentials out of what the proxy infra prints: the <c>accessToken</c> and <c>key</c> query values (in a
-    /// URL, a path or a <c>queryParams</c> map) and any <c>Authorization</c> header (the proxy logs request headers on
-    /// <c>http_request</c>, bearer token included) become <see cref="Redacted"/>.
+    /// Keeps credentials out of what the proxy infra prints: the <c>accessToken</c> and <c>key</c> query values
+    /// (in a URL, a path or a <c>queryParams</c> map) and any <c>Authorization</c> header (the proxy logs request
+    /// headers on <c>http_request</c>, bearer token included) become <see cref="Redacted"/>.
     /// </summary>
     public static class ProxyRedaction
     {
@@ -198,7 +193,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
             return copy;
         }
 
-        /// <summary>Free text (a URL, a path, a proxy output line) with every secret query value and Authorization value redacted.</summary>
+        /// <summary>
+        /// Free text (a URL, a path, a proxy output line) with every secret query value and Authorization value
+        /// redacted.
+        /// </summary>
         public static string RedactText(string text)
         {
             if (string.IsNullOrEmpty(text))

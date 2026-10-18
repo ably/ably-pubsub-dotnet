@@ -11,18 +11,10 @@ using Xunit.Sdk;
 namespace Ably.PubSub.Tests.Uts.Infra
 {
     /// <summary>
-    /// What every UTS test class shares: the clients it built are torn down after each test, whether the
-    /// body passed or threw (the specs' <c>AFTER EACH TEST: CLOSE_CLIENT(client)</c>), and a test never
-    /// hand-rolls that teardown.
-    ///
-    /// <para>Teardown runs in this order: every tracked realtime client is closed (when the tier says so)
-    /// and disposed; then every <see cref="OnTeardown"/> cleanup, last-in first-out; then every
-    /// <see cref="OnVerify"/> verification. Each step runs even if an earlier one threw. If any cleanup
-    /// or verification threw, <see cref="DisposeAsync"/> then throws one <see cref="UtsTeardownException"/>
-    /// listing them all, which xUnit reports as a failure of the test: a mock that recorded a handler
-    /// error, or a request nobody expected, can't pass silently.</para>
-    ///
-    /// xUnit creates one instance per test, so "per instance" here is "per test".
+    /// What every UTS test class shares: the clients it built are torn down after each test, whether the body
+    /// passed or threw (the specs' <c>AFTER EACH TEST: CLOSE_CLIENT(client)</c>), and a test never hand-rolls
+    /// that teardown. Order: clients, then <see cref="OnTeardown"/> cleanups (last in, first out), then
+    /// <see cref="OnVerify"/> checks; every step runs, and failures are thrown together as <see cref="UtsTeardownException"/>.
     /// </summary>
     public abstract class UtsTestBase : IAsyncLifetime
     {
@@ -38,31 +30,23 @@ namespace Ably.PubSub.Tests.Uts.Infra
         protected ITestOutputHelper Output { get; }
 
         /// <summary>
-        /// How long teardown waits for a client to reach CLOSED before giving up on it and disposing it
-        /// anyway. Only the integration tiers wait; see <see cref="CloseClientsOnTeardown"/>.
+        /// How long teardown waits for a client to reach CLOSED before giving up on it and disposing it anyway.
         /// </summary>
         protected virtual TimeSpan CloseTimeout => TimeSpan.FromSeconds(5);
 
-        /// <summary>
-        /// Whether teardown sends CLOSE and waits for CLOSED before disposing. The unit tier says no: a
-        /// mock server doesn't answer CLOSE unless the test does, and disposing stops the client's
-        /// workflow, timers and transport without it. The integration tiers say yes, so the sandbox
-        /// sees a clean close.
-        /// </summary>
+        /// <summary>Whether teardown sends CLOSE and waits for CLOSED before disposing.</summary>
         protected virtual bool CloseClientsOnTeardown => false;
 
         /// <summary>
         /// How long teardown waits, after disposing a client, for its workflow to process the dispose and stop.
-        /// <c>Dispose()</c> only queues a DisposeCommand, so until the workflow has run it the client's timers
-        /// are live and a command queued meanwhile (e.g. a retry timer firing) still runs after it.
         /// </summary>
         protected virtual TimeSpan DisposeTimeout => TimeSpan.FromSeconds(5);
 
         Task IAsyncLifetime.InitializeAsync() => InitializeAsync();
 
         /// <summary>
-        /// The teardown described in the class summary. xUnit calls it after every test; an infra
-        /// self-test may call it on a helper instance to prove what it does.
+        /// The teardown described in the class summary. xUnit calls it after every test; an infra self-test may
+        /// call it on a helper instance to prove what it does.
         /// </summary>
         /// <returns>A task that faults with <see cref="UtsTeardownException"/> if teardown found problems.</returns>
         public async Task DisposeAsync()
@@ -121,23 +105,17 @@ namespace Ably.PubSub.Tests.Uts.Infra
         public Task CloseClient(PubSubRealtimeClient client) => TearDown(client);
 
         /// <summary>
-        /// True once a disposed client's workflow has stopped: its command channel is completed and drained
-        /// (the DisposeCommand ran, aborting the state timer) and nothing is being processed.
+        /// True once a disposed client's workflow has stopped: its command channel is completed and drained (the
+        /// DisposeCommand ran, aborting the state timer) and nothing is being processed.
         /// </summary>
         internal static bool IsWorkflowStopped(PubSubRealtimeClient client)
             => CommandChannelCompletion(client).IsCompleted && !client.Workflow.IsProcessingCommands();
 
         /// <summary>
-        /// Takes a UTS client off the process-wide OS network-state hook. Every <c>Connection</c> registers itself,
-        /// in its constructor and whatever <c>AutomaticNetworkStateMonitoring</c> says, in the SDK's private static
-        /// <c>Connection.OsEventSubscribers</c>, so a native test calling the public static
-        /// <c>Connection.NotifyOperatingSystemNetworkState</c> in parallel would reach every live UTS client (a
-        /// spurious DISCONNECTED or reconnect, RTN20). The client factories call this right after construction; the
-        /// connection's own clean-up (the private <c>CleanUpNetworkStateEvents</c>, which <c>Dispose()</c> also
-        /// runs) is invoked by reflection, so the SDK's behaviour for native clients is unchanged. A UTS test that
-        /// needs a network change uses <c>MockNetworkListener</c>, which reaches its own clients only.
+        /// Takes a UTS client off the process-wide OS network-state hook (the SDK's private static
+        /// <c>Connection.OsEventSubscribers</c>, so a native test's <c>NotifyOperatingSystemNetworkState</c> can't reach it,
+        /// RTN20); calls the private <c>CleanUpNetworkStateEvents</c> by reflection, so a rename in the SDK breaks it.
         /// </summary>
-        /// <param name="client">A client a UTS factory just built.</param>
         internal static void DetachFromOsNetworkEvents(PubSubRealtimeClient client)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -168,9 +146,8 @@ namespace Ably.PubSub.Tests.Uts.Infra
         }
 
         /// <summary>
-        /// Registers a check that runs after every client and cleanup is torn down; if it throws, the test
-        /// fails (see the class summary). The unit base uses it for mock handler errors and unexpected
-        /// HTTP requests.
+        /// Registers a check that runs after every client and cleanup is torn down; if it throws, the test fails
+        /// (see the class summary).
         /// </summary>
         protected void OnVerify(Action verification)
         {
@@ -183,8 +160,8 @@ namespace Ably.PubSub.Tests.Uts.Infra
         protected virtual Task InitializeAsync() => Task.CompletedTask;
 
         /// <summary>
-        /// <c>Workflow.CommandChannel.Reader.Completion</c>, read by reflection: the net462 head doesn't reference
-        /// System.Threading.Channels, so the infra can't name the channel type.
+        /// <c>Workflow.CommandChannel.Reader.Completion</c>, read by reflection: the net462 head doesn't
+        /// reference System.Threading.Channels, so the infra can't name the channel type.
         /// </summary>
         private static Task CommandChannelCompletion(PubSubRealtimeClient client)
         {

@@ -4,12 +4,10 @@ using Xunit;
 namespace Ably.PubSub.Tests.Uts.Infra
 {
     /// <summary>
-    /// The runtime skip of <c>writing-derived-tests.md</c>'s "SDK deviation" end state: a test that keeps
-    /// the spec-correct assertion against behaviour the SDK gets wrong, skipped unless
-    /// <c>RUN_DEVIATIONS</c> is set. xUnit 2.4 has no runtime skip, so the attribute decides <c>Skip</c>
-    /// in its constructor, which xUnit evaluates at discovery.
-    ///
-    /// <code>RUN_DEVIATIONS=1 dotnet test ... --filter "FullyQualifiedName~RTN15h3"</code>
+    /// The runtime skip of <c>writing-derived-tests.md</c>'s "SDK deviation" end state: a test that keeps the
+    /// spec-correct assertion against behaviour the SDK gets wrong, skipped unless <c>RUN_DEVIATIONS</c> is set.
+    /// xUnit 2.4 has no runtime skip, so the attribute decides <c>Skip</c> in its constructor, which xUnit
+    /// evaluates at discovery.
     /// </summary>
     public sealed class DeviationFactAttribute : FactAttribute
     {

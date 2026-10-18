@@ -5,14 +5,9 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
 {
     /// <summary>
     /// The protocol-message templates of <c>mock_websocket.md</c> (<c>CONNECTED_MESSAGE</c>,
-    /// <c>CLOSED_MESSAGE</c>, <c>DISCONNECTED_MESSAGE</c>, <c>HEARTBEAT_MESSAGE</c>,
-    /// <c>ERROR_MESSAGE(code, message)</c>, <c>PING_MESSAGE(id)</c>), the wire action numbers, and builders
-    /// for the other messages the corpus sends (ATTACHED, DETACHED, MESSAGE, PRESENCE, SYNC, ACK, NACK, AUTH).
-    ///
-    /// Every template is a fresh <see cref="JObject"/> of wire names, not a <c>ProtocolMessage</c>: unknown
-    /// fields and action numbers survive to the wire untouched, and one test can't mutate a template the
-    /// next test inherits. A spec's inline <c>ProtocolMessage(action: X, ...)</c> becomes a JObject literal
-    /// with these constants.
+    /// <c>CLOSED_MESSAGE</c>, <c>DISCONNECTED_MESSAGE</c>, <c>HEARTBEAT_MESSAGE</c>, <c>ERROR_MESSAGE(code,
+    /// message)</c>, <c>PING_MESSAGE(id)</c>), the wire action numbers, and builders for the other messages the
+    /// corpus sends (ATTACHED, DETACHED, MESSAGE, PRESENCE, SYNC, ACK, NACK, AUTH).
     /// </summary>
     public static class ProtocolMessages
     {
@@ -41,7 +36,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         public const int Ping = 22;
         public const int Pong = 23;
 
-        /// <summary>The specs' <c>HAS_PRESENCE</c> channel flag (<c>ProtocolMessage.Flag.HasPresence</c>, internal to the SDK).</summary>
+        /// <summary>
+        /// The specs' <c>HAS_PRESENCE</c> channel flag (<c>ProtocolMessage.Flag.HasPresence</c>, internal to the
+        /// SDK).
+        /// </summary>
         public const int HasPresenceFlag = 1 << 0;
 
         public const string TestConnectionId = "test-connection-id";
@@ -50,7 +48,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>The spec's <c>CONNECTED_MESSAGE</c>.</summary>
         public static JObject ConnectedMessage() => ConnectedMessage(TestConnectionId);
 
-        /// <summary>CONNECTED with chosen details; <c>connectionStateTtl</c> and <c>maxIdleInterval</c> in wire milliseconds.</summary>
+        /// <summary>
+        /// CONNECTED with chosen details; <c>connectionStateTtl</c> and <c>maxIdleInterval</c> in wire
+        /// milliseconds.
+        /// </summary>
         public static JObject ConnectedMessage(
             string connectionId = TestConnectionId,
             string connectionKey = TestConnectionKey,
@@ -85,8 +86,8 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         public static JObject HeartbeatMessage() => new JObject { ["action"] = Heartbeat };
 
         /// <summary>
-        /// The spec's <c>DISCONNECTED_MESSAGE</c>: <c>error: {code: 80003, message: "Connection disconnected"}</c>,
-        /// with no <c>statusCode</c> unless one is given (the template has none).
+        /// The spec's <c>DISCONNECTED_MESSAGE</c>: <c>error: {code: 80003, message: "Connection
+        /// disconnected"}</c>, with no <c>statusCode</c> unless one is given (the template has none).
         /// </summary>
         public static JObject DisconnectedMessage(
             int code = 80003,
@@ -101,7 +102,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         /// <summary>
         /// The spec's <c>ERROR_MESSAGE(code, message)</c>, with <c>statusCode: code / 100</c> exactly as the
         /// template says (integer division: 40142 gives 401, 80000 gives 800, which is not an HTTP status).
-        /// Pass <paramref name="statusCode"/> to override.
         /// </summary>
         public static JObject ErrorMessage(int code, string message, int? statusCode = null)
             => new JObject
@@ -131,7 +131,10 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
         public static JObject DetachedMessage(string channel, IDictionary<string, JToken> fields = null)
             => Channelled(Detached, channel, fields);
 
-        /// <summary>A DETACHED carrying an error: the RTL13 server-initiated detach. <c>statusCode</c> defaults to <c>code / 100</c>.</summary>
+        /// <summary>
+        /// A DETACHED carrying an error: the RTL13 server-initiated detach. <c>statusCode</c> defaults to <c>code
+        /// / 100</c>.
+        /// </summary>
         public static JObject ServerDetachedMessage(string channel, int code, string message, int? statusCode = null)
         {
             var detached = Channelled(Detached, channel, null);
@@ -161,10 +164,7 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
             return protocolMessage;
         }
 
-        /// <summary>
-        /// One entry of a PRESENCE or SYNC message's <c>presence</c> array. <paramref name="action"/> is the
-        /// numeric presence action: 0 absent, 1 present, 2 enter, 3 leave, 4 update.
-        /// </summary>
+        /// <summary>One entry of a PRESENCE or SYNC message's <c>presence</c> array.</summary>
         public static JObject PresenceEntry(
             int action,
             string clientId,
