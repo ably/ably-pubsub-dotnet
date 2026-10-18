@@ -335,7 +335,8 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // UTS: realtime/proxy/RTL14/channel-error-goes-failed-1
-        [Fact(Timeout = TestTimeoutMs)]
+        // DEVIATION: see deviations.md
+        [DeviationFact("RTL14", Timeout = TestTimeoutMs)]
         [Trait("spec", "RTL14")]
         public async Task RTL14_ChannelErrorGoesFailed()
         {

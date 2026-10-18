@@ -35,7 +35,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         private static JObject DetailedConnected() => ProtocolMessages.ConnectedMessage("connection-id", "connection-key", connectionStateTtl: 120000, maxIdleInterval: 15000);
 
         // UTS: realtime/unit/RTL3e/disconnected-attached-noop-0
-        [UtsFact]
+        [UtsFact(Skip = "UTS spec error RTL3e: the UTS spec contradicts the features spec; skipped until the spec is fixed; see deviations.md (UTS Spec Errors)")]
         [Trait("spec", "RTL3e")]
         public async Task RTL3e_DisconnectedAttachedNoop()
         {
