@@ -116,6 +116,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\DeltaSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\DeltaSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ExtraSandboxSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\ForwardsCompatibilitySpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\MockHttpRealtimeSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\PresenceSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ProtocolMessageTests.cs" />

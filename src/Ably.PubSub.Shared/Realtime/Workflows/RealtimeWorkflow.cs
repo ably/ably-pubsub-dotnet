@@ -86,6 +86,7 @@ namespace Ably.PubSub.Realtime.Workflow
                 ("State handler", (message, state) => ConnectionManager.State.OnMessageReceived(message, state)),
                 ("Heartbeat handler", HeartbeatHandler.OnMessageReceived),
                 ("Ack handler", (message, _) => HandleAckMessage(message)),
+                ("Ping handler", (message, _) => HandlePingMessage(message)),
             };
 
             Logger.Debug("Workflow initialised!");
@@ -1328,6 +1329,21 @@ namespace Ably.PubSub.Realtime.Workflow
                     Logger.Debug($"Message ({message.Action}) with serial ({message.MsgSerial}) was queued to get Ack");
                 }
             }
+        }
+
+        // RTN23c1: on receiving a PING on a transport, reply with a PONG on that same transport,
+        // regardless of the heartbeats transport param. RTN23c2: the PONG carries the PING's id when
+        // present, and no id otherwise. A PONG is not AckRequired, so sending it straight to the
+        // transport keeps it out of the MsgSerial/ACK machinery.
+        internal Task<bool> HandlePingMessage(ProtocolMessage message)
+        {
+            if (message.Action != ProtocolMessage.MessageAction.Ping)
+            {
+                return TaskConstants.BooleanFalse;
+            }
+
+            ConnectionManager.SendToTransport(new ProtocolMessage(ProtocolMessage.MessageAction.Pong) { Id = message.Id });
+            return TaskConstants.BooleanTrue;
         }
 
         internal Task<bool> HandleAckMessage(ProtocolMessage message)

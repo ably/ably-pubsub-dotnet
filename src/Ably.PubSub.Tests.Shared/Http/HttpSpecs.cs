@@ -360,11 +360,13 @@ namespace Ably.PubSub.Tests
 
             [Fact]
             [Trait("spec", "TO3n")]
-            public void ClientOptions_IdempotentPublishingDefaultToTrueForProtocolVersion12()
+            public void ClientOptions_IdempotentRestPublishingDefaultsToTrue()
             {
                 var clientOptions = new ClientOptions();
 
-                // This test needs to change once we implement v1.2
+                // TO3n: idempotentRestPublishing defaults to true for libraries declaring
+                // protocol version 1.2 or above. This library declares Defaults.ProtocolVersion,
+                // which is above that threshold, so the default is unconditionally true.
                 clientOptions.IdempotentRestPublishing.Should().BeTrue();
             }
 

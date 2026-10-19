@@ -161,6 +161,11 @@ namespace Ably.PubSub.Realtime
                     }
 
                     break;
+                default:
+                    // RTF1: tolerate protocol messages with actions this library does not handle
+                    // (e.g. OBJECT/OBJECT_SYNC/ANNOTATION or future additions) by ignoring them.
+                    Logger.Debug($"Ignoring ProtocolMessage with unhandled action {protocolMessage.Action} on channel {channel.Name}");
+                    break;
             }
 
             return Task.FromResult(true);
