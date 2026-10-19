@@ -177,7 +177,7 @@ namespace Ably.PubSub.Tests.Http
             [Trait("spec", "RSL1e")]
             public async Task WithNoData_ShouldOnlySendNameProperty()
             {
-                var client = GetRestClient(null, options =>
+                var client = GetRestClient(PublishResultResponse, options =>
                 {
                     // Idempotent publishing will add an id to the message, so disable for this test
                     options.IdempotentRestPublishing = false;
@@ -193,7 +193,7 @@ namespace Ably.PubSub.Tests.Http
             [Trait("spec", "RSL1e")]
             public async Task WithNoName_ShouldOnlySendDataProperty()
             {
-                var client = GetRestClient(null, options =>
+                var client = GetRestClient(PublishResultResponse, options =>
                 {
                     // Idempotent publishing will add an id to the message, so disable for this test
                     options.IdempotentRestPublishing = false;
@@ -209,7 +209,7 @@ namespace Ably.PubSub.Tests.Http
             [Trait("spec", "RSL1e")]
             public async Task WithBlankMessage_ShouldSendBlankMessage()
             {
-                var client = GetRestClient(null, options =>
+                var client = GetRestClient(PublishResultResponse, options =>
                 {
                     // Idempotent publishing will add an id to the message, so disable for this test
                     options.IdempotentRestPublishing = false;
@@ -225,7 +225,7 @@ namespace Ably.PubSub.Tests.Http
             [Trait("spec", "RSL1e")]
             public async Task WithNoNameAndMsgPack_ShouldOnlySendDataProperty()
             {
-                var client = GetRestClient(null, opts => opts.UseBinaryProtocol = true);
+                var client = GetRestClient(PublishResultResponse, opts => opts.UseBinaryProtocol = true);
 
                 var messageWithNoName = new Message { Data = "NoName" };
                 await client.Channels.Get("noname").PublishAsync(messageWithNoName);

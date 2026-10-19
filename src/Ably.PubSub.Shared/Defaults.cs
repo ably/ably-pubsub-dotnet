@@ -37,7 +37,7 @@ namespace Ably.PubSub
             return plus >= 0 ? informationalVersion.Substring(0, plus) : informationalVersion;
         }
 
-        public const string ProtocolVersion = "2"; // CSV2
+        public const string ProtocolVersion = "6"; // CSV2
 
         public const int QueryLimit = 100;
 

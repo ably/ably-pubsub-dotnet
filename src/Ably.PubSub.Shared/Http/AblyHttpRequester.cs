@@ -410,7 +410,7 @@ namespace Ably.PubSub
 
             // Always accept JSON
             message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(GetHeaderValue(Protocol.Json)));
-            if (message.Method == HttpMethod.Post || message.Method == HttpMethod.Put)
+            if (message.Method == HttpMethod.Post || message.Method == HttpMethod.Put || string.Equals(message.Method.Method, "PATCH", StringComparison.OrdinalIgnoreCase))
             {
                 if (request.PostParameters.Any() && request.RequestBody.Length == 0)
                 {

@@ -260,7 +260,7 @@ namespace Ably.PubSub.Tests.Realtime
             var client = await SetupConnectedClient();
 
             List<bool> callbackResults = new List<bool>();
-            void Callback(bool b, ErrorInfo info) => callbackResults.Add(b);
+            void Callback(PublishResult result, ErrorInfo info) => callbackResults.Add(info == null);
 
             client.ConnectionManager.Send(new ProtocolMessage(ProtocolMessage.MessageAction.Message), Callback);
             client.ConnectionManager.Send(new ProtocolMessage(ProtocolMessage.MessageAction.Message), Callback);

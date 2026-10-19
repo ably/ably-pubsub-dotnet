@@ -208,6 +208,28 @@ namespace Ably.PubSub.Tests.Realtime
         }
 
         [Fact]
+        [Trait("spec", "RTAN4c")]
+        public async Task Subscribe_ShouldMatchTheAnnotationTypeExactly()
+        {
+            var (client, channel) = await GetAttachedChannel();
+            var upperCase = new List<Annotation>();
+            var exact = new List<Annotation>();
+            channel.Annotations.Subscribe("Reaction", upperCase.Add);
+            Action<Annotation> exactHandler = exact.Add;
+            channel.Annotations.Subscribe("reaction", exactHandler);
+
+            // Unsubscribing with a different case leaves the exact subscription in place.
+            channel.Annotations.Unsubscribe("Reaction", exactHandler).Should().BeFalse();
+
+            client.FakeProtocolMessageReceived(AnnotationFrame(
+                new Annotation { Type = "reaction", Serial = "s1", MessageSerial = Serial, Action = AnnotationAction.Create }));
+            await client.ProcessCommands();
+
+            upperCase.Should().BeEmpty();
+            exact.Should().HaveCount(1);
+        }
+
+        [Fact]
         [Trait("spec", "RTAN4d")]
         public async Task Subscribe_ShouldImplicitlyAttachTheChannel()
         {

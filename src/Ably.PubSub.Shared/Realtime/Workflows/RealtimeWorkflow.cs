@@ -732,7 +732,7 @@ namespace Ably.PubSub.Realtime.Workflow
             State.AttemptsInfo.RecordTokenRetry();
         }
 
-        private Result SendMessage(ProtocolMessage message, Action<bool, ErrorInfo> callback)
+        private Result SendMessage(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback)
         {
             if (message.AckRequired)
             {
@@ -1303,7 +1303,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
             foreach (var item in State.WaitingForAck.Where(x => x.Callback != null))
             {
-                item.SafeExecute(false, messageError);
+                item.SafeExecute(null, messageError);
             }
 
             State.WaitingForAck.Clear();
@@ -1313,13 +1313,13 @@ namespace Ably.PubSub.Realtime.Workflow
             // RTL6c2 queue.
             foreach (var item in State.PendingMessages.Where(x => x.Callback != null))
             {
-                item.SafeExecute(false, messageError);
+                item.SafeExecute(null, messageError);
             }
 
             State.PendingMessages.Clear();
         }
 
-        public void QueueAck(ProtocolMessage message, Action<bool, ErrorInfo> callback)
+        public void QueueAck(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback)
         {
             if (message.AckRequired)
             {
@@ -1359,11 +1359,28 @@ namespace Ably.PubSub.Realtime.Workflow
                     {
                         if (message.Action == ProtocolMessage.MessageAction.Ack)
                         {
-                            current.SafeExecute(true, null);
+                            if (current.Serial < message.MsgSerial)
+                            {
+                                // An ACK covers only msgSerial..msgSerial+count-1; a pending message below that
+                                // range was skipped, so it counts as NACKed (protocol.md "Message acknowledgement
+                                // protocol"). Like java and cocoa, fail it with the ACK's error, else an unknown error.
+                                current.SafeExecute(null, message.Error ?? ErrorInfo.ReasonUnknown);
+                            }
+                            else
+                            {
+                                // TR4s / RTL6j: res holds one PublishResult per acknowledged protocol message,
+                                // in order, so this entry's result sits at its offset from the ACK's msgSerial.
+                                // It is null when the server sent no (or too short a) res, e.g. a pre-v5 server.
+                                var index = current.Serial - message.MsgSerial;
+                                var publishResult = message.Res != null && index < message.Res.Length
+                                    ? message.Res[index]
+                                    : null;
+                                current.SafeExecute(publishResult, null);
+                            }
                         }
                         else
                         {
-                            current.SafeExecute(false, message.Error ?? ErrorInfo.ReasonUnknown);
+                            current.SafeExecute(null, message.Error ?? ErrorInfo.ReasonUnknown);
                         }
 
                         State.WaitingForAck.Remove(current);

@@ -11,6 +11,10 @@ namespace Ably.PubSub.Tests
     {
         internal virtual AblyResponse DefaultResponse { get; } = AblyResponse.EmptyResponse;
 
+        /// <summary>A 2xx publish response body (RSL1n) for tests that await a REST publish.</summary>
+        internal static Task<AblyResponse> PublishResultResponse(AblyRequest request) =>
+            new AblyResponse { TextResponse = "{\"serials\":[\"serial\"]}" }.ToTask();
+
         internal AblyRequest LastRequest => Requests.LastOrDefault();
 
         internal AblyRequest FirstRequest => Requests.FirstOrDefault();

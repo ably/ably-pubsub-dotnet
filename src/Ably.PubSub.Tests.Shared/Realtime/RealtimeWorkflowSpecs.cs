@@ -582,9 +582,9 @@ namespace Ably.PubSub.Tests.NETFramework.Realtime
                 var callbacks = new List<ValueTuple<bool, ErrorInfo>>();
                 var message = new ProtocolMessage(ProtocolMessage.MessageAction.Message, "Test");
 
-                void Callback(bool ack, ErrorInfo err)
+                void Callback(PublishResult result, ErrorInfo err)
                 {
-                    callbacks.Add((ack, err));
+                    callbacks.Add((err == null, err));
                 }
 
                 // Act
@@ -617,12 +617,12 @@ namespace Ably.PubSub.Tests.NETFramework.Realtime
 
                 var awaiter = new TaskCompletionAwaiter();
 
-                Action<bool, ErrorInfo> GetCallback(int forCount) =>
-                    (ack, err) =>
+                Action<PublishResult, ErrorInfo> GetCallback(int forCount) =>
+                    (result, err) =>
                     {
                         if (callbacks.Count == forCount)
                         {
-                            callbacks.Add((ack, err));
+                            callbacks.Add((err == null, err));
                         }
 
                         if (callbacks.Count == 3)
@@ -658,9 +658,9 @@ namespace Ably.PubSub.Tests.NETFramework.Realtime
                 var callbacks = new List<ValueTuple<bool, ErrorInfo>>();
                 var message = new ProtocolMessage(ProtocolMessage.MessageAction.Message, "Test");
 
-                void Callback(bool ack, ErrorInfo err)
+                void Callback(PublishResult result, ErrorInfo err)
                 {
-                    callbacks.Add((ack, err));
+                    callbacks.Add((err == null, err));
                 }
 
                 // Act
@@ -688,9 +688,9 @@ namespace Ably.PubSub.Tests.NETFramework.Realtime
 
                 var message = new ProtocolMessage(ProtocolMessage.MessageAction.Message, "Test");
 
-                void Callback(bool ack, ErrorInfo err)
+                void Callback(PublishResult result, ErrorInfo err)
                 {
-                    callbacks.Add((ack, err));
+                    callbacks.Add((err == null, err));
                 }
 
                 // Act

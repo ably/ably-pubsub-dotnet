@@ -230,7 +230,7 @@ namespace Ably.PubSub.Transport
 
         public void Send(
             ProtocolMessage message,
-            Action<bool, ErrorInfo> callback = null,
+            Action<PublishResult, ErrorInfo> callback = null,
             ChannelOptions channelOptions = null)
         {
             if (Logger.IsDebug)
@@ -248,7 +248,7 @@ namespace Ably.PubSub.Transport
             Result result = VerifyMessageHasCompatibleClientId(message);
             if (result.IsFailure)
             {
-                callback?.Invoke(false, result.Error);
+                callback?.Invoke(null, result.Error);
                 return;
             }
 

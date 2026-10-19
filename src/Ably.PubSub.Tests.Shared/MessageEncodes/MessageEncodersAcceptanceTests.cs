@@ -71,7 +71,7 @@ namespace Ably.PubSub.AcceptanceTests
             [Trait("spec", "RSL4a")]
             public async Task PublishSupportedMessages(Message message, string encoding)
             {
-                var client = GetRestClient();
+                var client = GetRestClient(PublishResultResponse);
 
                 await client.Channels.Get("test").PublishAsync(message);
 

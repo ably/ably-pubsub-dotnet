@@ -317,18 +317,18 @@ namespace Ably.PubSub.Realtime.Workflow
     {
         public ProtocolMessage ProtocolMessage { get; }
 
-        public Action<bool, ErrorInfo> Callback { get; }
+        public Action<PublishResult, ErrorInfo> Callback { get; }
 
         public bool Force { get; }
 
-        private SendMessageCommand(ProtocolMessage protocolMessage, Action<bool, ErrorInfo> callback, bool force)
+        private SendMessageCommand(ProtocolMessage protocolMessage, Action<PublishResult, ErrorInfo> callback, bool force)
         {
             ProtocolMessage = protocolMessage;
             Callback = callback;
             Force = force;
         }
 
-        public static SendMessageCommand Create(ProtocolMessage message, Action<bool, ErrorInfo> callback = null, bool force = false) => new SendMessageCommand(message, callback, force);
+        public static SendMessageCommand Create(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback = null, bool force = false) => new SendMessageCommand(message, callback, force);
 
         protected override string ExplainData()
         {

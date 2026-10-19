@@ -11,6 +11,6 @@ namespace Ably.PubSub.Transport
 
         ClientOptions Options { get; }
 
-        void Send(ProtocolMessage message, Action<bool, ErrorInfo> callback = null, ChannelOptions channelOptions = null);
+        void Send(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback = null, ChannelOptions channelOptions = null);
     }
 }

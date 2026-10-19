@@ -14,7 +14,7 @@ namespace Ably.PubSub.Realtime
     public sealed class RealtimeAnnotations : IDisposable
     {
         private readonly RealtimeChannel _channel;
-        private readonly Handlers<Annotation> _handlers = new Handlers<Annotation>();
+        private readonly Handlers<Annotation> _handlers = new Handlers<Annotation>(caseSensitive: true); // RTAN4c: the type filter matches exactly
 
         internal RealtimeAnnotations(RealtimeChannel channel)
         {

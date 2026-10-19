@@ -11,9 +11,9 @@ namespace Ably.PubSub.Transport
 
         public ProtocolMessage Message { get; }
 
-        public Action<bool, ErrorInfo> Callback { get; }
+        public Action<PublishResult, ErrorInfo> Callback { get; }
 
-        public MessageAndCallback(ProtocolMessage message, Action<bool, ErrorInfo> callback, ILogger logger = null)
+        public MessageAndCallback(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback, ILogger logger = null)
         {
             Message = message;
             Callback = callback;
@@ -53,17 +53,17 @@ namespace Ably.PubSub.Transport
 
     internal static class MessageAndCallbackExtensions
     {
-        public static void SafeExecute(this MessageAndCallback info, bool success, ErrorInfo error)
+        public static void SafeExecute(this MessageAndCallback info, PublishResult result, ErrorInfo error)
         {
             try
             {
-                info.Callback?.Invoke(success, error);
+                info.Callback?.Invoke(result, error);
             }
             catch (Exception)
             {
-                var result = success ? "Success" : "Failed";
+                var outcome = error == null ? "Success" : "Failed";
                 var errorMessage = error != null ? $"Error: {error}" : string.Empty;
-                info.Logger.Error($"Error executing callback for message with serial {info.Message.MsgSerial}. Result: {result}. {errorMessage}");
+                info.Logger.Error($"Error executing callback for message with serial {info.Message.MsgSerial}. Result: {outcome}. {errorMessage}");
             }
         }
     }

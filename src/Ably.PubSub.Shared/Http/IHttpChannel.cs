@@ -18,22 +18,32 @@ namespace Ably.PubSub.Http
         /// <param name="name">The event name of the message to publish.</param>
         /// <param name="data">The message payload. Allowed payloads are string, objects and byte[].</param>
         /// <param name="clientId">Explicit message clientId.</param>
-        /// <returns>Task.</returns>
-        Task PublishAsync(string name, object data, string clientId = null);
+        /// <returns>
+        /// A task whose result holds the serials of the published messages (RSL1, RSL1n). An individual serial is null if the
+        /// message was discarded due to a configured conflation rule (PBR2a). The result is never null: an empty or absent
+        /// response body gives a <see cref="PublishResult"/> with no serials. Failures are thrown as <see cref="AblyException"/>.
+        /// </returns>
+        Task<PublishResult> PublishAsync(string name, object data, string clientId = null);
 
         /// <summary>
         /// Publish a single message object to the channel.
         /// </summary>
         /// <param name="message"><see cref="Message"/>.</param>
-        /// <returns>Task.</returns>
-        Task PublishAsync(Message message);
+        /// <returns>
+        /// A task whose result holds the serial of the published message (RSL1, RSL1n); see
+        /// <see cref="PublishAsync(string, object, string)"/> for the null semantics.
+        /// </returns>
+        Task<PublishResult> PublishAsync(Message message);
 
         /// <summary>
         /// Publish a list of messages to the channel.
         /// </summary>
         /// <param name="messages">a list of messages.</param>
-        /// <returns>Task.</returns>
-        Task PublishAsync(IEnumerable<Message> messages);
+        /// <returns>
+        /// A task whose result holds the serials of the published messages, 1:1 with <paramref name="messages"/> (RSL1, RSL1n);
+        /// see <see cref="PublishAsync(string, object, string)"/> for the null semantics.
+        /// </returns>
+        Task<PublishResult> PublishAsync(IEnumerable<Message> messages);
 
         /// <summary>
         /// Returns past message of this channel.
@@ -79,6 +89,37 @@ namespace Ably.PubSub.Http
         Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null);
 
         /// <summary>
+        /// Updates an existing message (RSL15). The fields of <paramref name="message"/> replace those of the existing
+        /// message; the serial identifies the message to update and is required (RSL15a). The message passed in is not
+        /// modified (RSL15c).
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the fields to apply.</param>
+        /// <param name="operation">optional description of the update, sent as the version of the message (RSL15b7).</param>
+        /// <param name="parameters">optional publish parameters, sent in the querystring (RSL15f).</param>
+        /// <returns>The <see cref="UpdateDeleteResult"/> holding the version serial of the update (RSL15e). Failures are thrown as <see cref="AblyException"/>.</returns>
+        Task<UpdateDeleteResult> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Marks a message as deleted (RSL15). The message is not removed from the history of the channel.
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments.
+        /// </summary>
+        /// <param name="message">a message with a populated serial.</param>
+        /// <param name="operation">optional description of the delete, sent as the version of the message (RSL15b7).</param>
+        /// <param name="parameters">optional publish parameters, sent in the querystring (RSL15f).</param>
+        /// <returns>The <see cref="UpdateDeleteResult"/> holding the version serial of the delete (RSL15e).</returns>
+        Task<UpdateDeleteResult> DeleteMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
+        /// Appends the data of the given message to the data of an existing message (RSL15).
+        /// See <see cref="UpdateMessageAsync(Message, MessageOperation, IDictionary{string, string})"/> for the arguments.
+        /// </summary>
+        /// <param name="message">a message with a populated serial and the data to append.</param>
+        /// <param name="operation">optional description of the append, sent as the version of the message (RSL15b7).</param>
+        /// <param name="parameters">optional publish parameters, sent in the querystring (RSL15f).</param>
+        /// <returns>The <see cref="UpdateDeleteResult"/> holding the version serial of the append (RSL15e).</returns>
+        Task<UpdateDeleteResult> AppendMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
+
+        /// <summary>
         /// Returns the active status for the channel including the number of publishers, subscribers and presenceMembers etc.
         /// </summary>
         /// <returns><see cref="ChannelDetails"/>Channel Details.</returns>
@@ -113,21 +154,24 @@ namespace Ably.PubSub.Http
         /// <param name="name">message name.</param>
         /// <param name="data">optional message data object.</param>
         /// <param name="clientId">optional client id.</param>
-        void Publish(string name, object data, string clientId = null);
+        /// <returns>The <see cref="PublishResult"/> holding the serials of the published messages (RSL1n).</returns>
+        PublishResult Publish(string name, object data, string clientId = null);
 
         /// <summary>
         /// Sync version of <see cref="PublishAsync(Message)"/>.
         /// Prefer async method where possible.
         /// </summary>
         /// <param name="message">message to publish.</param>
-        void Publish(Message message);
+        /// <returns>The <see cref="PublishResult"/> holding the serial of the published message (RSL1n).</returns>
+        PublishResult Publish(Message message);
 
         /// <summary>
         /// Sync version of <see cref="PublishAsync(IEnumerable{Message})"/>.
         /// Prefer sync version where possible.
         /// </summary>
         /// <param name="messages">array of messages to publish.</param>
-        void Publish(IEnumerable<Message> messages);
+        /// <returns>The <see cref="PublishResult"/> holding the serials of the published messages (RSL1n).</returns>
+        PublishResult Publish(IEnumerable<Message> messages);
 
         /// <summary>
         /// Sync version of <see cref="HistoryAsync()"/>.
