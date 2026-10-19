@@ -82,7 +82,7 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 
 ## Deprecated API removed
 
-2.0 drops every member 1.x had marked `[Obsolete]`, and hides the client constructors behind the door factories.
+2.0 drops every member 1.x had marked `[Obsolete]`. Separately, it hides the client constructors behind the `PubSubDevice` / `PubSubServer` door factories; those constructors were never marked `[Obsolete]` in 1.x, but they are listed here because they are no longer part of the public API.
 
 | Removed | Use instead |
 |---------|-------------|
@@ -127,6 +127,20 @@ New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message u
 **Behaviour change:** the SDK now declares wire protocol version 6 (1.x declared 2). The version is sent as the realtime `v` parameter and the REST `X-Ably-Version` header, and the service sends the newer message structure. The stats endpoint remains pinned to the v2 response format, so `StatsAsync` results are unchanged.
 
 **Behaviour change:** `Request()`/`RequestV2()` callers that send no `X-Ably-Version` header now receive protocol-6 response shapes (for example, `GET /channels` returns channel names, and a batch `POST /messages` returns a single results envelope). Pass the `X-Ably-Version` header to pin a version.
+
+## Release a realtime channel only once it is detached
+
+In 1.x, `Channels.Release(name)` and `Channels.ReleaseAll()` on a realtime channel that was not in the `Initialized`, `Detached` or `Failed` state detached it and removed it once the detach completed. 1.x logs a deprecation warning when this happens. In 2.0 they instead throw an `AblyException` with error code 90011 and status code 400, and leave the channel as it was. `ReleaseAll()` checks every channel first, and releases none of them if any one is in another state. Detach the channel and wait for the detach to complete before releasing it:
+
+```csharp
+// 1.x
+realtime.Channels.Release("my-channel");
+
+// 2.0
+var channel = realtime.Channels.Get("my-channel");
+await channel.DetachAsync();
+realtime.Channels.Release("my-channel");
+```
 
 ## Do not mix 1.x and 2.0 in one project
 

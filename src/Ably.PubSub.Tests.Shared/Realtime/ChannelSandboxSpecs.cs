@@ -1510,7 +1510,7 @@ namespace Ably.PubSub.Tests.Realtime
         [ProtocolData]
         [Trait("issue ", "980")]
 
-        public async Task WhenReleasingAttachedChannels_TheyShouldBeRemovedFromTheList(Protocol protocol)
+        public async Task WhenReleasingChannelsAfterDetaching_TheyShouldBeRemovedFromTheList(Protocol protocol)
         {
             var client = await GetRealtimeClient(protocol);
 
@@ -1524,10 +1524,12 @@ namespace Ably.PubSub.Tests.Realtime
 
             client.Channels.Should().HaveCount(100);
 
-            client.Channels.ReleaseAll();
+            foreach (var channel in channels)
+            {
+                await channel.DetachAsync();
+            }
 
-            var taskAwaiter = new ConditionalAwaiter(() => client.Channels.Any() == false, () => $"Time elapsed: Channels {client.Channels.Count()}");
-            await taskAwaiter;
+            client.Channels.ReleaseAll();
 
             client.Channels.Should().BeEmpty();
             foreach (var channel in channels)

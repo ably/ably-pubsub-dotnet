@@ -100,6 +100,7 @@ namespace Ably.PubSub
         public const int UnableToRecoverChannelNoMatchingEpoch = 90005;
         public const int UnableToRecoverChannelUnboundedRequest = 90006;
         public const int ChannelOperationFailedNoServerResponse = 90007;
+        public const int ChannelReleaseInvalidState = 90011;
         public const int UnableToEnterPresenceChannelNoClientId = 91000;
         public const int UnableToEnterPresenceChannelInvalidState = 91001;
         public const int UnableToLeavePresenceChannelThatIsNotEntered = 91002;
