@@ -61,7 +61,7 @@ namespace Ably.PubSub.Types
             ObjectSync = 20,
 
             /// <summary>
-            /// ANNOTATION action, wire value 21 per TR2. Defined for forwards compatibility; not yet handled by this library.
+            /// ANNOTATION action, wire value 21 per TR2. Carries the annotations of a message.
             /// </summary>
             Annotation = 21,
 
@@ -96,6 +96,8 @@ namespace Ably.PubSub.Types
             Publish = 1 << 17,
             Subscribe = 1 << 18,
             PresenceSubscribe = 1 << 19,
+            AnnotationPublish = 1 << 21,
+            AnnotationSubscribe = 1 << 22,
 #pragma warning restore SA1602 // Enumeration items should be documented
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
         }
@@ -132,6 +134,7 @@ namespace Ably.PubSub.Types
         {
             Messages = new Message[] { };
             Presence = new PresenceMessage[] { };
+            Annotations = new Annotation[] { };
         }
 
         internal ProtocolMessage(MessageAction action)
@@ -225,13 +228,22 @@ namespace Ably.PubSub.Types
         public PresenceMessage[] Presence { get; set; }
 
         /// <summary>
+        /// List of annotations contained in this protocol message.
+        /// </summary>
+        [JsonProperty("annotations")]
+        public Annotation[] Annotations { get; set; }
+
+        /// <summary>
         /// Connection details received. <see cref="Ably.PubSub.ConnectionDetails"/>.
         /// </summary>
         [JsonProperty("connectionDetails")]
         public ConnectionDetails ConnectionDetails { get; set; }
 
         [JsonIgnore]
-        internal bool AckRequired => Action == MessageAction.Message || Action == MessageAction.Presence;
+        internal bool AckRequired =>
+            Action == MessageAction.Message ||
+            Action == MessageAction.Presence ||
+            Action == MessageAction.Annotation; // RTN7a
 
         [OnSerializing]
         private void OnSerializing(StreamingContext context)
@@ -254,6 +266,11 @@ namespace Ably.PubSub.Types
             if (Presence != null && Presence.Length == 0)
             {
                 Presence = null;
+            }
+
+            if (Annotations != null && Annotations.Length == 0)
+            {
+                Annotations = null;
             }
         }
 

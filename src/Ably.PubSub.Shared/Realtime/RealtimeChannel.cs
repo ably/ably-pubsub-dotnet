@@ -60,6 +60,10 @@ namespace Ably.PubSub.Realtime
 
         internal IHttpChannel HttpChannel => RealtimeClient.HttpClient.Channels.Get(Name);
 
+        // The REST channel of the same name carrying this channel's options, so that payloads of the
+        // messages and annotations it retrieves are decoded (and decrypted) as the realtime ones are.
+        internal IHttpChannel RestChannel => RealtimeClient.HttpClient.Channels.Get(Name, Options);
+
         internal ChannelAwaiter AttachedAwaiter { get; }
 
         internal ChannelAwaiter DetachedAwaiter { get; }
@@ -99,6 +103,8 @@ namespace Ably.PubSub.Realtime
 
         public Presence Presence { get; }
 
+        public RealtimeAnnotations Annotations { get; }
+
         /// <inheritdoc />
         public PushChannel Push
         {
@@ -126,6 +132,7 @@ namespace Ably.PubSub.Realtime
             Options = options;
             MessageDecodingContext = new DecodingContext(options);
             Presence = new Presence(realtimeClient.ConnectionManager, this, clientId, Logger);
+            Annotations = new RealtimeAnnotations(this);
             RealtimeClient = realtimeClient;
             State = ChannelState.Initialized;
             AttachedAwaiter = new ChannelAwaiter(this, ChannelState.Attached, Logger, OnAttachTimeout);
@@ -577,6 +584,26 @@ namespace Ably.PubSub.Realtime
             return HttpChannel.HistoryAsync(query);
         }
 
+        public Task<Message> GetMessageAsync(string serial)
+        {
+            return RestChannel.GetMessageAsync(serial);
+        }
+
+        public Task<Message> GetMessageAsync(Message message)
+        {
+            return RestChannel.GetMessageAsync(message);
+        }
+
+        public Task<PaginatedResult<Message>> GetMessageVersionsAsync(string serial, PaginatedRequestParams query = null)
+        {
+            return RestChannel.GetMessageVersionsAsync(serial, query);
+        }
+
+        public Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null)
+        {
+            return RestChannel.GetMessageVersionsAsync(message, query);
+        }
+
         public void OnError(ErrorInfo error)
         {
             ErrorReason = error; // Set or clear the error
@@ -593,6 +620,7 @@ namespace Ably.PubSub.Realtime
             DetachedAwaiter?.Dispose();
             _handlers.RemoveAll();
             Presence?.RemoveAllListeners();
+            Annotations?.RemoveAllListeners();
             StateChanged = null;
             Error = null;
             InternalStateChanged = null;
@@ -608,7 +636,7 @@ namespace Ably.PubSub.Realtime
             query.ExtraParameters.Add("fromSerial", Properties.AttachSerial);
         }
 
-        private void PublishImpl(IEnumerable<Message> messages, Action<bool, ErrorInfo> callback)
+        private void EnsureCanPublish()
         {
             if (State == ChannelState.Suspended || State == ChannelState.Failed)
             {
@@ -619,10 +647,29 @@ namespace Ably.PubSub.Realtime
             {
                 throw new AblyException(new ErrorInfo($"Message cannot be published. Client is not allowed to queue messages when connection is in {State} state", ErrorCodes.BadRequest, HttpStatusCode.BadRequest));
             }
+        }
+
+        private void PublishImpl(IEnumerable<Message> messages, Action<bool, ErrorInfo> callback)
+        {
+            EnsureCanPublish();
 
             var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Message, Name)
             {
                 Messages = messages.ToArray(),
+            };
+
+            SendMessage(msg, callback);
+        }
+
+        // RTAN1b - the connection and channel state conditions are those of publishing a message (RTL6c).
+        // RTAN1c - the annotation travels in the annotations array of an ANNOTATION protocol message.
+        internal void PublishAnnotation(Annotation annotation, Action<bool, ErrorInfo> callback)
+        {
+            EnsureCanPublish();
+
+            var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Annotation, Name)
+            {
+                Annotations = new[] { annotation },
             };
 
             SendMessage(msg, callback);

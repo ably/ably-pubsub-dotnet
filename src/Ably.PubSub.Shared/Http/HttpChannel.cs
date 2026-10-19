@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Net;
 using Ably.PubSub.Encryption;
+using Ably.PubSub.MessageEncoders;
 using Ably.PubSub.Push;
 
 namespace Ably.PubSub.Http
@@ -21,6 +23,7 @@ namespace Ably.PubSub.Http
         private readonly string _basePath;
         private ChannelOptions _options;
         private readonly PushChannel _pushChannel;
+        private readonly RestAnnotations _annotations;
 
         internal HttpChannel(PubSubHttpClient ablyRest, string name, ChannelOptions options, IMobileDevice mobileDevice = null)
         {
@@ -28,6 +31,7 @@ namespace Ably.PubSub.Http
             _ablyRest = ablyRest;
             _options = options;
             _basePath = $"/channels/{name.EncodeUriPart()}";
+            _annotations = new RestAnnotations(ablyRest, this, _basePath);
 
             if (mobileDevice != null)
             {
@@ -64,6 +68,9 @@ namespace Ably.PubSub.Http
 
         /// <inheritdoc/>
         public IPresence Presence => this;
+
+        /// <inheritdoc/>
+        public RestAnnotations Annotations => _annotations;
 
         /// <inheritdoc/>
         public Task PublishAsync(string name, object data, string clientId = null)
@@ -198,6 +205,54 @@ namespace Ably.PubSub.Http
         }
 
         /// <inheritdoc/>
+        public async Task<Message> GetMessageAsync(string serial)
+        {
+            // RSL11a
+            ValidateSerial(serial);
+
+            // RSL11b
+            var request = _ablyRest.CreateGetRequest($"{_basePath}/messages/{serial.EncodeUriPart()}", Options);
+            var message = await _ablyRest.ExecuteRequest<Message>(request);
+            if (message == null)
+            {
+                throw new AblyException(new ErrorInfo($"No message was returned for serial '{serial}'", ErrorCodes.InternalError, HttpStatusCode.InternalServerError));
+            }
+
+            // A single message response bypasses the paginated decode path, so the TM2 defaults
+            // and the payload decoding are applied here (RSL11c).
+            MessageHandler.ApplyTm2Defaults(message);
+            return MessageHandler.FromEncoded(message, Options);
+        }
+
+        /// <inheritdoc/>
+        public Task<Message> GetMessageAsync(Message message)
+        {
+            return GetMessageAsync(message?.Serial);
+        }
+
+        /// <inheritdoc/>
+        public Task<PaginatedResult<Message>> GetMessageVersionsAsync(string serial, PaginatedRequestParams query = null)
+        {
+            // RSL14a
+            ValidateSerial(serial);
+
+            query = query ?? new PaginatedRequestParams();
+            query.Validate();
+
+            // RSL14b
+            var request = _ablyRest.CreateGetRequest($"{_basePath}/messages/{serial.EncodeUriPart()}/versions", Options);
+            request.AddQueryParameters(query.GetParameters());
+
+            return _ablyRest.ExecutePaginatedRequest(request, next => GetMessageVersionsAsync(serial, next));
+        }
+
+        /// <inheritdoc/>
+        public Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null)
+        {
+            return GetMessageVersionsAsync(message?.Serial, query);
+        }
+
+        /// <inheritdoc/>
         public void Publish(string name, object data, string clientId = null)
         {
             AsyncHelper.RunSync(() => PublishAsync(name, data, clientId));
@@ -238,6 +293,14 @@ namespace Ably.PubSub.Http
         public ChannelDetails Status()
         {
             return AsyncHelper.RunSync(StatusAsync);
+        }
+
+        private static void ValidateSerial(string serial)
+        {
+            if (serial.IsEmpty())
+            {
+                throw new AblyException(new ErrorInfo("A message serial is required", ErrorCodes.InvalidParameterValue, HttpStatusCode.BadRequest));
+            }
         }
     }
 }

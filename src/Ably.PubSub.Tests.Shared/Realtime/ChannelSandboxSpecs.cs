@@ -745,7 +745,7 @@ namespace Ably.PubSub.Tests.Realtime
 
             await channel.PublishAsync(new Message("test", "best"));
 
-            ResetEvent.WaitOne();
+            ResetEvent.WaitOne(10000).Should().BeTrue("the published messages should be received within 10 seconds");
             var connectionId = client.Connection.Id;
             testMessage.Should().NotBeNull();
             testMessage.ConnectionId.Should().Be(connectionId);
@@ -779,7 +779,7 @@ namespace Ably.PubSub.Tests.Realtime
 
             await channel.PublishAsync(messages);
 
-            ResetEvent.WaitOne();
+            ResetEvent.WaitOne(10000).Should().BeTrue("the published messages should be received within 10 seconds");
             testMessages.Select(x => x.Id).Should().NotContainNulls();
         }
 

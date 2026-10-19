@@ -141,12 +141,13 @@ namespace Ably.PubSub.Tests.Shared.Realtime
                 ("MsgSerial", typeof(long)),
                 ("Messages", typeof(Message[])),
                 ("Presence", typeof(PresenceMessage[])),
+                ("Annotations", typeof(Annotation[])),
                 ("Timestamp", typeof(DateTimeOffset?)),
             };
 
             var props = pm.GetType().GetProperties();
-            props.Length.Should().Be(15);
-            propertyNamesAndTypes.Length.Should().Be(15);
+            props.Length.Should().Be(16);
+            propertyNamesAndTypes.Length.Should().Be(16);
 
             foreach (var propertyInfo in props)
             {

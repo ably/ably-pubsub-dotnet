@@ -49,6 +49,36 @@ namespace Ably.PubSub.Http
         Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query);
 
         /// <summary>
+        /// Retrieves the latest version of the message with the given serial (RSL11). The payload is decoded (RSL11c).
+        /// </summary>
+        /// <param name="serial">the serial of the message to retrieve (RSL11a).</param>
+        /// <returns>The decoded <see cref="Message"/> (RSL11c).</returns>
+        Task<Message> GetMessageAsync(string serial);
+
+        /// <summary>
+        /// Retrieves the latest version of the given message (RSL11a1). The message must have a populated serial.
+        /// </summary>
+        /// <param name="message">a message which has a serial.</param>
+        /// <returns>The decoded <see cref="Message"/> (RSL11c).</returns>
+        Task<Message> GetMessageAsync(Message message);
+
+        /// <summary>
+        /// Retrieves all the versions of the message with the given serial (RSL14).
+        /// </summary>
+        /// <param name="serial">the serial of the message whose versions are retrieved (RSL14a).</param>
+        /// <param name="query">optional <see cref="PaginatedRequestParams"/> query (RSL14a).</param>
+        /// <returns>A <see cref="PaginatedResult{T}"/> of the versions of the message (RSL14c).</returns>
+        Task<PaginatedResult<Message>> GetMessageVersionsAsync(string serial, PaginatedRequestParams query = null);
+
+        /// <summary>
+        /// Retrieves all the versions of the given message (RSL14a1). The message must have a populated serial.
+        /// </summary>
+        /// <param name="message">a message which has a serial.</param>
+        /// <param name="query">optional <see cref="PaginatedRequestParams"/> query (RSL14a).</param>
+        /// <returns>A <see cref="PaginatedResult{T}"/> of the versions of the message (RSL14c).</returns>
+        Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null);
+
+        /// <summary>
         /// Returns the active status for the channel including the number of publishers, subscribers and presenceMembers etc.
         /// </summary>
         /// <returns><see cref="ChannelDetails"/>Channel Details.</returns>
@@ -63,6 +93,12 @@ namespace Ably.PubSub.Http
         /// Returns the Presence object.
         /// </summary>
         IPresence Presence { get; }
+
+        /// <summary>
+        /// Publishes, deletes and retrieves annotations of the messages on this channel (RSL10).
+        /// Experimental: the annotations API may change.
+        /// </summary>
+        RestAnnotations Annotations { get; }
 
         /// <summary>
         /// A convenient set of methods that help with managing subscriptions to a push channel.

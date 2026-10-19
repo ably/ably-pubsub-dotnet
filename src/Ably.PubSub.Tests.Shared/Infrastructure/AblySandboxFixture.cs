@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Ably.PubSub.Encryption;
@@ -10,6 +11,9 @@ namespace Ably.PubSub.Tests
     public class AblySandboxFixture
     {
         private static readonly DateTimeOffset StartInterval = DateHelper.CreateDate(DateTimeOffset.UtcNow.Year - 1, 2, 3, 15, 5);
+
+        /// <summary>Channels in this namespace (mutable:*) have mutable messages enabled.</summary>
+        public const string MutableMessagesNamespace = "mutable";
 
         private static readonly Dictionary<string, TestEnvironmentSettings> Settings = new Dictionary<string, TestEnvironmentSettings>();
 
@@ -38,6 +42,13 @@ namespace Ably.PubSub.Tests
             }
 
             JObject testAppSpec = JObject.Parse(ResourceHelper.GetResource("test-app-setup.json"));
+
+            // The annotations and message retrieval sandbox tests need a namespace with mutable messages enabled.
+            var namespaces = (JArray)testAppSpec["post_apps"]["namespaces"];
+            if (namespaces != null && namespaces.All(x => (string)x["id"] != MutableMessagesNamespace))
+            {
+                namespaces.Add(new JObject { ["id"] = MutableMessagesNamespace, ["mutableMessages"] = true });
+            }
 
             var cipher = testAppSpec["cipher"];
             settings.CipherParams = new CipherParams(
