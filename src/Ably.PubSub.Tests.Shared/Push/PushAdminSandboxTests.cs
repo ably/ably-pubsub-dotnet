@@ -36,7 +36,7 @@ namespace Ably.PubSub.Tests.Push
                     transportType = "ablyChannel",
                     channel = channelName,
                     ablyKey = client.Options.Key,
-                    ablyUrl = "https://" + client.Options.FullRestHost(),
+                    ablyUrl = "https://" + Defaults.GetPrimaryDomain(client.Options.Endpoint),
                 });
 
                 var awaiter = new TaskCompletionAwaiter();

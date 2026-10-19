@@ -41,7 +41,7 @@ namespace Ably.PubSub
         public AblyHttpOptions()
         {
             // Used for testing
-            Host = Defaults.RestHost;
+            Host = Defaults.GetPrimaryDomain(null);
 
             // Setting up some defaults
             DisconnectedRetryTimeout = Defaults.DisconnectedRetryTimeout;
@@ -61,7 +61,7 @@ namespace Ably.PubSub
         {
             IsSecure = options.Tls;
             Port = options.Tls ? options.TlsPort : options.Port;
-            Host = options.FullRestHost();
+            Host = Defaults.GetPrimaryDomain(options.Endpoint);
             DisconnectedRetryTimeout = options.DisconnectedRetryTimeout;
             SuspendedRetryTimeout = options.SuspendedRetryTimeout;
             HttpOpenTimeout = options.HttpOpenTimeout;

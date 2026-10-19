@@ -559,9 +559,9 @@ namespace Ably.PubSub.Tests
 
             var options = await AblySandboxFixture.GetSettings();
             var httpTokenAbly =
-                new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = false });
+                new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = options.Endpoint, Tls = false });
             var httpsTokenAbly =
-                new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = true });
+                new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = options.Endpoint, Tls = true });
 
             // If it doesn't throw we are good :)
             await httpTokenAbly.Channels.Get("foo").PublishAsync("test", "true");
@@ -598,7 +598,7 @@ namespace Ably.PubSub.Tests
 
             var token = ably.Auth.RequestTokenAsync(CreateTokenParams(capability)).Result;
 
-            var tokenAbly = new PubSubHttpClient(new ClientOptions { Token = token.Token, Environment = "sandbox" });
+            var tokenAbly = new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = ably.Options.Endpoint });
 
             var error =
                 await
@@ -654,7 +654,7 @@ namespace Ably.PubSub.Tests
             var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol
             });
 
@@ -677,7 +677,7 @@ namespace Ably.PubSub.Tests
             var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol
             });
             await
@@ -697,7 +697,7 @@ namespace Ably.PubSub.Tests
             var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol
             });
 
@@ -722,7 +722,7 @@ namespace Ably.PubSub.Tests
             var tokenClient = new PubSubHttpClient(new ClientOptions
             {
                 TokenDetails = token,
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol
             });
 
@@ -746,7 +746,7 @@ namespace Ably.PubSub.Tests
             var authUrlClient = new PubSubHttpClient(new ClientOptions
             {
                 AuthUrl = new Uri(authUrl),
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol
             });
 
@@ -770,7 +770,7 @@ namespace Ably.PubSub.Tests
             var authUrlClient = new PubSubHttpClient(new ClientOptions
             {
                 AuthUrl = new Uri(authUrl),
-                Environment = settings.Environment,
+                Endpoint = settings.Endpoint,
                 UseBinaryProtocol = protocol == Defaults.Protocol,
                 HttpRequestTimeout = new TimeSpan(0, 0, 20)
             });
@@ -796,7 +796,7 @@ namespace Ably.PubSub.Tests
             var client = new PubSubRealtimeClient(new ClientOptions
                                                  {
                                                      AuthUrl = new Uri(authUrl),
-                                                     Environment = settings.Environment,
+                                                     Endpoint = settings.Endpoint,
                                                      UseBinaryProtocol = protocol == Defaults.Protocol,
                                                      HttpRequestTimeout = new TimeSpan(0, 0, 20)
                                                  });
@@ -818,7 +818,7 @@ namespace Ably.PubSub.Tests
             var client = new PubSubRealtimeClient(new ClientOptions
                                               {
                                                   AuthUrl = new Uri(authUrl),
-                                                  Environment = settings.Environment,
+                                                  Endpoint = settings.Endpoint,
                                                   UseBinaryProtocol = protocol == Defaults.Protocol,
                                                   HttpRequestTimeout = new TimeSpan(0, 0, 20)
                                               });
@@ -847,7 +847,7 @@ namespace Ably.PubSub.Tests
             var authCallbackClient = await GetRestClient(protocol, options =>
             {
                 options.AuthCallback = tokenParams => tokenClient.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" }).Convert();
-                options.Environment = settings.Environment;
+                options.Endpoint = settings.Endpoint;
                 options.UseBinaryProtocol = protocol == Defaults.Protocol;
             });
 
@@ -870,7 +870,7 @@ namespace Ably.PubSub.Tests
             var authCallbackClient = await GetRestClient(protocol, options =>
             {
                 options.AuthCallback = async tokenParams => await tokenClient.Auth.CreateTokenRequestAsync(new TokenParams { ClientId = "*" });
-                options.Environment = settings.Environment;
+                options.Endpoint = settings.Endpoint;
                 options.UseBinaryProtocol = protocol == Defaults.Protocol;
             });
 

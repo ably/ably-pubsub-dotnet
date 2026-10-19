@@ -18,11 +18,17 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
     [Trait("spec", "RTN17")]
     public class ConnectionFallbackSpecs : AblyRealtimeSpecs
     {
+        private const string DefaultPrimaryHost = "main.realtime.ably.net";
+
         [Fact]
-        [Trait("spec", "RTN17b")]
+        [Trait("spec", "RTN17g")]
+        [Trait("spec", "REC2c2")]
         public async Task WithCustomHostAndError_ConnectionGoesStraightToFailedInsteadOfDisconnected()
         {
-            var client = await GetConnectedClient(opts => opts.RealtimeHost = "test.com");
+            var client = await GetConnectedClient(opts => opts.Endpoint = "test.com");
+
+            // REC2c2: a hostname endpoint has no default fallback hosts.
+            client.State.Connection.FallbackHosts.Should().BeEmpty();
 
             client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error)
             {
@@ -33,35 +39,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
         }
 
         [Fact]
-        [Trait("spec", "RTN17b")]
-        public async Task WithCustomPortAndError_ConnectionGoesStraightToFailedInsteadOfDisconnected()
-        {
-            var client = await GetConnectedClient(opts => opts.Port = 100);
-
-            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error)
-            {
-                Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout }
-            });
-
-            await client.WaitForState(ConnectionState.Failed);
-        }
-
-        [Fact]
-        [Trait("spec", "RTN17b")]
-        public async Task WithCustomEnvironmentAndError_ConnectionGoesStraightToFailedInsteadOfDisconnected()
-        {
-            var client = await GetConnectedClient(opts => opts.Environment = "sandbox");
-
-            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error)
-            {
-                Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout }
-            });
-
-            await client.WaitForState(ConnectionState.Failed);
-        }
-
-        [Fact]
-        [Trait("spec", "RTN17a")]
+        [Trait("spec", "RTN17i")]
         public async Task WhenPreviousAttemptFailed_ShouldGoToDefaultHostFirst()
         {
             var client = GetClientWithFakeTransport();
@@ -75,7 +53,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
                 Error = new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout }
             });
 
-            // We should go through the states - Disconnected and then Connecting with a new RealtimeHost
+            // We should go through the states - Disconnected and then Connecting with a new host
             await client.WaitForState(ConnectionState.Disconnected);
             await client.WaitForState(ConnectionState.Connecting);
             // We want to wait until the Connecting command is completely finished as the event
@@ -94,7 +72,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
 
             await client.ConnectClient();
 
-            realtimeHosts.Last().Should().Be(Defaults.RealtimeHost);
+            realtimeHosts.Last().Should().Be(DefaultPrimaryHost);
         }
 
         [Fact]
@@ -159,7 +137,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
             await client.WaitForState(ConnectionState.Connecting);
             await client.ProcessCommands();
 
-            hostsTried.Should().Equal(Defaults.RealtimeHost);
+            hostsTried.Should().Equal(DefaultPrimaryHost);
 
             // The fallbacks are deferred by one attempt rather than lost. That reconnect to the
             // primary now fails at connect time, which is the RSC15l1 "host unreachable" case RTN17f
@@ -257,7 +235,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
 
             // Immediately, not in ten minutes - and the unreachable probe did not veto it.
             client.State.AttemptsInfo.InstantRetryCount.Should().Be(1);
-            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
+            LastCreatedTransport.Parameters.Host.Should().Be(DefaultPrimaryHost);
         }
 
         [Fact]
@@ -297,7 +275,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
                 .Should().Be(1, "a fallback candidate is exactly what RTN17j wants checked");
 
             client.State.AttemptsInfo.InstantRetryCount.Should().Be(1, "the probe governs the host, not the retry");
-            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
+            LastCreatedTransport.Parameters.Host.Should().Be(DefaultPrimaryHost);
         }
 
         [Fact]
@@ -359,7 +337,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
                 new ErrorInfo { StatusCode = HttpStatusCode.GatewayTimeout }));
             client.State.AttemptsInfo.Attempts.Add(attempt);
 
-            AttemptsHelpers.GetHost(client.State, Defaults.RealtimeHost)
+            AttemptsHelpers.GetHost(client.State, DefaultPrimaryHost)
                 .Should().BeOneOf(client.State.Connection.FallbackHosts, "the candidate must really be a fallback, or this proves nothing");
 
             await client.Workflow.ProcessCommand(HandleConnectingTokenErrorCommand.Create(
@@ -368,7 +346,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
 
             // The internet is unreachable, so the fallback candidate is declined and the renewed
             // token goes out against the primary.
-            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
+            LastCreatedTransport.Parameters.Host.Should().Be(DefaultPrimaryHost);
         }
 
         [Fact]
@@ -464,7 +442,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
             await MakeRestRequestRequest(); // Will make 2 requests 1 to the saved fallback host but no the same as RealtimeFallbackHost and 1 to RealtimeFallbackHost
             await MakeRestRequestRequest(); // Will make 1 request to the RealtimeFallback host
 
-            handler.Requests.Count.Should().Be(5); // First attempt is with rest.ably.io
+            handler.Requests.Count.Should().Be(5); // First attempt is with the primary domain
             var attemptedHosts = handler.Requests.Select(x => x.RequestUri.Host).ToList();
             attemptedHosts[0].Should().Be(client.Connection.Host);
             attemptedHosts[1].Should().BeOneOf(Defaults.FallbackHosts);
@@ -480,7 +458,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
 
         [Fact]
         [Trait("spec", "RTN17e")]
-        [Trait("spec", "RTN17a")]
+        [Trait("spec", "RTN17i")]
         public async Task WhenRealtimeGoesFromFallbackHostToDefault_RestRequestShouldBeOnDefaultHost()
         {
             var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("[12345678]") };
@@ -490,7 +468,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
             await client.ConnectClient(); // On the default host
             await client.DisconnectWithRetryableError();
             await client.ConnectClient(); // On fallback host
-            LastCreatedTransport.Parameters.Host.Should().NotBe(Defaults.RealtimeHost);
+            LastCreatedTransport.Parameters.Host.Should().NotBe(DefaultPrimaryHost);
             await client.DisconnectWithRetryableError(); // Disconnect again
             await client.ConnectClient(); // We try the default host first
 
@@ -499,11 +477,11 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
             var wasLastRequestAFallback = client.Options.GetFallbackHosts().Any(x => lastRequestUri.Contains(x));
             wasLastRequestAFallback.Should().BeFalse();
 
-            lastRequestUri.Should().Contain(Defaults.RestHost);
+            lastRequestUri.Should().Contain(DefaultPrimaryHost);
         }
 
         [Fact]
-        [Trait("spec", "RTN17c")]
+        [Trait("spec", "RTN17j")]
         public async Task WithDefaultHostAndRecoverableError_ConnectionGoesToDisconnectedInsteadOfFailedAndRetryInstantly()
         {
             var client = await GetConnectedClient();
@@ -519,7 +497,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
         }
 
         [Fact]
-        [Trait("spec", "RTN17c")]
+        [Trait("spec", "RTN17j")]
         public async Task WhileInDisconnectedStateLoop_ShouldRetryWithMultipleHosts()
         {
             var client = await GetConnectedClient(opts => opts.DisconnectedRetryTimeout = TimeSpan.FromMilliseconds(10));
@@ -562,7 +540,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
         }
 
         [Fact]
-        [Trait("spec", "RTN17c")]
+        [Trait("spec", "RTN17i")]
         public async Task WhenItMovesFromDisconnectedToSuspended_ShouldTryDefaultHostAgain()
         {
             var now = new Now();
@@ -601,7 +579,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
 
             realtimeHosts.Should().HaveCount(2);
             realtimeHosts.First().Should().Match(x => client.State.Connection.FallbackHosts.Contains(x));
-            realtimeHosts.Last().Should().Be("realtime.ably.io");
+            realtimeHosts.Last().Should().Be(DefaultPrimaryHost);
         }
 
         [Fact]
@@ -641,7 +619,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
             await client.WaitForState(ConnectionState.Suspended);
             await client.WaitForState(ConnectionState.Connecting);
 
-            realtimeHosts.Should().AllBe("realtime.ably.io");
+            realtimeHosts.Should().AllBe(DefaultPrimaryHost);
         }
 
         [Fact]
@@ -693,7 +671,7 @@ namespace Ably.PubSub.Tests.Realtime.ConnectionSpecs
             await client.WaitForState(ConnectionState.Suspended);
             await client.WaitForState(ConnectionState.Connecting);
 
-            realtimeHosts.Should().AllBe("realtime.ably.io");
+            realtimeHosts.Should().AllBe(DefaultPrimaryHost);
         }
 
         public ConnectionFallbackSpecs(ITestOutputHelper output)

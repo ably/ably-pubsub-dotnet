@@ -6,35 +6,68 @@ namespace Ably.PubSub.Tests.Shared
     public class DefaultTests
     {
         [Fact]
-        [Trait("spec", "RSC15h")]
-        public void Defaults_ReturnsFallbackHosts()
+        [Trait("spec", "REC1a")]
+        [Trait("spec", "REC2c1")]
+        public void DefaultEndpoint()
         {
-            var expectedFallBackHosts = new[]
+            Defaults.GetPrimaryDomain(null).Should().Be("main.realtime.ably.net");
+            var expectedFallbackHosts = new[]
             {
-                "a.ably-realtime.com",
-                "b.ably-realtime.com",
-                "c.ably-realtime.com",
-                "d.ably-realtime.com",
-                "e.ably-realtime.com",
+                "main.a.fallback.ably-realtime.com",
+                "main.b.fallback.ably-realtime.com",
+                "main.c.fallback.ably-realtime.com",
+                "main.d.fallback.ably-realtime.com",
+                "main.e.fallback.ably-realtime.com",
             };
-            var fallbackHosts = Defaults.FallbackHosts;
-            Assert.Equal(expectedFallBackHosts, fallbackHosts);
+            Assert.Equal(expectedFallbackHosts, Defaults.GetEndpointFallbackHosts(null));
+            Assert.Equal(Defaults.GetEndpointFallbackHosts(null), Defaults.FallbackHosts);
         }
 
         [Fact]
-        [Trait("spec", "RSC15i")]
-        public void Defaults_WithEnvironment_ReturnsEnvironmentFallbackHosts()
+        [Trait("spec", "REC1b4")]
+        [Trait("spec", "REC2c4")]
+        public void RoutingPolicyEndpoint()
         {
-            var expectedFallBackHosts = new[]
+            Defaults.GetPrimaryDomain("acme").Should().Be("acme.realtime.ably.net");
+            var expectedFallbackHosts = new[]
             {
-                "sandbox-a-fallback.ably-realtime.com",
-                "sandbox-b-fallback.ably-realtime.com",
-                "sandbox-c-fallback.ably-realtime.com",
-                "sandbox-d-fallback.ably-realtime.com",
-                "sandbox-e-fallback.ably-realtime.com",
+                "acme.a.fallback.ably-realtime.com",
+                "acme.b.fallback.ably-realtime.com",
+                "acme.c.fallback.ably-realtime.com",
+                "acme.d.fallback.ably-realtime.com",
+                "acme.e.fallback.ably-realtime.com",
             };
-            var fallbackHosts = Defaults.GetEnvironmentFallbackHosts("sandbox");
-            Assert.Equal(expectedFallBackHosts, fallbackHosts);
+            Assert.Equal(expectedFallbackHosts, Defaults.GetEndpointFallbackHosts("acme"));
+        }
+
+        [Fact]
+        [Trait("spec", "REC1b3")]
+        [Trait("spec", "REC2c3")]
+        public void NonprodRoutingPolicyEndpoint()
+        {
+            Defaults.GetPrimaryDomain("nonprod:sandbox").Should().Be("sandbox.realtime.ably-nonprod.net");
+            var expectedFallbackHosts = new[]
+            {
+                "sandbox.a.fallback.ably-realtime-nonprod.com",
+                "sandbox.b.fallback.ably-realtime-nonprod.com",
+                "sandbox.c.fallback.ably-realtime-nonprod.com",
+                "sandbox.d.fallback.ably-realtime-nonprod.com",
+                "sandbox.e.fallback.ably-realtime-nonprod.com",
+            };
+            Assert.Equal(expectedFallbackHosts, Defaults.GetEndpointFallbackHosts("nonprod:sandbox"));
+        }
+
+        [Theory]
+        [Trait("spec", "REC1b2")]
+        [Trait("spec", "REC2c2")]
+        [InlineData("foo.example.com")]
+        [InlineData("localhost")]
+        [InlineData("127.0.0.1")]
+        [InlineData("::1")]
+        public void HostnameEndpoint(string hostname)
+        {
+            Defaults.GetPrimaryDomain(hostname).Should().Be(hostname);
+            Defaults.GetEndpointFallbackHosts(hostname).Should().BeEmpty();
         }
 
         [Fact]

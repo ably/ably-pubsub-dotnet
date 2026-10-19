@@ -15,7 +15,7 @@ namespace Ably.PubSub.Tests.Push
                 transportType = "ablyChannel",
                 channel = "pushenabled:test",
                 ablyKey = client.Options.Key,
-                ablyUrl = "https://" + client.Options.FullRestHost(),
+                ablyUrl = "https://" + Defaults.GetPrimaryDomain(client.Options.Endpoint),
             });
             return device;
         }

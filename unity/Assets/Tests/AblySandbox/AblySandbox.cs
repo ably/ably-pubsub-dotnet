@@ -64,9 +64,9 @@ namespace Assets.Tests.AblySandbox
             ResetEvent?.Dispose();
         }
 
-        public async Task<PubSubHttpClient> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string environment = null)
+        public async Task<PubSubHttpClient> GetRestClient(Protocol protocol, Action<ClientOptions> optionsAction = null, string endpoint = null)
         {
-            var settings = await Fixture.GetSettings(environment);
+            var settings = await Fixture.GetSettings(endpoint);
             var defaultOptions = settings.CreateDefaultOptions();
             defaultOptions.UseBinaryProtocol = protocol == Defaults.Protocol;
             optionsAction?.Invoke(defaultOptions);

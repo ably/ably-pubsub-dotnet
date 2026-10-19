@@ -121,7 +121,7 @@ namespace Ably.PubSub.Tests.Http
             }
 
             var msg = new Message("test", "test");
-            var client = await GetRestClient(protocol, opts => opts.IdempotentRestPublishing = true, "idempotent-dev");
+            var client = await GetRestClient(protocol, opts => opts.IdempotentRestPublishing = true);
             var channel = client.Channels.Get("test".AddRandomSuffix());
 
             await channel.PublishAsync(msg);
@@ -219,7 +219,7 @@ namespace Ably.PubSub.Tests.Http
             const int numberOfRetries = 2;
             var client = await GetRestClient(protocol, opts =>
             {
-                opts.FallbackHosts = new[] { "sandbox-rest.ably.io" };
+                opts.FallbackHosts = new[] { Defaults.GetPrimaryDomain(opts.Endpoint) };
                 opts.IdempotentRestPublishing = true;
             });
 
@@ -278,7 +278,7 @@ namespace Ably.PubSub.Tests.Http
             const int numberOfRetries = 2;
             var client = await GetRestClient(protocol, opts =>
             {
-                opts.FallbackHosts = new[] { "sandbox-rest.ably.io" };
+                opts.FallbackHosts = new[] { Defaults.GetPrimaryDomain(opts.Endpoint) };
                 opts.IdempotentRestPublishing = true;
             });
 

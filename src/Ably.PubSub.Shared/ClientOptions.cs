@@ -13,8 +13,6 @@ namespace Ably.PubSub
     public class ClientOptions : AuthOptions
     {
         private string _clientId;
-        private string _realtimeHost;
-        private string _restHost;
         private Func<DateTimeOffset> _nowFunc;
 #if MSGPACK
         private bool _useBinaryProtocol;
@@ -111,98 +109,38 @@ namespace Ably.PubSub
         public ILoggerSink LogHandler { get; set; }
 
         /// <summary>
-        /// For development environments only. Allows a non default host for the rest service.
-        /// Default: null.
+        /// Sets the endpoint that both REST requests and realtime connections use. The value can be:
+        /// <list type="bullet">
+        /// <item><description>a routing policy name, such as <c>main</c>, which connects to <c>[name].realtime.ably.net</c>;</description></item>
+        /// <item><description>a nonprod routing policy name prefixed with <c>nonprod:</c>, such as <c>nonprod:sandbox</c>,
+        /// which connects to <c>[name].realtime.ably-nonprod.net</c>;</description></item>
+        /// <item><description>a hostname (one containing <c>.</c> or <c>::</c>, or <c>localhost</c>), which is used as given
+        /// with no default fallback hosts.</description></item>
+        /// </list>
+        /// The default is <c>main</c>.
+        /// Spec: REC1.
         /// </summary>
-        public string RestHost
-        {
-            set => _restHost = value;
-        }
+        public string Endpoint { get; set; }
 
         /// <summary>
-        /// For development environments only. Allows a non default host for the realtime service.
-        /// Default: null.
-        /// </summary>
-        public string RealtimeHost
-        {
-            set => _realtimeHost = value;
-        }
-
-        /// <summary>
-        /// Gets or sets an array of custom Fallback hosts to be (optionally) used in place of the defaults.
-        /// If an empty array is specified, then fallback host functionality is disabled.
+        /// An array of fallback hosts to be used in the case of an error necessitating the use of an alternative host.
+        /// If you have been provided a set of custom fallback hosts by Ably, please specify them here.
+        /// When set, these replace the default fallback hosts derived from <see cref="Endpoint"/>;
+        /// an empty array disables fallback.
+        /// Spec: REC2a2, RSC15a, TO3k6.
         /// </summary>
         public string[] FallbackHosts
         {
             set => _fallbackHosts = value;
         }
 
-        internal bool IsProductionEnvironment => Environment.IsEmpty() || Environment.Equals("production", StringComparison.OrdinalIgnoreCase);
-
-        internal bool IsDefaultPort => Tls ? TlsPort == Defaults.TlsPort : Port == Defaults.Port;
-
         /// <summary>
-        /// Used for getting default/provided RestHost.
+        /// The fallback hosts to use: an explicit <see cref="FallbackHosts"/> always replaces the defaults (REC2a2);
+        /// otherwise they derive from <see cref="Endpoint"/> (REC2c).
         /// </summary>
-        /// <returns>RestHost.</returns>
-        public string FullRestHost()
-        {
-            if (_restHost.IsNotEmpty())
-            {
-                return _restHost;
-            }
-
-            if (!IsProductionEnvironment)
-            {
-                return $"{Environment}-{Defaults.RestHost}";
-            }
-
-            return Defaults.RestHost;
-        }
-
-        /// <summary>
-        /// Used for getting default/provided RealtimeHost.
-        /// </summary>
-        /// <returns>RealtimeHost.</returns>
-        public string FullRealtimeHost()
-        {
-            if (_realtimeHost.IsNotEmpty())
-            {
-                return _realtimeHost;
-            }
-
-            if (_restHost.IsNotEmpty())
-            {
-                Logger.Warning(
-                    $@"restHost is set to {_restHost} but realtimeHost is not set,
-                    so setting realtimeHost to {_restHost} too. If this is not what you want,
-                    please set realtimeHost explicitly.");
-                return _restHost;
-            }
-
-            if (!IsProductionEnvironment)
-            {
-                return $"{Environment}-{Defaults.RealtimeHost}";
-            }
-
-            return Defaults.RealtimeHost;
-        }
-
-        /// <summary>
-        /// Used for getting default/provided FallbackHosts.
-        /// </summary>
-        /// <returns>FallbackHosts.</returns>
-        public string[] GetFallbackHosts()
-        {
-            if (_fallbackHosts is null && _restHost.IsEmpty() && _realtimeHost.IsEmpty() && IsDefaultPort)
-            {
-                return IsProductionEnvironment
-                    ? Defaults.FallbackHosts
-                    : Defaults.GetEnvironmentFallbackHosts(Environment);
-            }
-
-            return _fallbackHosts ?? new string[] { };
-        }
+        /// <returns>A copy of the fallback hosts; empty when fallback is disabled or the endpoint is a hostname.</returns>
+        internal string[] GetFallbackHosts() =>
+            _fallbackHosts != null ? (string[])_fallbackHosts.Clone() : Defaults.GetEndpointFallbackHosts(Endpoint);
 
         /// <summary>
         /// For development environments only; allows a non-default Ably port to be specified.
@@ -344,12 +282,6 @@ namespace Ably.PubSub
         /// Provides Channels Setting for all Channels created. For more information see <see cref="ChannelOptions"/>.
         /// </summary>
         public ChannelOptions ChannelDefaults { get; internal set; } = new ChannelOptions();
-
-        /// <summary>
-        /// For development; allows to specify a non production environment.
-        /// Default: null.
-        /// </summary>
-        public string Environment { get; set; }
 
         /// <summary>
         /// Allows the user to override the Websocket Transport Factory and provide their own implementation.
@@ -496,9 +428,8 @@ namespace Ably.PubSub
         /// <para>
         /// This is the copy the door packages (Ably.PubSub.Device / Ably.PubSub.Server) stamp their
         /// side agent onto, so that stamping a client never mutates the caller's own options instance.
-        /// It lives here rather than in the door helper because <see cref="RestHost"/>,
-        /// <see cref="RealtimeHost"/> and <see cref="FallbackHosts"/> are write-only from outside the
-        /// class and can only be carried across from inside it.
+        /// It lives here rather than in the door helper because <see cref="FallbackHosts"/> is
+        /// write-only from outside the class and can only be carried across from inside it.
         /// </para>
         /// </summary>
         /// <returns>A copy of these options.</returns>
@@ -527,6 +458,7 @@ namespace Ably.PubSub
                 Recover = Recover,
                 LogLevel = LogLevel,
                 LogHandler = LogHandler,
+                Endpoint = Endpoint,
                 Port = Port,
                 Tls = Tls,
                 TlsPort = TlsPort,
@@ -540,7 +472,6 @@ namespace Ably.PubSub
                 HttpMaxRetryCount = HttpMaxRetryCount,
                 HttpMaxRetryDuration = HttpMaxRetryDuration,
                 ChannelDefaults = ChannelDefaults,
-                Environment = Environment,
                 TransportFactory = TransportFactory,
                 IdempotentRestPublishing = IdempotentRestPublishing,
                 TransportParams = TransportParams == null ? null : new Dictionary<string, object>(TransportParams),
@@ -559,8 +490,6 @@ namespace Ably.PubSub
             };
 
             // Write-only / private-field members, only reachable from inside the class.
-            copy._restHost = _restHost;
-            copy._realtimeHost = _realtimeHost;
             copy._fallbackHosts = _fallbackHosts;
             copy._nowFunc = _nowFunc;
 

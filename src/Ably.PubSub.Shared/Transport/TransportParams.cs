@@ -156,7 +156,7 @@ namespace Ably.PubSub.Transport
         public Uri GetUri()
         {
             var wsScheme = Tls ? "wss://" : "ws://";
-            var uriBuilder = new UriBuilder(wsScheme, Host, Port)
+            var uriBuilder = new UriBuilder(wsScheme, HttpUtility.HostForUrl(Host), Port)
             {
                 Query = GetParams().ToQueryString(),
             };

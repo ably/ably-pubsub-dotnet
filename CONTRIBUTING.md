@@ -90,6 +90,10 @@ Experience has shown you are better off running local VMs for guest OS images as
 
 Note: it was recently decided to remove explicit mention of Windows 7 as a supported platform for the Ably .NET SDK. It is probably worth considering when we can also look to exclude Windows 8 and Windows 8.1 setting the minimum supported version to Windows 10.
 
+Integration tests run against the `nonprod:sandbox` endpoint by default. To run them against a specific endpoint, specify it in the environment:
+
+    ABLY_ENDPOINT=nonprod:staging ./build.sh --target=Test.NetStandard.Integration.WithRetry --framework=net6.0
+
 ## Release process
 
 >Important Note 

@@ -26,13 +26,11 @@ namespace Ably.PubSub.Tests.PubSub
     /// </summary>
     public class ClientOptionsCloneSpecs
     {
-        // Public setter, no getter: the loop stamps them via the setter and asserts through the
+        // Public setter, no getter: the loop stamps it via the setter and asserts through the
         // private backing field (Clone copies the field by reference).
         private static readonly IReadOnlyDictionary<string, string> WriteOnlyBackingField =
             new Dictionary<string, string>
             {
-                ["RestHost"] = "_restHost",
-                ["RealtimeHost"] = "_realtimeHost",
                 ["FallbackHosts"] = "_fallbackHosts",
             };
 

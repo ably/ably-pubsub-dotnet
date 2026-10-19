@@ -14,10 +14,11 @@ namespace Ably.PubSub.Tests.Realtime
     {
         [Fact]
         [Trait("spec", "RTN2")]
-        public async Task ShouldUseDefaultRealtimeHost()
+        [Trait("spec", "REC1a")]
+        public async Task ShouldUseDefaultPrimaryDomain()
         {
             _ = await GetConnectedClient();
-            LastCreatedTransport.Parameters.Host.Should().Be(Defaults.RealtimeHost);
+            LastCreatedTransport.Parameters.Host.Should().Be("main.realtime.ably.net");
         }
 
         [Theory]

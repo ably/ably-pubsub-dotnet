@@ -388,7 +388,9 @@ namespace Ably.PubSub.Tests
                 options.HttpRequestTimeout = TimeSpan.FromSeconds(1);
             }));
 
-            // custom host with a port that is not in use speeds up the test
+            // A host carrying a port is not a valid host, so the request fails before connecting.
+            // HttpUtility.HostForUrl brackets any host containing ':' as an IPv6 literal, so the
+            // malformed host surfaces as an unparseable hostname rather than an invalid port.
             client.HttpClient.SetPreferredHost("fake.host:54321");
             try
             {
@@ -398,7 +400,7 @@ namespace Ably.PubSub.Tests
             {
                 e.ErrorInfo.Code.Should().Be(ErrorCodes.InternalError);
                 e.ErrorInfo.Message.Should().NotBeNullOrEmpty();
-                e.ErrorInfo.Message.Should().Contain("Invalid URI: Invalid port specified.");
+                e.ErrorInfo.Message.Should().Contain("Invalid URI: The hostname could not be parsed.");
             }
         }
 

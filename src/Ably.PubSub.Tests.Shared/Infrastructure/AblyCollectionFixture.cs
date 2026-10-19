@@ -51,7 +51,10 @@ namespace Ably.PubSub.Tests
 
         public bool Tls { get; set; }
 
-        public string Environment { get; set; } = "sandbox";
+        // The endpoint every sandbox test runs against: ABLY_ENDPOINT when set, otherwise nonprod:sandbox.
+        public static readonly string DefaultEndpoint = GetDefaultEndpoint();
+
+        public string Endpoint { get; set; } = DefaultEndpoint;
 
         public CipherParams CipherParams { get; set; }
 
@@ -60,20 +63,26 @@ namespace Ably.PubSub.Tests
             Keys = new List<Key>();
         }
 
-        public ClientOptions CreateDefaultOptions(string key = null, string environment = null)
+        public ClientOptions CreateDefaultOptions(string key = null, string endpoint = null)
         {
-            environment ??= Environment;
-
-            var ablyEnv = System.Environment.GetEnvironmentVariable("ABLY_ENV");
-            var env = !string.IsNullOrEmpty(ablyEnv) ? ablyEnv.Trim() : environment;
-
-            return new ClientOptions { Key = key ?? FirstValidKey, Tls = Tls, Environment = env };
+            return new ClientOptions { Key = key ?? FirstValidKey, Tls = Tls, Endpoint = endpoint ?? Endpoint };
         }
 
-        internal AblyHttpRequester GetHttpClient(string environment = null)
+        private static string GetDefaultEndpoint()
         {
-            var ablyHttpOptions = new AblyHttpOptions { IsSecure = Tls };
-            ablyHttpOptions.Host = CreateDefaultOptions(null, environment).FullRestHost();
+            var ablyEndpoint = System.Environment.GetEnvironmentVariable("ABLY_ENDPOINT");
+            return string.IsNullOrEmpty(ablyEndpoint) ? "nonprod:sandbox" : ablyEndpoint.Trim();
+        }
+
+        internal AblyHttpRequester GetHttpClient(string endpoint = null)
+        {
+            var options = CreateDefaultOptions(null, endpoint);
+            var ablyHttpOptions = new AblyHttpOptions
+            {
+                IsSecure = Tls,
+                Host = Defaults.GetPrimaryDomain(options.Endpoint),
+                FallbackHosts = options.GetFallbackHosts(),
+            };
             return new AblyHttpRequester(ablyHttpOptions);
         }
     }

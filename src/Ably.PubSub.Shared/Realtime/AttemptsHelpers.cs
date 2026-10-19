@@ -29,7 +29,7 @@ namespace Ably.PubSub.Realtime
             return (now() - firstAttempt.Value) >= state.Connection.ConnectionStateTtl;
         }
 
-        public static string GetHost(RealtimeState state, string realtimeHost)
+        public static string GetHost(RealtimeState state, string primaryDomain)
         {
             var lastFailedState = state.AttemptsInfo.Attempts.SelectMany(x => x.FailedStates).LastOrDefault(x => x.ShouldUseFallback());
             string customHost = string.Empty;
@@ -38,11 +38,11 @@ namespace Ably.PubSub.Realtime
 
             if (lastFailedState != null)
             {
-                // RTN17a if we were previously connected to a fallback host
-                // we need to first try again on the default host before starting to check fallback hosts
+                // RTN17i if we were previously connected to a fallback host
+                // we need to first try again on the primary domain before starting to check fallback hosts
                 if (state.Connection.Host.IsNotEmpty() && state.Connection.IsFallbackHost)
                 {
-                    return realtimeHost;
+                    return primaryDomain;
                 }
 
                 if (lastFailedState.State == ConnectionState.Disconnected)
@@ -62,7 +62,7 @@ namespace Ably.PubSub.Realtime
                 }
             }
 
-            return realtimeHost;
+            return primaryDomain;
 
             string GetFallbackHost(int failedRequestCount)
             {
