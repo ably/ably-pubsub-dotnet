@@ -80,7 +80,7 @@ namespace Ably.PubSub.Tests.PubSub
         }
 
         [Fact]
-        public async Task CoreConstructedRestClient_SendsNeitherSideFlag()
+        public async Task CoreConstructedHttpClient_SendsNeitherSideFlag()
         {
             var agentValues = await CaptureHttpAgentTokens(handler =>
             {
@@ -113,12 +113,32 @@ namespace Ably.PubSub.Tests.PubSub
             // carries a device/server classification. This test (and the tests above constructing
             // via the internal constructors) compiles through InternalsVisibleTo; an accidental
             // future `public` constructor would otherwise ship silently.
+            //
+            // The subclass route is guarded too: an unsealed client with a `protected` or
+            // `protected internal` constructor would let application code derive from it and call
+            // that constructor, bypassing the doors just as a public constructor would. So both
+            // clients must be sealed, and no instance constructor may be family-accessible.
             typeof(PubSubRealtimeClient)
                 .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                 .Should().BeEmpty("application code must construct realtime clients through the door factories");
             typeof(PubSubHttpClient)
                 .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                 .Should().BeEmpty("application code must construct HTTP clients through the door factories");
+
+            typeof(PubSubRealtimeClient).IsSealed
+                .Should().BeTrue("a subclass could otherwise reach a non-public constructor and bypass the door factories");
+            typeof(PubSubHttpClient).IsSealed
+                .Should().BeTrue("a subclass could otherwise reach a non-public constructor and bypass the door factories");
+
+            const BindingFlags allInstanceConstructors = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            typeof(PubSubRealtimeClient)
+                .GetConstructors(allInstanceConstructors)
+                .Where(ctor => ctor.IsFamily || ctor.IsFamilyOrAssembly)
+                .Should().BeEmpty("a protected constructor would let a subclass construct a realtime client without a door");
+            typeof(PubSubHttpClient)
+                .GetConstructors(allInstanceConstructors)
+                .Where(ctor => ctor.IsFamily || ctor.IsFamilyOrAssembly)
+                .Should().BeEmpty("a protected constructor would let a subclass construct an HTTP client without a door");
         }
 
         [Fact]
