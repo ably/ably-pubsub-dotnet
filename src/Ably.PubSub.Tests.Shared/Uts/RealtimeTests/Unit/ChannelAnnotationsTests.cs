@@ -628,7 +628,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTAN4e1/no-warn-unattached-0
-        [UtsFact(Skip = "Missing SDK API: the attachOnSubscribe (TB4) channel option is not in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTAN4e1")]
         public async Task RTAN4e1_NoWarnUnattached()
         {

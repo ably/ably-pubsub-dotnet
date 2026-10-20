@@ -388,7 +388,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL7h/no-attach-on-subscribe-0
-        [UtsFact(Skip = "Missing SDK API: attachOnSubscribe channel option (TB4, RTL7h) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL7h")]
         public async Task RTL7h_NoAttachOnSubscribe()
         {
@@ -793,7 +793,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL22a/filter-matching-name-0
-        [UtsFact(Skip = "Missing SDK API: subscribe(MessageFilter, ...) (RTL22) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#subscribe(MessageFilter) (RTL22); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL22a")]
         public async Task RTL22a_FilterMatchingName()
         {
@@ -868,7 +868,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL22a/filter-matching-ref-timeserial-1
-        [UtsFact(Skip = "Missing SDK API: subscribe(MessageFilter, ...) (RTL22) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#subscribe(MessageFilter) (RTL22); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL22a")]
         public async Task RTL22a_FilterMatchingRefTimeserial()
         {
@@ -950,7 +950,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL22b/filter-isref-false-0
-        [UtsFact(Skip = "Missing SDK API: subscribe(MessageFilter, ...) (RTL22) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#subscribe(MessageFilter) (RTL22); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL22b")]
         public async Task RTL22b_FilterIsrefFalse()
         {
@@ -1035,7 +1035,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL22c/filter-multiple-criteria-0
-        [UtsFact(Skip = "Missing SDK API: subscribe(MessageFilter, ...) (RTL22) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#subscribe(MessageFilter) (RTL22); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL22c")]
         public async Task RTL22c_FilterMultipleCriteria()
         {
@@ -1129,7 +1129,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL22a/filter-matching-clientid-2
-        [UtsFact(Skip = "Missing SDK API: subscribe(MessageFilter, ...) (RTL22) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#subscribe(MessageFilter) (RTL22); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL22a")]
         public async Task RTL22a_FilterMatchingClientid()
         {

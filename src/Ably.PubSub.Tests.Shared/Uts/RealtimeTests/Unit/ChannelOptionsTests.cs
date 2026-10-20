@@ -116,7 +116,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/TB4/attach-on-subscribe-default-0
-        [Fact(Skip = "Missing SDK API: RealtimeChannelOptions.attachOnSubscribe (TB4) is not in this SDK; see deviations.md (Failing Tests)")]
+        [Fact(Skip = "Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "TB4")]
         public void TB4_AttachOnSubscribeDefault()
         {
@@ -302,7 +302,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTS5a/creates-derived-channel-0
-        [Fact(Skip = "Missing SDK API: Channels#getDerived (RTS5) is not in this SDK; see deviations.md (Failing Tests)")]
+        [Fact(Skip = "Missing SDK public API: Channels#getDerived (RTS5); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTS5a")]
         public void RTS5a_CreatesDerivedChannel()
         {
@@ -317,7 +317,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTS5a1/filter-base64-encoded-0
-        [Fact(Skip = "Missing SDK API: Channels#getDerived (RTS5) is not in this SDK; see deviations.md (Failing Tests)")]
+        [Fact(Skip = "Missing SDK public API: Channels#getDerived (RTS5); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTS5a1")]
         public void RTS5a1_FilterBase64Encoded()
         {
@@ -330,7 +330,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTS5a2/derived-with-params-0
-        [Fact(Skip = "Missing SDK API: Channels#getDerived (RTS5) is not in this SDK; see deviations.md (Failing Tests)")]
+        [Fact(Skip = "Missing SDK public API: Channels#getDerived (RTS5); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTS5a2")]
         public void RTS5a2_DerivedWithParams()
         {
@@ -347,7 +347,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTS5/get-derived-with-options-0
-        [Fact(Skip = "Missing SDK API: Channels#getDerived (RTS5) is not in this SDK; see deviations.md (Failing Tests)")]
+        [Fact(Skip = "Missing SDK public API: Channels#getDerived (RTS5); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTS5")]
         public void RTS5_GetDerivedWithOptions()
         {
@@ -360,7 +360,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/DO2a/filter-attribute-0
-        [Fact(Skip = "Missing SDK API: DeriveOptions (DO2a) is not in this SDK; see deviations.md (Failing Tests)")]
+        [Fact(Skip = "Missing SDK public API: DeriveOptions (DO2a); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "DO2a")]
         public void DO2a_FilterAttribute()
         {

@@ -170,6 +170,176 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Draft fix:** measure the channel re-attach delay without `retryIn`, e.g. record the fake-clock time of each ATTACH frame after SUSPENDED and assert the gaps fall within `channelRetryTimeout * backoff * jitter`.
 - **Test impact:** `BackoffJitterTests` suspended-channel-retry test: skipped stub (`Skip = "UTS spec error RTB1: …"`, spec lines as comments). It's a stub rather than a fail-fast placeholder because the test can't be written against this SDK either (no channel `RetryIn`); moved from Mock Infrastructure Limitations.
 
+### RSA3b — tests assert the plain token in `Authorization: Bearer`, but the features spec makes Base64 optional
+
+- **Spec point:** RSA3b (REST unit tests in `uts/rest/unit/auth/auth_scheme.md`, `auth_callback.md`, `authorize.md`, `token_renewal.md`).
+- **What the features spec says:** `(RSA3b)` "For REST requests, the token string is optionally Base64-encoded and used in the `Authorization: Bearer` header".
+- **What the UTS spec gets wrong:** the tests assert `Authorization == "Bearer <plain token>"` (and `RSC10`/`RSA4b` mocks match on the plain header to decide which token to reject), which over-specifies a choice the features spec leaves to the SDK. This SDK Base64-encodes the token (`AblyAuth.AddAuthHeader`: `"Bearer " + token.ToBase64()`).
+- **Observed:** `Expected request.Headers["Authorization"] to be "Bearer callback-token" ... but "Bearer Y2FsbGJhY2stdG9rZW4=" ...`.
+- **Draft fix:** compare against the SDK-chosen encoding (accept either form through a `mock_http.md` helper), or assert only the decoded token.
+- **Test impact:** adapted to the features-permitted behaviour, not skipped (each adapted point asserts `"Bearer " + Base64(token)`, mock conditions match that form, and a `// NOTE:` names RSA3b; every other assertion is verbatim): `AuthSchemeTests.RSA4_UseTokenAuthForced`, `RSA4_AuthCallbackTriggersToken`, `RSA4_AuthUrlTriggersToken`, `RSA1_TokenAuthTakesPrecedence`, `RSC18_TokenAuthOverNonTls`; `AuthCallbackTests.RSA8d_CallbackInvokedForAuth`, `RSA8d_CallbackReturnsJwt`, `RSA8d_CallbackReturnsTokenRequest`, `RSA8c_AuthUrlInvokedForAuth`, `RSA8c_AuthUrlReturnsJwt`; `AuthorizeTests.RSA10a_AuthorizeDefaultParams`; `TokenRenewalTests.RSA4b_RenewalOn40142`, `RSA4b_RenewalViaAuthurl`, `RSC10_RequestRetriedAfterRenewal`. Skipped placeholders (the test's subject is the header value itself): `AuthSchemeTests.RSA3_TokenAuthExplicitToken`, `AuthSchemeTests.RSA3_TokenAuthTokenDetails`.
+
+### RSC1b — the no-auth test expects the 40106 on the first request, the features spec doesn't say when
+
+- **Spec point:** RSC1b (test `rest/unit/RSC1b/no-auth-method-error-0`, `uts/rest/unit/auth/auth_scheme.md`).
+- **What the features spec says:** `(RSC1b)` "If invalid arguments are provided such as no API key, no token and no means to create a token, then this will result in an error with error code 40106 and an informative message."
+- **What the UTS spec gets wrong:** it constructs `Rest(options: ClientOptions())` and expects the error from `client.request(...)`; RSC1b fixes neither the moment nor the call. The SDK raises 40106 when the client is built (`AblyAuth.CheckAndGetAuthMethod`).
+- **Draft fix:** accept a construction-time error (wrap both the construction and the request in the error expectation).
+- **Test impact:** adapted to the features-permitted behaviour, not skipped: `AuthSchemeTests.RSC1b_NoAuthMethodError` asserts the construction throws 40106 and that no HTTP request was made, with a `// NOTE:`.
+
+### RSA4a2 — the expired-static-token test expects a local 40171 with no HTTP request
+
+- **Spec point:** RSA4a2, RSA4b1 (test `rest/unit/RSA4a2/expired-token-no-renewal-0`, `uts/rest/unit/auth/auth_scheme.md`).
+- **What the features spec says:** `(RSA4a2)` "if the server responds with a token error (401 HTTP status code and an Ably error value `40140 <= code < 40150`), then the client library should indicate an error with error code `40171`, not retry the request and, in the case of the realtime library, transition the connection to the `FAILED` state"; `(RSA4b1)` local expiry detection is optional and only "when all of the following applies: ... the library has previously queried the time from the Ably service and persisted the local clock offset according to RSA10k".
+- **What the UTS spec gets wrong:** it expects a request with a locally expired static token to fail with 40171 without any HTTP request, with no server time known. Per the features spec that failure follows a server token error (so one request is made); local detection is optional (the manual lists this as an example of a spec error).
+- **Observed:** no error is thrown for the request (the SDK, like RSA4b1 permits, sends it).
+- **Draft fix:** have the mock answer 401/40142 and assert 40171 and a single request.
+- **Test impact:** `AuthSchemeTests.RSA4a2_ExpiredTokenNoRenewal` is a skipped placeholder.
+
+### RSA4b1 — pre-emptive-renewal tests rely on local expiry detection without a known server time
+
+- **Spec point:** RSA4b1 (tests `rest/unit/RSA4b1/preemptive-renewal-0` in `token_renewal.md` and `rest/unit/RSA16c/updated-after-expiry-renewal-2` in `token_details.md`).
+- **What the features spec says:** `(RSA4b1)` "Client libraries can optionally save a round-trip request to the Ably service for expired tokens by detecting when a token has expired when all of the following applies: the current token is a `TokenDetails` object with an `expires` attribute; the library has previously queried the time from the Ably service and persisted the local clock offset according to RSA10k; the `expires` time has passed based on the Ably service time and not the local clock".
+- **What the UTS spec gets wrong:** both tests expect a pre-emptive renewal from the local clock alone (no `queryTime`, no `/time`).
+- **Observed:** the token is reused (callback count 1, `token-v1` still current).
+- **Draft fix:** query the server time first (`authorize(authOptions: {queryTime: true})` with a `/time` stub answering `[ms]`) so the optional detection applies, or assert the renewal on the server's 40142.
+- **Test impact:** `TokenRenewalTests.RSA4b1_PreemptiveRenewal`, `TokenDetailsTests.RSA16c_UpdatedAfterExpiryRenewal` are skipped placeholders.
+
+### RSC16 / RSA10k — `/time` stubbed as an object
+
+- **Spec point:** RSC16, RSA10k (`uts/rest/unit/auth/authorize.md`, `fallback.md`, `rest_client.md`, `request_endpoint.md`, `request.md`, and `uts/rest/unit/helpers/mock_http.md`, whose examples carry the same object form).
+- **What the features spec says:** `(RSC16)` "`RestClient#time` function sends a get request to the `/time` path of the REST endpoint as specified in RSC25 and returns the server time in milliseconds since epoch or as a Date/Time object where suitable"; `(RSA10k)` "If the `AuthOption` argument's `queryTime` attribute is true, it will obtain the server time once and persist the offset from the local clock."
+- **What the UTS spec gets wrong:** the mocks answer `/time` with `{"time": 1234567890000}`, whereas the endpoint returns a JSON array of milliseconds (as `uts/rest/unit/time.md` itself stubs it).
+- **Observed:** `Cannot deserialize the current JSON object ... into type 'List<long>'`.
+- **Draft fix:** answer `/time` with `[1234567890000]` everywhere, including the `mock_http.md` examples.
+- **Test impact:**
+  - **(a) Stub corrected, not skipped** (each carries `// NOTE: /time stub corrected to the array form RSC16/time.md use`; `/time` is incidental to the test's subject): `FallbackTests.REC1a_DefaultPrimaryDomain`, `REC1b2_ExplicitHostnameWithPeriod`, `REC1b2_EndpointLocalhost`, `REC1b2_EndpointIpv6Address`, `REC1b3_NonprodRoutingPolicy`, `REC1b4_ProductionRoutingPolicy`, `REC2a2_CustomFallbackHosts`, `REC2c1_DefaultFallbackDomains`, `REC2c3_NonprodFallbackDomains`, `REC2c4_ProductionEndpointFallbackDomains`, `RSC15l_QualifyingErrorsTriggerFallback`, `RSC15l_ConnectionRefusedFallback`, `RSC15l_DnsErrorFallback`, `RSC15l_ConnectionTimeoutFallback`, `RSC15l_RequestTimeoutFallback`, `RSC15l_Http5xxTriggersFallback`, `RSC15l4_CloudfrontErrorTriggersFallback` (gated, see "RSC15l4"), `RSC15j_HostHeaderMatchesRequest`; `RequestEndpointTests.RSC25_DefaultPrimaryDomain`, `RSC25_CustomEndpointDomain`, `RSC25_MultipleRequestsPrimaryDomain`, `RSC25_PrimaryTriedBeforeFallback`; `RestClientTests.RSC7e_AblyVersionHeader`, `RSC7d_AblyAgentHeaderFormat` (also adapted, see "RSC7d1"), `RSC7c_RequestIdIncluded`, `RSC7c_RequestIdPreservedFallback` (gated, see "RSC7c"), `RSC18_TlsControlsProtocolScheme`, `RSC18_BasicAuthOverHttpRejected` (adapted and gated, see "RSC18"). Of these, 24 pass (RSC7d and RSC18 tls included); `RSC15l4`, `RSC7c` x2 and `RSC18_BasicAuthOverHttpRejected` are gated for the independent reasons named.
+  - **(b) Placeholder (the test's subject is the time value or its parsing):** `AuthorizeTests.RSA10k_AuthorizeQueryTime` (skipped).
+  - The two `fallback.md` RSC15f tests carry the same stub and are placeholders for another reason, see "RSC15f".
+
+### RSA10a — the switch-to-basic test expects authorize() to leave token auth
+
+- **Spec point:** RSA10a (test `rest/unit/RSA16d/null-after-switch-to-basic-3`, `uts/rest/unit/auth/token_details.md`).
+- **What the features spec says:** `(RSA10a)` "Instructs the library to create a token immediately and ensures Token Auth is used for all future requests."
+- **What the UTS spec gets wrong:** it calls `authorize(authOptions: AuthOptions(key: ..., useTokenAuth: false))` and expects the client to be on Basic auth with `tokenDetails == null`; `authorize()` always creates a token and keeps token auth.
+- **Draft fix:** drop the step, or build a second client with `useTokenAuth: false` to cover RSA16d for Basic auth (already covered by `null-with-basic-auth-0`).
+- **Test impact:** `TokenDetailsTests.RSA16d_NullAfterSwitchToBasic` is a skipped placeholder.
+
+### RSA15a / RSA15c — REST unit tests expect a construction-time throw with code 40102
+
+- **Spec point:** RSA15a, RSA15c (tests `rest/unit/RSA15a/token-clientid-must-match-0`, `rest/unit/RSA15c/incompatible-clientid-error-0`, `uts/rest/unit/auth/client_id.md`).
+- **What the features spec says:** `(RSA15a)` "Any `clientId` provided in `ClientOptions` must match any non wildcard (`'*'`) `clientId` value in `TokenDetails` or `connectionDetails` of the `CONNECTED` `ProtocolMessage`, where applicable"; `(RSA15c)` "Following an auth request which uses a `TokenDetails` or `TokenRequest` object that contains an incompatible `clientId`, the library should in the case of Realtime transition the connection state to `FAILED`, and in the case of REST result in an appropriate error response".
+- **What the UTS spec gets wrong:** the same timing problem as the realtime "RSA7" entry above: the tests expect `Rest(...)` itself to throw, with code 40102 (a code and a construction-time throw that features.md does not name). RSA15c's REST case is "an appropriate error response" following an auth request; the RSA15c test has no setup, steps or assertions of its own.
+- **Draft fix:** assert the error on the first request (as `rest/unit/RSA7/clientid-mismatch-error-1` does, see the "RSA15 — no clientId mismatch error" Failing Tests entry).
+- **Test impact:** `ClientIdTests.RSA15a_TokenClientidMustMatch`, `ClientIdTests.RSA15c_IncompatibleClientidError` are skipped placeholders.
+
+### RSL1k1 / RSL1k3 — idempotent id expectations in the publish tests
+
+- **Spec point:** RSL1k1, RSL1k3, RSAN1c4 (tests `rest/unit/RSL1k/mixed-ids-in-batch-1`, `rest/unit/RSL1k2/message-id-format-0`, `rest/unit/RSAN1c4/idempotent-id-generated-0`, `rest/unit/RSL1e/null-name-and-data-0`; `uts/rest/unit/channel/idempotency.md`, `annotations.md`, `publish.md`).
+- **What the features spec says:** `(RSL1k1)` "Idempotent publishing via library-generated `Message` `id` s is supported if `idempotentRestPublishing` (see TO3n) is enabled and one or more `Message` instances are passed to `publish()` and all `Message` s have an empty `id` attribute. The library generates a base `id` string by base64-encoding a sequence of at least 9 bytes obtained from a source of randomness."; `(RSL1k3)` "If more than one `Message` is passed to `publish()` and one or more of those messages contains a non-empty `id` attribute, then all message ids (present or absent) are preserved on sending the batch of messages."; `(RSAN1c4)` "... base64-encoding a sequence of at least 9 bytes ...".
+- **What the UTS spec gets wrong:**
+  - `mixed-ids-in-batch-1` expects a library-generated id for the message without an id when others in the batch carry ids; RSL1k3 says absent ids stay absent.
+  - `message-id-format-0` and `idempotent-id-generated-0` require the base part to match `[A-Za-z0-9_-]+` (url-safe base64); features says only "base64-encoding", and the SDK uses standard base64 (`+`, `/`, `=` possible; the unit run produced `tokM1+weTvMo`).
+  - `null-name-and-data-0` compares the whole body with `[{"data": "hello"}]` etc., but `idempotentRestPublishing` defaults to true (TO3n), so RSL1k1 adds an `id` to each message.
+- **Draft fix:** mixed ids: expect `id` absent on the middle message (or assert RSL1k3 preservation). Pattern: `[A-Za-z0-9+/_-]+=*`. RSL1e: set `idempotentRestPublishing: false` in the test, or compare the body ignoring `id`.
+- **Test impact:** `IdempotencyTests.RSL1k_MixedIdsInBatch` is a skipped placeholder (its subject is the over-specified behaviour). `IdempotencyTests.RSL1k2_MessageIdFormat` and `AnnotationsTests.RSAN1c4_IdempotentIdGenerated` are adapted to the base64 alphabet; `PublishTests.RSL1e_NullNameAndData` removes the generated `id` before comparing (each with a `// NOTE:`), not skipped.
+
+### RSL4d3 — a JSON object payload is a string on the wire
+
+- **Spec point:** RSL4d3 (test `rest/unit/RSL1a/publish-message-array-1`, `uts/rest/unit/channel/publish.md`).
+- **What the features spec says:** `(RSL4d3)` "a JSON Message payload is stringified either as a JSON Object or Array and represented as a JSON string and the `encoding` attribute is set to \"json\"".
+- **What the UTS spec gets wrong:** it asserts `body[1]["data"] == { "key": "value" }` (a raw JSON object in the request body); the payload is a string containing the JSON, with `encoding: "json"`.
+- **Draft fix:** assert `parse_json(body[1]["data"]) == { "key": "value" }` (and `body[1]["encoding"] == "json"`).
+- **Test impact:** `PublishTests.RSL1a_PublishMessageArray` parses the string before comparing (`// NOTE:`), not skipped.
+
+### RSL4 — the encoding-fixtures test loads an `encoding.json` that does not exist in ably-common
+
+- **Spec point:** RSL4, RSL6a1 (test `rest/unit/RSL4/encoding-fixtures-ably-common-0`, `uts/rest/unit/encoding/message_encoding.md`).
+- **What the features spec says:** `(RSL6a1)` "A set of tests must exist to ensure that the client library provides data encoding & decoding interoperability with other client libraries. The tests must use the [set of predefined interoperability message fixtures](https://github.com/ably/ably-common/blob/main/test-resources/messages-encoding.json) ...".
+- **What the UTS spec gets wrong:** it calls `load_fixtures("encoding.json")` and reads `input_data`, `expected_wire_data`, `expected_encoding` and `use_binary_protocol`. No `encoding.json` exists in ably-common (neither in the vendored `common` @ 133665b nor upstream main); the test-resources folder holds `messages-encoding.json` and `presence-messages-encoding.json`, whose entries have `data`, `encoding`, `expectedType` and `expectedValue`.
+- **Draft fix:** point the spec at `messages-encoding.json` and use its field names (or add the fixture to ably-common).
+- **Test impact:** `MessageEncodingTests.RSL4_EncodingFixturesAblyCommon` is a skipped placeholder.
+
+### TM2s1 / TM2u — the defaults tests apply the received-message defaults to a locally deserialised JSON object
+
+- **Spec point:** TM2s, TM2s1, TM2s2, TM2u (tests `rest/unit/TM2s1/version-defaults-from-message-0`, `rest/unit/TM2u/annotations-defaults-empty-0`, `uts/rest/unit/types/mutable_message_types.md`).
+- **What the features spec says:** `(TM2s)` "`version` - an object containing information about the latest version of a message. If a message received from Ably (whether over realtime or REST) does not contain a `version` object the SDK must initialize a `version` object and set a subset of fields as specified below."; `(TM2u)` "`annotations` - an object of type `MessageAnnotations`. If not set on the wire, the SDK must set it to an empty `MessageAnnotations` object."
+- **What the UTS spec gets wrong:** both tests call `Message.fromJson({...})` on a local object and expect the defaults; `fromJson` is not a features-spec operation and a locally deserialised object is not "a message received from Ably". The SDK applies the defaults on its receive paths (REST history, realtime delivery; `MessageHandler.ApplyTm2Defaults`), not in `JsonHelper` deserialisation, so `Version` and `Annotations` are null here (`Expected msg.Version not to be <null>`).
+- **Draft fix:** drive the test through a received path (a REST history or get-message response) instead of `fromJson`.
+- **Test impact:** `MutableMessageTypesTests.TM2s1_VersionDefaultsFromMessage`, `TM2u_AnnotationsDefaultsEmpty` are skipped placeholders (the test's subject is the over-specified detail, so the RULE's placeholder form applies).
+
+### TP3h — member-key test asserts the order "connectionId:clientId"
+
+- **Spec point:** TP3h (test `rest/unit/TP3h/member-key-combines-ids-0`, `uts/rest/unit/types/presence_message_types.md`).
+- **What the features spec says:** `(TP3h)` "`memberKey` string function that combines the `connectionId` and `clientId` ensuring multiple connected clients with the same clientId are uniquely identifiable".
+- **What the UTS spec gets wrong:** it asserts `"conn-1:user-1"`; TP3h fixes no order. The SDK builds `"{ClientId}:{ConnectionId}"` (`user-1:conn-1`).
+- **Draft fix:** assert only that the key differs for different connectionIds and is the same for equal ids (or fix an order in features.md).
+- **Test impact:** adapted to the features-permitted behaviour, not skipped: `PresenceMessageTypesTests.TP3h_MemberKeyCombinesIds` asserts `user-1:conn-1` / `user-1:conn-2` with a `// NOTE:`.
+
+### TP3 — the presence toJson tests expect the action as the string "enter"
+
+- **Spec point:** TP3, TP3b (tests `rest/unit/TP3/presence-to-json-2`, `rest/unit/TP3/null-attributes-omitted-3`, `uts/rest/unit/types/presence_message_types.md`).
+- **What the features spec says:** `protocol.md` (Presence Message) "Action state := The presence action (`ABSENT`, `PRESENT`, `ENTER`, `LEAVE`, or `UPDATE`) encoded as the ordinal in the [PresenceMessage Action](/api/realtime-sdk/types#presence-action) enum."; `(TP3b)` "`action` enum".
+- **What the UTS spec gets wrong:** both tests assert `json_data["action"] == "enter"` on the serialised wire form, but the wire form is the ordinal (the same corpus uses `"action": 1` in `rest/unit/TG/pagination-presence-results-7`). The SDK serialises `2`.
+- **Draft fix:** assert the numeric ordinal (`2` for ENTER).
+- **Test impact:** `PresenceMessageTypesTests.TP3_PresenceToJson`, `TP3_NullAttributesOmitted` are skipped placeholders.
+
+### RSP4 — the presence-history pagination test expects LEAVE for wire action 4
+
+- **Spec point:** RSP4, TP2 (test `rest/unit/RSP4/history-pagination-1`, `uts/rest/unit/presence/rest_presence.md`).
+- **What the features spec says:** `(TP2)` "`PresenceMessage` `Action` enum has the following values in order from zero: `ABSENT`, `PRESENT`, `ENTER`, `LEAVE`, `UPDATE`", so LEAVE is 3 and UPDATE is 4.
+- **What the UTS spec gets wrong:** the second page is `{ "action": 4, ... }` and the test asserts `page2.items[0].action == PresenceAction.leave`. The spec's own `RSP4a/history-returns-paginated-1` and `RSP5/presence-action-mapping-8` use 3 for leave and 4 for update (the trailing note "some SDKs use 4" is not in features).
+- **Draft fix:** change the second page's action to 3 (or assert `PresenceAction.update`).
+- **Test impact:** `RestPresenceTests.RSP4_HistoryPagination` is a skipped spec-error placeholder.
+
+### RSP5 — the cipher test's encrypted fixture cannot be decrypted
+
+- **Spec point:** RSP5, RSL6a (test `rest/unit/RSP5/decode-cipher-channel-7`, `uts/rest/unit/presence/rest_presence.md`).
+- **What the features spec says:** `(RSL6a)` "All messages received will be decoded automatically based on the `encoding` field (by inverting the encoding rules of RSL4 and applying the decryption rules of RSL5 ...)".
+- **What the UTS spec gets wrong:** `encrypted_data = "HO4cYSP8LybPYBPZPHQOtuD53yrD3YV3NBoTEYBh4U0="` (commented "Encrypted data for {"secret":"data"}") is 32 bytes, an IV plus one block. With the key `WUP6u0K7MXI5Zeo0VppPwg==` and AES-128-CBC it decrypts to the truncated text `{"example":{"jso` (no valid PKCS7 padding), not `{"secret":"data"}`. The SDK leaves the message undecoded (`encoding` stays `json/utf-8/cipher+aes-128-cbc`, per RSL6b), so no compliant SDK can pass the `data IS Object` assertion.
+- **Draft fix:** use a ciphertext that really encrypts `{"secret":"data"}` (IV + two blocks), for example generated with the same key, or a fixture from ably-common `crypto-data-128.json`.
+- **Test impact:** `RestPresenceTests.RSP5_DecodeCipherChannel` is a skipped spec-error placeholder.
+
+### RSC15l — tests stub one response for a status or timeout that triggers a fallback retry
+
+- **Spec point:** RSC15l, RSC19d (tests `rest/unit/RSC19d/response-status-code-0`, `rest/unit/RSC19d/response-success-indicator-1`, `uts/rest/unit/request.md`; `rest/unit/RSC13/request-timeout-enforced-0` and `rest/unit/RSC8e/unsupported-content-type-0`, `uts/rest/unit/rest_client.md`).
+- **What the features spec says:** `(RSC15l)` "Errors that necessitate use of an alternative host include any of the following conditions", including `(RSC15l2)` "request timeout" and the 500-504 statuses; `(RSC15a)` "In the case of an error necessitating use of an alternative host ... try `fallback domains` in random order, continuing to try further domains if qualifying errors occur".
+- **What the UTS spec gets wrong:** the tests queue a single 500 response (RSC19d: status 500; RSC8e Case 1) or a request that times out (RSC13) on a client with the default fallback hosts, then expect that response or timeout to surface. The SDK correctly retries on a fallback host, where the mock has nothing queued, so the mock fails the retry ("nothing answered the request GET https://main.x.fallback.ably-realtime.com/..."). Observed.
+- **Draft fix:** set `fallbackHosts: []` in those tests (as `rest/unit/RSC19e/network-error-propagated-0` does), or queue a response for every host. With `fallbackHosts: []` the two RSC19d tests pass and RSC13 gets the `HttpClient.Timeout` error ("... configured HttpClient.Timeout ... elapsing", code 50000; the `timeout` match is case-insensitive).
+- **Test impact:** `RequestTests.RSC19d_ResponseStatusCode`, `RSC19d_ResponseSuccessIndicator`, `RestClientTests.RSC13_RequestTimeoutEnforced`, `RSC8e_UnsupportedContentType` are skipped placeholders. Behind the RSC8e stub there is an SDK deviation, observed with `fallbackHosts: []`: Case 2 (200 `text/html`) throws `ArgumentNullException` (`JsonHelper.DeserializeObject`, parsing a null text body) instead of the `statusCode` 400 / code 40013 error that `(RSC8e2)` requires ("In the case of a response with a `statusCode` less than 400, an error must be propagated back to the caller with a `statusCode` of 400, a `code` of `40013`"); Case 1 gives the 500 as `(RSC8e1)` requires. Open bug once the spec is fixed. The two `RequestTests.RSC19d_*` placeholders are inherited by `RealtimeTests.Unit.RealtimeRequestTests` (RTC9) and skipped the same way.
+
+### RSC15f — the cached-fallback tests assume the first fallback host is `main.a`
+
+- **Spec point:** RSC15f, RSC15a (tests `rest/unit/RSC15f/successful-fallback-cached-0`, `rest/unit/RSC15f/cached-fallback-expires-1`, `uts/rest/unit/fallback.md`).
+- **What the features spec says:** `(RSC15a)` "try `fallback domains` in random order"; `(RSC15f)` "Once/if a given fallback host succeeds, the client should store that successful fallback host for `ClientOptions.fallbackRetryTimeout`".
+- **What the UTS spec gets wrong:** the mock queues the fallback success only for `main.a.fallback.ably-realtime.com` (`queue_response_for_host`), but the first fallback host is any of `main.[a-e].fallback...`, so most runs send the fallback request to a host nothing answers. `rest/unit/RSC15f/expired-not-resurrected-2` avoids the assumption and passes.
+- **Draft fix:** answer by role instead of host (a handler: the primary fails, any other host answers `[ms]`), as `expired-not-resurrected-2` does, and read the cached host from the first fallback request.
+- **Test impact:** `FallbackTests.RSC15f_SuccessfulFallbackCached`, `RSC15f_CachedFallbackExpires` are skipped placeholders.
+
+### RSC7d1 — the Ably-Agent test restricts the library name to `ably-[a-z]+`
+
+- **Spec point:** RSC7d1 (test `rest/unit/RSC7d/ably-agent-header-format-0`, `uts/rest/unit/rest_client.md`).
+- **What the features spec says:** `(RSC7d1)` "This must include at least the `<library name>/<library version>` entry plus, optionally, the `name[/version]` entry for underlying library layer or platform layers. An example would be `ably-flutter/1.2.0 ably-java/1.2.1 android/24`."
+- **What the UTS spec gets wrong:** it matches `ably-[a-z]+/[0-9]+\.[0-9]+\.[0-9]+`, which rejects a library name with a hyphen; the SDK sends `ably-pubsub-dotnet/2.0.0 dotnet6/6.0.29 dotnet-macOS`.
+- **Draft fix:** match `ably-[a-z-]+/[0-9]+\.[0-9]+\.[0-9]+`.
+- **Test impact:** adapted to the features-permitted behaviour, not skipped: `RestClientTests.RSC7d_AblyAgentHeaderFormat` uses `ably-[a-z-]+/...` with a `// NOTE:`.
+
+### RSC18 — the basic-auth-over-http test expects a construction-time error
+
+- **Spec point:** RSC18 (test `rest/unit/RSC18/basic-auth-over-http-rejected-1`).
+- **What the features spec says:** `(RSC18)` "Basic Auth over HTTP will result in an error as private keys cannot be submitted over an insecure connection". It doesn't say when.
+- **What the UTS spec gets wrong:** it expects `Rest(...)` itself to throw. The SDK raises the error on the first authenticated request.
+- **Draft fix:** assert the error on an authenticated request (for example `stats()`; `time()` sends no credentials, RSC16).
+- **Test impact:** adapted to the features-permitted behaviour, not skipped: the test constructs the client and asserts the error on `StatsAsync()` with a `// NOTE:`. The error content is a separate SDK deviation, see "RSC18" under Failing Tests.
+
+### RSC6a — the no-parameters stats test asserts the request omits every query parameter
+
+- **Spec point:** RSC6a, RSC6b2-4 (test `rest/unit/RSC6a/no-params-clean-request-2`, `uts/rest/unit/stats.md`).
+- **What the features spec says:** the IDL marks `direction`, `limit` and `unit` `api-default`: "`Type api-default value` denotes that the Ably server API uses those defaults and therefore it is unnecessary for the client library to send these default values to the API".
+- **What the UTS spec gets wrong:** it asserts `request.query_params IS empty` after `stats()` with no arguments. Sending the defaults (the SDK sends `direction=backwards`, `limit=100`, `by=minute`) is permitted.
+- **Draft fix:** assert each parameter "absent OR the default", as `direction-defaults-backwards-1`, `limit-defaults-to-100-1`, `unit-defaults-to-minute-1` and `rest_presence.md` do.
+- **Test impact:** `StatsTests.RSC6a_NoParamsCleanRequest` is a skipped placeholder (the test's subject is the omission). The test is inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), where it is skipped the same way.
+
 ## Failing Tests
 
 ### RTN4c — errorReason is set after a client-initiated close
@@ -231,7 +401,7 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **What the features spec says:** `(RSA4e)` "If in the course of a REST request ... an attempt to authenticate using `authUrl` or `authCallback` fails due to a timeout, network error, a token in an invalid format (per RSA4f), or some other auth error condition other than an explicit `ErrorInfo` from Ably, the request should result in an error with `code` 40170, `statusCode` 401, and a suitable error message".
 - **What the SDK does:** "Expected error.Code to be 40170, but found 80019".
 - **Root cause:** `AblyAuth.RequestTokenAsync` wraps every authCallback exception as `ErrorCodes.ClientAuthProviderRequestFailed` (80019, the realtime RSA4c1 code) with the original as `Cause`, for REST and realtime alike (`rest-mapping.md` section 7).
-- **Test impact:** `AuthCallbackErrorsTests.RSA4e_RestCallbackError40170`, env-gated.
+- **Test impact:** `AuthCallbackErrorsTests.RSA4e_RestCallbackError40170`, env-gated; and `AuthCallbackTests.RSA8d_CallbackErrorPropagated` (`rest/unit/RSA8d/callback-error-propagated-4`, spec-correct: `error.message` contains the callback's message; the wrapper's message is "Error calling AuthCallback, token request failed..." and the original lives in `Cause`), env-gated.
 - **Status:** open bug.
 
 ### RSA4f / RSA4c1 — an authCallback result of an invalid type gives statusCode 400, not 401
@@ -514,50 +684,386 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Test impact:** `ConnectionPingTests.RTN13d_PingDeferredConnecting`, `ConnectionPingTests.RTN13c_DeferredPingTimeout` and `ConnectionPingTests.RTN13d_PingDeferredDisconnected` (the last passes only when the instant reconnect wins the race with `ping()`; it failed with "Unable to ping service; not connected" in a parallel run): `[DeviationFact("RTN13d")]`.
 - **Status:** open bug.
 
-### RTN26 / RTL25 — `whenState` is missing (Connection and RealtimeChannel)
+### RSC10 — request() is not retried with a renewed token after a token error
 
-- **Spec point:** RTN26, RTL25. Tests: `WhenStateTests` (6: `realtime/unit/RTN26a/immediate-callback-current-state-0`, `RTN26b/deferred-callback-future-state-0`, `RTN26b/fires-only-once-1`, `RTN26a/multiple-whenstate-calls-1`, `RTN26a/no-fire-for-past-state-2`, `RTN26/whenstate-different-states-0`) and `ChannelWhenStateTests` (4: `RTL25a/resolves-immediately-current-0`, `RTL25b/waits-for-state-change-0`, `RTL25b/fires-once-only-1`, `RTL25a/past-state-does-not-resolve-1`).
-- **What the features spec says:** "`(RTN26)` `Connection#whenState` function" — "`(RTN26a)` If the connection is already in the given state, calls the listener with a \`null\` argument"; "`(RTL25)` `RealtimeChannel#whenState` function" — "`(RTL25a)` If the channel is already in the given state, calls the listener with a \`null\` argument".
-- **What the SDK does:** the API is missing: neither `Connection` nor `IRealtimeChannel` has `WhenState` (`realtime-mapping.md` §12, Missing APIs). Every test needs the method, so none can run.
-- **Test impact:** 10 skipped stubs (`Skip = "Missing SDK API: …"`, spec lines kept as comments); they can't be written until the API exists.
-- **Other SDKs:** Not present in ably-java or ably-cocoa either (no `whenState` in their sources); a newer spec point no SDK here implements.
-- **Status:** open: feature not implemented in this SDK (moved from Mock Infrastructure Limitations: a missing SDK API is SDK non-compliance, not a mock gap).
+- **Spec point:** RSC10, RSA4b (test `rest/integration/RSC10/token-renewal-expired-jwt-0`, `uts/rest/integration/auth.md`).
+- **What the spec says:** `(RSC10)` "If a REST request responds with a token error (401 HTTP status code and an Ably error value `40140 <= code < 40150`), then the Auth class is responsible for reissuing a token and the request should be reattempted"; `(RSA4b)` "the client should automatically make a single attempt to reissue the token and resend the request using the new token".
+- **What the SDK does:** `client.Request("GET", "/channels/…")` with an `authCallback` whose first token is an expired JWT returns the server's 401 / 40142 "Token expired" response; the callback is called once, not twice, and the request is not retried (`Expected ((int)result.StatusCode) to be less than 300, but found 401`).
+- **Root cause:** `PubSubHttpClient.HttpPaginatedRequestInternal` (the `Request` / `RequestV2` path) sets `request.NoExceptionOnHttpError = true`, so the 401 comes back as a response; the reauthorise-and-retry lives only in `PubSubHttpClient.ExecuteRequest`'s `catch (AblyException ex)` branch (`IsUnAuthorizedError && IsTokenError`), which is never entered. Other REST operations (which throw on HTTP errors) do renew.
+- **Test impact:** `RestTests.Integration.AuthTests.RSC10_TokenRenewalExpiredJwt`, env-gated `[DeviationFact("RSC10")]` with the spec-correct assertions (request succeeds, callback invoked twice). The spec's `generate_jwt(expires_at: now() - 5_seconds)` is `GenerateJwt(…, expiresAt: DateTimeOffset.UtcNow.AddSeconds(-5))`.
+- **Status:** open bug.
 
-### RTL22 — `subscribe(MessageFilter, …)` is missing
+### RSH1b1 — deviceRegistrations.get() sends the local device's credentials for any deviceId
 
-- **Spec point:** RTL22. Tests (`ChannelSubscribeTests`, 5): `realtime/unit/RTL22a/filter-matching-name-0`, `RTL22a/filter-matching-ref-timeserial-1`, `RTL22a/filter-matching-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0`.
-- **What the features spec says:** "`(RTL22)` Methods must be provided for attaching and removing a listener which only executes when the message matches a set of criteria."
-- **What the SDK does:** the API is missing: no `Subscribe` overload takes a `MessageFilter` (`realtime-mapping.md` §12).
-- **Test impact:** 5 skipped stubs (`Skip = "Missing SDK API: …"`, spec lines kept as comments); they can't be written until the API exists.
-- **Other SDKs:** Not present in ably-java or ably-cocoa either (no `MessageFilter`).
-- **Status:** open: feature not implemented in this SDK (moved from Mock Infrastructure Limitations: a missing SDK API is SDK non-compliance, not a mock gap).
+- **Spec point:** RSH1b1, RSH6 (tests `rest/integration/RSH1b3/save-and-get-device-0`, `RSH1b3/update-device-registration-1`, `RSH1b1/get-unknown-device-error-0`, `RSH1b4/remove-device-0`; `uts/rest/integration/push_admin.md`).
+- **What the spec says:** `(RSH1b1)` "`#get(deviceId)` performs a request to /push/deviceRegistrations/:deviceId and returns a `DeviceDetails` object if the `deviceId` is found or results in a not found error if the device cannot be found. If the client has been activated as a push target device, and the specified `deviceId` is that of the present client, then this request must include push device authentication."
+- **What the SDK does:** every `DeviceRegistrations.GetAsync(id)` carries the client's own local-device authentication (here `X-Ably-DeviceSecret`, as the device is not activated), whatever `id` is. The sandbox rejects it: 401 / 40100 "Incompatible deviceSecret specified for device access", so a get of a just-saved device throws instead of returning it, and a get of an unknown or removed device gives 401 instead of 404.
+- **Root cause:** `PushAdmin` `IDeviceRegistrations.GetAsync` calls `AddDeviceAuthenticationToRequest(request, _restClient.Device)` unconditionally (contrast `IPushChannelSubscriptions.SaveAsync`, which adds it only when `subscription.DeviceId == _restClient.Device?.Id`). The integration factory gives each client a `LocalDevice` with a `DeviceSecret` (as the Device door does on a real device); a server-door client with no mobile device has no local device and is not affected.
+- **Test impact:** `RestTests.Integration.PushAdminTests.RSH1b3_SaveAndGetDevice`, `RSH1b3_UpdateDeviceRegistration`, `RSH1b1_GetUnknownDeviceError`, `RSH1b4_RemoveDevice`, env-gated `[DeviationFact("RSH1b1")]` with the spec-correct assertions. The save, list, remove and removeWhere tests pass.
+- **Status:** open bug.
 
-### RTL10b — channel history has no `untilAttach`
+### RSC15l4 — a `Server: CloudFront` 4xx response does not trigger fallback
+
+- **Spec point:** RSC15l, RSC15l4 (test `rest/proxy/RSC15l4/cloudfront-header-fallback-0`, `uts/rest/integration/proxy/rest_fallback.md`).
+- **What the spec says:** `(RSC15l)` "Errors that necessitate use of an alternative host include any of the following conditions"; `(RSC15l4)` "a response with a `Server: CloudFront` header and an HTTP status code `>= 400`".
+- **What the SDK does:** with `fallbackHosts: ["localhost"]` and the proxy answering the first `/time` with 403 + `Server: CloudFront`, `client.time()` throws the parsed 403 / 40300 "Forbidden" at once; no fallback request is made.
+- **Root cause:** `AblyHttpRequester.IsRetryableResponse` returns `ErrorInfo.IsRetryableStatusCode(response.StatusCode)` only (500–504); the `Server` header is never inspected.
+- **Test impact:** `RestTests.Integration.Proxy.RestFallbackTests.RSC15l4_CloudfrontHeaderFallback`, env-gated `[DeviationFact("RSC15l4")]` with the spec-correct assertions.
+- **Also affected:** `FallbackTests.RSC15l4_CloudfrontErrorTriggersFallback` (`rest/unit/RSC15l4/cloudfront-error-triggers-fallback-0`), env-gated `[DeviationFact("RSC15l4")]`: `time()` throws the 403 at once.
+- **Status:** open bug.
+
+### RSA5 / RSA6 — createTokenRequest() defaults ttl and capability client-side
+
+- **Spec point:** RSA5, RSA6 (tests `rest/unit/RSA5/ttl-null-when-unspecified-0`, `rest/unit/RSA6/capability-null-when-unspecified-0`).
+- **What the features spec says:** `(RSA5)` "If the user-provided `tokenParams` does not specify a TTL, the TTL field should be omitted from the `tokenRequest`, and Ably will supply a token with a TTL of 60 minutes"; `(RSA6)` "If the user-provided `tokenParams` does not specify capabilities, the `capability` field should be omitted from the `tokenRequest`".
+- **What the SDK does:** the request carries `ttl` 1 h and `capability` `{"*":["*"]}` (`Did not expect a value, but found 1h.`, `Expected tokenRequest.Capability to be <null>, but found {"*":["*"]}`).
+- **Root cause:** `AblyAuth.CreateTokenRequestAsync` falls back to `TokenParams.WithDefaultsApplied()` and `TokenRequest.Populate` applies `Defaults.DefaultTokenTtl` and `Capability.AllowAll`.
+- **Test impact:** `TokenRequestParamsTests.RSA5_TtlNullWhenUnspecified`, `RSA6_CapabilityNullWhenUnspecified`, env-gated `[DeviationFact]`.
+- **Status:** open bug.
+
+### RSA15 — no clientId mismatch error for a token whose clientId differs from ClientOptions
+
+- **Spec point:** RSA15a, RSA15c (test `rest/unit/RSA7/clientid-mismatch-error-1`, `uts/rest/unit/auth/client_id.md`).
+- **What the features spec says:** `(RSA15a)` "Any `clientId` provided in `ClientOptions` must match any non wildcard (`'*'`) `clientId` value in `TokenDetails` ..."; `(RSA15c)` "... in the case of REST result in an appropriate error response".
+- **What the SDK does:** with `clientId: "client-a"` and a `TokenDetails` for `client-b`, `channel.status()` succeeds (`Expected a <AblyException> to be thrown, but no exception was thrown`); no mismatch check exists in `AblyAuth`.
+- **Test impact:** `ClientIdTests.RSA7_ClientidMismatchError`, env-gated `[DeviationTheory("RSA15a")]` with all 5 table rows; only row 2 fails, but the passing rows are gated too because a theory cannot be split.
+- **Status:** open bug.
+
+### RSA15b / RSA7b — a wildcard token overrides the ClientOptions clientId in Auth.clientId
+
+- **Spec point:** RSA15b (test `rest/unit/RSA15b/wildcard-token-permits-any-0`).
+- **What the features spec says:** `(RSA15b)` "If the clientId from `TokenDetails` or `connectionDetails` contains only a wildcard string '\*', then the client is permitted to be either unidentified ... or identified by providing a `clientId` when communicating with Ably"; `(RSA7b1)` Auth#clientId is not null when "A `clientId` is provided in the `ClientOptions`".
+- **What the SDK does:** with `clientId: "any-client"` and a `"*"` token, `Auth.ClientId` is `"*"` (`Expected client.Auth.ClientId to be "any-client" ... but "*"`).
+- **Root cause:** `AblyAuth.ClientId` prefers `CurrentToken.ClientId` over `Options.GetClientId()`.
+- **Test impact:** `ClientIdTests.RSA15b_WildcardTokenPermitsAny`, env-gated.
+- **Status:** open bug.
+
+### RSA16d — Auth#tokenDetails stays set after a failed renewal
+
+- **Spec point:** RSA16d (test `rest/unit/RSA16d/null-after-invalidation-2`).
+- **What the features spec says:** `(RSA16d)` "Is `null` if there is no current token, including after a previous token has been determined to be invalid or expired, or if the library is using basic auth".
+- **What the SDK does:** after the server rejects the token (40142) and the renewal fails, `AblyAuth.CurrentToken` still holds the first token (the test reads it as described under the RSA16 Adapted Tests entry).
+- **Root cause:** `AblyAuth` never clears `CurrentToken` when a token error or a failed renewal occurs.
+- **Test impact:** `TokenDetailsTests.RSA16d_NullAfterInvalidation`, env-gated.
+- **Status:** open bug.
+
+### RSA8d / RSA4f — a token string returned by authCallback is parsed as a TokenRequest
+
+- **Spec point:** RSA8d, RSA4f (tests `rest/unit/RSA8d/callback-returns-jwt-1`, `rest/unit/RSA16b/token-string-from-callback-1`).
+- **What the features spec says:** `(RSA8d)` "... expects either a token string, a `TokenDetails` object or a `TokenRequest` object to be returned"; `(RSA4f)` the object is invalid only if "neither a `String`, `JsonObject`, `TokenRequest` object, nor `TokenDetails` object".
+- **What the SDK does:** the request fails with 80019 whose cause is a `JsonReaderException` ("AuthCallback returned a string which can't be converted to TokenRequest").
+- **Root cause:** `AblyAuth.RequestTokenAsync` sends a returned `string` through `GetTokenRequest`, which deserialises it as `TokenRequest` JSON, so a raw token or JWT never works (`rest-mapping.md` section 9).
+- **Test impact:** `AuthCallbackTests.RSA8d_CallbackReturnsJwt`, `TokenDetailsTests.RSA16b_TokenStringFromCallback`, env-gated.
+- **Status:** open bug.
+
+### RSA8c — an authUrl JSON TokenDetails without `issued` is treated as a TokenRequest
+
+- **Spec point:** RSA8c (tests `rest/unit/RSA4/authurl-triggers-token-3`, `rest/unit/RSA8c/authurl-invoked-for-auth-0`, `rest/unit/RSA4b/renewal-via-authurl-2`).
+- **What the features spec says:** `(RSA8c)` the token is "taken to be a `TokenRequest` or `TokenDetails` object if the response has `Content-Type` `"application/json"`".
+- **What the SDK does:** an authUrl response `{"token": ..., "expires": ...}` is treated as a `TokenRequest` and exchanged at `/keys/<keyName>/requestToken` (the next captured request has no `Authorization` header; in the renewal test the exchange response fails to deserialise).
+- **Root cause:** `AblyAuth.RequestTokenAsync` uses `TokenDetails.IsToken(json)`, which requires an `issued` member.
+- **Test impact:** `AuthSchemeTests.RSA4_AuthUrlTriggersToken`, `AuthCallbackTests.RSA8c_AuthUrlInvokedForAuth`, `TokenRenewalTests.RSA4b_RenewalViaAuthurl`, env-gated.
+- **Status:** open bug.
+
+### RSA8c — a failing authUrl request is retried
+
+- **Spec point:** RSA8c (test `rest/unit/RSA8c/authurl-error-propagated-5`).
+- **What the features spec says:** `(RSA8c)` only defines how the authUrl is queried; it does not say whether a failed query is retried. The UTS spec asserts a single authUrl request after its 500.
+- **What the SDK does:** the authUrl is requested 4 times (the request goes through the same retrying HTTP requester as Ably requests, `HttpMaxRetryCount`), then fails.
+- **Test impact:** `AuthCallbackTests.RSA8c_AuthUrlErrorPropagated`, env-gated.
+- **Status:** open bug (to be confirmed with the SDK team): the SDK applies its Ably-host retry policy (`HttpMaxRetryCount`) to a custom authUrl, and features.md defines no retry for authUrl.
+
+### RSL8 — `status()` does not URI-encode the channel name in the path
+
+- **Spec point:** RSL8 (test `rest/unit/RSL8/status-special-chars-encoded-1`, `uts/rest/unit/channel/rest_channel_attributes.md`).
+- **What the spec says:** the UTS test asserts the path ends with `"/channels/" + encode_uri_component("namespace:my channel")`, i.e. `/channels/namespace%3Amy%20channel`. `(RSL8)` itself says only "makes a http get request to `<restHost>/channels/<channelId>`" and does not state an encoding rule (classification to be confirmed: SDK deviation versus UTS over-specification, since `:` is legal in a path segment).
+- **What the SDK does:** `HttpChannel.StatusAsync` builds `"/channels/" + Name` without `EncodeUriPart` (every other channel endpoint encodes); the path sent is `/channels/namespace:my%20channel` (the space is escaped by `System.Uri`, the colon is not).
+- **Test impact:** `RestChannelAttributesTests.RSL8_StatusSpecialCharsEncoded`, env-gated `[DeviationFact]` with the spec-correct assertion.
+- **Status:** open bug (inconsistent with the other channel endpoints), pending confirmation.
+
+### TI — `ErrorInfo` has no value equality
+
+- **Spec point:** TI (test `rest/unit/TI/error-equality-5`).
+- **What the spec says:** the UTS test requires two `ErrorInfo` objects with the same code, statusCode and message to be equal and one with a different code to differ. The features spec (TI1-TI5) is silent on equality, so the UTS is the requirement.
+- **What the SDK does:** `ErrorInfo` overrides neither `Equals` nor `GetHashCode` (reference equality): `Expected error1 to be [ErrorInfo ...] because same content, but found [ErrorInfo ...]`.
+- **Root cause:** `Types/ErrorInfo.cs`.
+- **Test impact:** `ErrorTypesTests.TI_ErrorEquality` is env-gated (`[DeviationFact("TI")]`).
+- **Status:** open bug (low priority).
+
+### TG — a `Link` header URL without a query string crashes the parser
+
+- **Spec point:** TG (test `rest/unit/TG/link-header-parsing-1`).
+- **What the spec says:** a Link header such as `</path>; rel="first"`, alone or after `</path?cursor=abc>; rel="next"`, is parsed to the right pagination state (`hasNext` false or true). `(TG2)` "Instantiating this type should not result in an error if paging headers are not returned from the REST API"; features is silent on the link URL's form, so the UTS is the requirement.
+- **What the SDK does:** `PaginatedRequestParams.GetLinkQuery` does `url.Split('?')[1]`, so a link without `?` throws `IndexOutOfRangeException` while the `PaginatedResult` is built.
+- **Root cause:** `PaginatedRequestParams.cs` (`GetLinkQuery`).
+- **Test impact:** `PaginatedResultTests.TG_LinkHeaderParsing` is env-gated (`[DeviationFact("TG")]`); it fails on its second case.
+- **Status:** open bug.
+
+### TP3 — `PresenceMessage` JSON deserialisation does not decode `data` / `encoding`
+
+- **Spec point:** TP3 (test `rest/unit/TP3/presence-encoded-data-from-json-1`).
+- **What the spec says:** "Deserialization must decode data based on the encoding field" (`json` gives an object, `base64` gives bytes, and the encoding is consumed). The features spec does not define a `fromJson`; the decoding operation it defines for presence messages is `fromEncoded` (TP4, missing, see Mock Infrastructure Limitations), so the UTS is the requirement for this API.
+- **What the SDK does:** `JsonHelper.DeserializeObject<PresenceMessage>` copies `data` and `encoding` as received (the `json` case leaves the string, so `JToken.DeepEquals` is false).
+- **Test impact:** `PresenceMessageTypesTests.TP3_PresenceEncodedDataFromJson` is env-gated (`[DeviationFact("TP3")]`).
+- **Status:** open (resolved by adding `PresenceMessage.FromEncoded`, TP4).
+
+### RSL6a / TM3 — a `json` decode after `base64` fails
+
+- **Spec point:** RSL6a, TM3 (tests `rest/unit/RSL6a/decode-chained-encodings-2`, `rest/unit/TM3/from-encoded-decodes-encoding-1`).
+- **What the features spec says:** `(RSL6a)` "All messages received will be decoded automatically based on the `encoding` field (by inverting the encoding rules of RSL4 ...) and the payloads will be converted into the format they were originally sent using i.e. binary, string, or JSON-encodable object or array"; `(TM3)` the same decoding "as specified in `RSL6`".
+- **What the SDK does:** `JsonEncoder.Decode` only handles a `string` payload. After the `base64` decoder the payload is `byte[]`, so `json/base64` leaves `Data` as bytes with `Encoding == "json"` (history), and `Message.FromEncoded` throws `Invalid Json data: 'System.Byte[]'` (50000). `json/utf-8/base64` works because the `utf-8` decoder produces the string first.
+- **Root cause:** `MessageEncoders/JsonEncoder.cs` (no byte[] to UTF-8 string conversion).
+- **Test impact:** `MessageEncodingTests.RSL6a_DecodeChainedEncodings` and `MessageTypesTests.TM3_FromEncodedDecodesEncoding` are env-gated (`[DeviationFact("RSL6a")]`, `[DeviationFact("TM3")]`); also `RestPresenceTests.RSP5_DecodeChainedEncoding` (`rest/unit/RSP5/decode-chained-encoding-5`, presence `json/base64`: `Data` stays `byte[]`) is env-gated (`[DeviationFact("RSL6a")]`).
+- **Status:** open bug.
+
+### RSH1a — publish() accepts an empty recipient or empty data
+
+- **Spec point:** RSH1a (tests `rest/unit/RSH1a/rejects-empty-recipient-3`, `rest/unit/RSH1a/rejects-empty-data-4`, `uts/rest/unit/push/push_admin_publish.md`).
+- **What the spec says:** `(RSH1a)` "Empty values for `recipient` or `data` should be immediately rejected." The tests expect error 40000 and no HTTP request for `{}` as recipient and for `{}` as data.
+- **What the SDK does:** `PushAdmin.PublishAsync` rejects only `null` (the null-recipient test passes); an empty `JObject` is sent as a request.
+- **Root cause:** `PushAdmin.PublishAsync` `ValidateRequest` checks `is null`, not emptiness.
+- **Test impact:** `PushAdminPublishTests.RSH1a_RejectsEmptyRecipient` and `RSH1a_RejectsEmptyData` are env-gated (`[DeviationFact("RSH1a")]`).
+- **Status:** open bug.
+
+### RSH6a — push device authentication sends `X-Ably-DeviceIdentityToken`, not `X-Ably-DeviceToken`
+
+- **Spec point:** RSH6a, RSH7a3, RSH7c3 (tests `rest/unit/RSH7a2/subscribe-device-post-0`, `rest/unit/RSH7c2/unsubscribe-device-delete-0`, `uts/rest/unit/push/push_channels.md`).
+- **What the spec says:** `(RSH6a)` "push device authentication is performed for a request by adding an `X-Ably-DeviceToken` request header whose value is the `deviceIdentityToken`. This header has always been `X-Ably-DeviceToken`, but has previously been mistakenly documented as `X-Ably-DeviceIdentityToken` ... It was never renamed."
+- **What the SDK does:** the request carries `X-Ably-DeviceIdentityToken` (`Defaults.DeviceIdentityTokenHeader`), so `request.headers["X-Ably-DeviceToken"]` is absent (`KeyNotFoundException`).
+- **Root cause:** `PushAdmin.AddDeviceAuthenticationToRequest` / `Defaults.DeviceIdentityTokenHeader`.
+- **Test impact:** `PushChannelsTests.RSH7a2_SubscribeDevicePost` and `RSH7c2_UnsubscribeDeviceDelete` are env-gated (`[DeviationFact("RSH6a")]`); the other assertions in them (method, path, body, query) pass.
+- **Status:** open bug.
+
+### RSH1b1 — deviceRegistrations.get() does not URI-encode the deviceId in the path
+
+- **Spec point:** RSH1b1 (test `rest/unit/RSH1b1/get-url-encodes-deviceid-2`).
+- **What the spec says:** the UTS test asserts the path is `"/push/deviceRegistrations/" + encode_uri_component("device/with special:chars")`, i.e. `/push/deviceRegistrations/device%2Fwith%20special%3Achars`. `(RSH1b1)` says only "performs a request to /push/deviceRegistrations/:deviceId"; features is silent on encoding, so the UTS is the requirement (same ruling as RSL8 above).
+- **What the SDK does:** the path sent is `/push/deviceRegistrations/device/with%20special:chars`: the id is concatenated unencoded, so a `/` in an id adds a path segment.
+- **Root cause:** `PushAdmin` `IDeviceRegistrations.GetAsync` (and `RemoveAsync`, `SaveAsync`) build `"/push/deviceRegistrations/" + deviceId` without `EncodeUriPart`.
+- **Test impact:** `PushDeviceRegistrationsTests.RSH1b1_GetUrlEncodesDeviceid` is env-gated (`[DeviationFact("RSH1b1")]`).
+- **Status:** open bug: the deviceId is not URI-encoded in the path, unlike other SDK paths (same principle as RSL8).
+
+### RSC7c — `addRequestIds` sends the request id as a header, not the `request_id` query parameter
+
+- **Spec point:** RSC7c (test `rest/unit/RSP3/get-request-id-enabled-6`).
+- **What the spec says:** `(RSC7c)` "If the `addRequestIds` client option is enabled, every REST request to Ably should include in a `request_id` query string parameter a random string ...".
+- **What the SDK does:** no `request_id` appears in the query (`AblyRequest.AddHeaders` sends it as a request header).
+- **Test impact:** `RestPresenceTests.RSP3_GetRequestIdEnabled` is env-gated (`[DeviationFact("RSC7c")]`).
+- **Also affected:** `RestClientTests.RSC7c_RequestIdIncluded`, `RSC7c_RequestIdPreservedFallback` (`rest/unit/RSC7c/request-id-included-0`, `request-id-preserved-fallback-1`), env-gated `[DeviationFact("RSC7c")]`: `request_id` is absent from the query in both.
+- **Status:** open bug.
+
+### RSC15a — when every host fails with 5xx, the error has no statusCode
+
+- **Spec point:** RSC15a, TI1 (test `rest/unit/RSP3/get-server-error-3`; classification pending).
+- **What the spec says:** the UTS test stubs every request with 500 / `{"error": {"code": 50000, "statusCode": 500, ...}}` and expects the thrown error to have `code` 50000 and `statusCode` 500. `(RSC15a)` says fallback domains are tried "failing when all have been tried"; features is silent on the resulting error, so the UTS is the requirement (the same ruling as the other silent cases above). `(TI1)` an `ErrorInfo` has `statusCode` (analogous to HTTP status code).
+- **What the SDK does:** a 5xx is retried on the fallback hosts; when they all fail the SDK throws a generic `ErrorInfo` ("Error executing request, exceeded max no. of retries", code 50000) with `statusCode` null, discarding the server's error.
+- **Root cause:** `AblyHttpRequester.Execute`, the final `throw` after the retry loop.
+- **Test impact:** `RestPresenceTests.RSP3_GetServerError` and `TimeTests.RSC16_ErrorPropagated` (the mock answers every request with a 500) are env-gated (`[DeviationFact("RSC15a")]`). A 401 and a 404 (not retryable) propagate correctly in the sibling tests. `RSC16_ErrorPropagated` is inherited by `RealtimeTests.Unit.RealtimeTimeTests` (RTC6) and fails the same way there under `RUN_DEVIATIONS=1`.
+- **Status:** open bug: after every host returns 5xx the surfaced error has statusCode null, although each failure was a 500 response (features RSC15a defines only the fallback order and failure after all hosts are tried; the UTS is the requirement for the error content).
+
+### RSC19f — a `request()` path without a leading slash produces an invalid URI
+
+- **Spec point:** RSC19f (test `rest/unit/RSC19f/path-leading-slash-handling-4`, `uts/rest/unit/request.md`).
+- **What the spec says:** `(RSC19f)` "`path` is the path component of the URL such as `"/channels"`". The features spec says nothing about a path without the leading slash, so the UTS is the requirement: `channels/test` must be sent as `/channels/test`.
+- **What the SDK does:** `request(GET, "channels/test")` fails with `Invalid URI: Invalid port specified` (code 50000); the path is appended to the host unchanged.
+- **Root cause:** `AblyHttpRequester` builds the URI as `{protocol}{host}{port}{request.Url}` without normalising the path. The case with a leading slash passes.
+- **Test impact:** `RequestTests.RSC19f_PathLeadingSlashHandling`, env-gated `[DeviationFact("RSC19f")]` with the spec-correct assertions. Inherited by `RealtimeTests.Unit.RealtimeRequestTests` (RTC9, through `client.HttpClient.Request`), same outcome.
+- **Status:** open bug.
+
+### HP7 — `errorMessage` is populated from `X-Ably-Errorcode`, not `X-Ably-Errormessage`
+
+- **Spec point:** HP7 (test `rest/unit/RSC19d/response-error-message-header-3`, `uts/rest/unit/request.md`).
+- **What the spec says:** `(HP7)` "`errorMessage` is a string attribute populated with the error code if the `X-Ably-Errormessage` HTTP header is sent in the response". The wording says "the error code", which reads as a typo; the UTS reads it as the header's value ("Token expired").
+- **What the SDK does:** with `X-Ably-Errorcode: 40101` and `X-Ably-Errormessage: Token expired`, `HttpPaginatedResponse.ErrorMessage` is `"40101"`.
+- **Root cause:** the `HttpPaginatedResponse` constructor reads the `X-Ably-Errorcode` header for both `ErrorCode` and `ErrorMessage`.
+- **Test impact:** `RequestTests.RSC19d_ResponseErrorMessageHeader`, env-gated `[DeviationFact("HP7")]`. Inherited by `RealtimeTests.Unit.RealtimeRequestTests` (RTC9), same outcome.
+- **Status:** open bug (classification note: the features wording "populated with the error code" is itself ambiguous, so the spec text may need a fix first).
+
+### HP8 — `HttpPaginatedResponse.Headers` holds only the HTTP response headers, not the content headers
+
+- **Spec point:** HP8 (test `rest/unit/RSC19d/response-headers-accessible-4`, `uts/rest/unit/request.md`).
+- **What the spec says:** `(HP8)` "`headers` is an Array of key value pairs for each response header".
+- **What the SDK does:** `Headers` is the `HttpResponseMessage.Headers` collection; `Content-Type` (a content header) is not in it, and `Headers.GetValues("Content-Type")` throws `InvalidOperationException: Misused header name, 'Content-Type'`.
+- **Root cause:** `AblyHttpRequester.GetAblyResponse` copies `response.Headers` only, never `response.Content.Headers`.
+- **Test impact:** `RequestTests.RSC19d_ResponseHeadersAccessible`, env-gated `[DeviationFact("HP8")]`. The other two headers in the test were not reached. Inherited by `RealtimeTests.Unit.RealtimeRequestTests` (RTC9), same outcome.
+- **Status:** open bug.
+
+### RSC6b4 — `stats()` sends the unit as `by`, not `unit`
+
+- **Spec point:** RSC6b4 (tests `rest/unit/RSC6b4/unit-param-values-0`, `rest/unit/RSC6b/all-params-combined-0`, `uts/rest/unit/stats.md`).
+- **What the spec says:** `(RSC6b4)` "`unit` is the period for which the stats will be aggregated by, values supported are `minute`, `hour`, `day` or `month`; if omitted the unit defaults to the REST API default (`minute`)".
+- **What the SDK does:** `StatsRequestParams` sends the unit as the query parameter `by`, not `unit`.
+- **Root cause:** `StatsRequestParams.GetParameters` adds `by`.
+- **Test impact:** `StatsTests.RSC6b4_UnitParamValues`, `RSC6b_AllParamsCombined` (key `unit` absent), env-gated `[DeviationFact("RSC6b4")]`. The "absent or default" tests (`direction-defaults-backwards-1`, `limit-defaults-to-100-1`, `unit-defaults-to-minute-1`) pass. Both are inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), same outcome.
+- **Status:** open bug.
+
+### TO3b / TO3c2 — no debug log message mentions "HTTP request"
+
+- **Spec point:** TO3b, TO3c2 (tests `rest/unit/TO3b/log-level-changeable-0`, `rest/unit/TO3c2/context-contains-expected-keys-0`, `uts/rest/unit/logging.md`).
+- **What the spec says:** `(TO3b)` "`logLevel` - controls the level of verbosity of log messages from the library. The implementation of this is likely to vary by platform"; `(TO3c)` "`logHandler` ... The implementation of this is likely to vary by platform". The features spec doesn't define log message texts, so the UTS is the requirement: a debug log containing "HTTP request" for a `time()` call.
+- **What the SDK does:** at `LogLevel.Debug` the log has `Sending GET request to /time` and `Executing request. Host: main.realtime.ably.net. Request: /time.`, nothing containing "HTTP request".
+- **Test impact:** `LoggingTests.TO3b_LogLevelChangeable` (the Debug-level logs exist; the message match fails) and `TO3c2_ContextContainsExpectedKeys`, env-gated `[DeviationFact("TO3b")]` / `[DeviationFact("TO3c2")]`. The SDK has no Info or Verbose level, so "info" and "verbose" are read as `Debug` (`rest-mapping.md` section 3), and the `context` argument assertions (TO3c, TO3c2) are commented under `// NOTE:` (README Known gaps).
+- **Status:** open (message text): decide whether the SDK should log "HTTP request" or the spec should drop the match.
+
+### RSC18 — Basic auth over HTTP raises code 500 "Current action cannot be performed over http", not 40103 / "insecure"
+
+- **Spec point:** RSC18 (test `rest/unit/RSC18/basic-auth-over-http-rejected-1`, `uts/rest/unit/rest_client.md`).
+- **What the spec says:** `(RSC18)` "If false, all communication is over HTTP however [Basic Auth] over HTTP will result in an error as private keys cannot be submitted over an insecure connection". The features spec names no error code; the UTS expects `error.code == 40103` or a message containing "insecure" or "TLS", and the UTS is the requirement.
+- **What the SDK does:** the first authenticated request throws `AblyInsecureRequestException` with code 500 and the message "Current action cannot be performed over http" (neither 40103 nor "insecure"/"TLS"). The timing (first authenticated request, not construction) is adapted inline, see "RSC18 — the basic-auth-over-http test expects a construction-time error" (UTS Spec Errors).
+- **Root cause:** `AblyAuth.EnsureSecureConnection` throws `new AblyInsecureRequestException()`, whose default message and code are generic.
+- **Test impact:** `RestClientTests.RSC18_BasicAuthOverHttpRejected`, env-gated `[DeviationFact("RSC18")]`; the "token auth over HTTP is allowed" part of the test is therefore only reached when the gate is on.
+- **Status:** open bug.
+
+## Missing SDK Public API / Features
+
+### CHM2g / CHM2h — `ChannelMetrics#objectPublishers` and `ChannelMetrics#objectSubscribers` are missing
+
+- **Spec point:** CHM2g, CHM2h (tests `rest/unit/CHM2/parses-all-metrics-fields-0`, `rest/unit/CHM2/zero-and-missing-metrics-1`, `uts/rest/unit/channel/rest_channel_attributes.md`).
+- **What the features spec says:** `ChannelMetrics` has `objectPublishers` (CHM2g) and `objectSubscribers` (CHM2h).
+- **What the SDK does:** `ChannelMetrics` has only `Connections`, `Publishers`, `Subscribers`, `PresenceConnections`, `PresenceMembers`, `PresenceSubscribers`.
+- **Test impact:** the two tests run; the object* assertions (2 and 2) are commented under a `// NOTE: missing SDK API`. The second test's "missing fields default to 0" check for CHM2g/h is therefore not exercised.
+- **Status:** not implemented.
+
+### MOP2 — `MessageOperation#toJson` is missing
+
+- **Spec point:** MOP2a-c (test `rest/unit/MOP2a/message-operation-fields-0`).
+- **What the features spec says:** the IDL defines `MessageOperation` with `clientId`, `description` and `metadata` (MOP2a-c); it defines no serialisation of its own.
+- **What the SDK does:** the UTS test calls `op.toJson()`; `MessageOperation` has no such method and no JSON property names (the SDK sends it as the message `version`, RSL15b7), so `JsonHelper.Serialize(op)` gives PascalCase keys.
+- **Test impact:** the test runs; the serialisation assertions (4 for the filled operation, 3 for the empty one) are commented under a `// NOTE:`.
+- **Status:** not implemented.
+
+### REC3b — `ClientOptions#connectivityCheckUrl` is missing
+
+- **Spec point:** REC3b (test `rest/unit/REC3b/custom-connectivity-check-url-0`, `uts/rest/unit/fallback.md`).
+- **What the features spec says:** `(REC3b)` "The `connectivity check URL` may be specified explicitly by the `connectivityCheckUrl` option".
+- **What the SDK does:** `ClientOptions` has no such option; the internet check always uses `Defaults.InternetCheckUrl`.
+- **Test impact:** `FallbackTests.REC3b_CustomConnectivityCheckUrl` is a skipped stub carrying the spec lines as comments.
+- **Status:** not implemented.
+
+### RSA17 — `Auth#revokeTokens` is missing
+
+- **Spec point:** RSA17, RSA17b–RSA17g, TRS2, TRF2. Tests (4): `rest/integration/RSA17g/revoke-token-prevents-use-0`, `RSA17d/token-auth-revoke-rejected-0`, `RSA17e/issued-before-reauth-margin-0`, `RSA17c/mixed-success-failure-0` (`RestTests.Integration.RevokeTokensTests`).
+- **What the features spec says:** `(RSA17g)` "Takes a `TokenRevocationTargetSpecifier` or an array of `TokenRevocationTargetSpecifier`s and sends them in a POST request to /keys/{API_KEY_NAME}/revokeTokens".
+- **What the SDK does:** `IAblyAuth` has no `revokeTokens` and there are no `TokenRevocationTargetSpecifier` / `TokenRevocationSuccessResult` / `TokenRevocationFailureResult` types (`rest-mapping.md` section 8).
+- **Test impact:** 4 skipped stubs carrying the spec lines as comments; plus the 17 unit stubs in `RestTests.Unit.RevokeTokensTests` (`rest/unit/RSA17g`, `RSA17b` x2, `RSA17c` x3, `TRS2`, `TRF2`, `RSA17d` x2, `RSA17e` x2, `RSA17f` x3, `RSA17/server-error-propagated-0`, `RSA17/request-uses-basic-auth-0`).
+- **Status:** not implemented.
+
+### RSC17 — `RestClient#clientId` is missing
+
+- **Spec point:** RSC17 (tests `rest/unit/RSC17/client-id-from-options-0`, `rest/unit/RSC17/client-id-matches-auth-1`, `uts/rest/unit/rest_client.md`).
+- **What the features spec says:** `(RSC17)` "When instantiating a `RestClient`, if a `clientId` attribute is set in `ClientOptions`, then the `Auth#clientId` attribute will contain the provided `clientId`".
+- **What the SDK does:** `PubSubHttpClient` has no `ClientId` (only `PubSubRealtimeClient.ClientId` exists); `client.Auth.ClientId` does. Both UTS tests assert through `client.clientId`.
+- **Test impact:** `RestClientTests.RSC17_ClientIdFromOptions`, `RSC17_ClientIdMatchesAuth` are skipped stubs carrying the spec lines as comments.
+- **Status:** not implemented.
+
+### RSC22 — `RestClient#batchPublish` is missing
+
+- **Spec point:** RSC22, RSC22c, RSC22d, BSP2, BPR2, BPF2 (28 unit tests in `uts/rest/unit/batch_publish.md`, `RestTests.Unit.BatchPublishTests`).
+- **What the features spec says:** `(RSC22c)` "Takes a `BatchPublishSpec` or an array of `BatchPublishSpec`s and sends then in a POST request to `/messages`."
+- **What the SDK does:** `PubSubHttpClient` has no `batchPublish` and no `BatchPublishSpec` / `BatchResult` / `BatchPublishSuccessResult` / `BatchPublishFailureResult` types, so every test depends on it.
+- **Test impact:** 28 skipped stubs carrying the spec lines as comments.
+- **Status:** not implemented.
+
+### RSC24 — `RestClient#batchPresence` is missing
+
+- **Spec point:** RSC24, BGR2, BGF2. Tests (3): `rest/integration/RSC24/batch-presence-multiple-channels-0`, `RSC24/restricted-key-channel-failure-1`, `RSC24/empty-channel-presence-2` (`RestTests.Integration.BatchPresenceTests`).
+- **What the features spec says:** `(RSC24)` "`RestClient#batchPresence` function takes an array of channel name strings and sends them as a comma separated string in the `channels` query parameter in a GET request to `/presence`, returning a `BatchResult<BatchPresenceSuccessResult | BatchPresenceFailureResult>` object."
+- **What the SDK does:** `PubSubHttpClient` has no `batchPresence` and there are no `BatchResult` / `BatchPresenceSuccessResult` / `BatchPresenceFailureResult` types (`rest-mapping.md` section 8), so every test depends on it.
+- **Test impact:** 3 skipped stubs carrying the spec lines as comments; plus the 13 unit stubs in `RestTests.Unit.BatchPresenceTests` (`rest/unit/RSC24` x7: `get-presence-channels-param-0`, `single-channel-param-0`, `special-chars-comma-joined-0`, `mixed-success-failure-results-0`, `server-error-propagated-0`, `auth-error-propagated-0`, `uses-configured-auth-0`; `BAR2` x3; `BGR2` x2; `BGF2` x1).
+- **Status:** not implemented.
+
+### RSL1i — `ClientOptions#maxMessageSize` and the 40009 size check are missing
+
+- **Spec point:** RSL1i, TO3l8 (test `rest/unit/RSL1i/message-size-limit-0`, `uts/rest/unit/channel/publish.md`).
+- **What the features spec says:** messages larger than `maxMessageSize` are rejected before transmission with error code 40009.
+- **What the SDK does:** `ClientOptions` has no `MaxMessageSize` (only `ConnectionDetails.MaxMessageSize`, a server-sent value) and `PublishAsync` performs no size check.
+- **Test impact:** `PublishTests.RSL1i_MessageSizeLimit` is a skipped stub carrying the spec lines as comments.
+- **Status:** not implemented.
+
+### RSL1l1 — the `params` argument of `RestChannel#publish` is missing
+
+- **Spec point:** RSL1l, RSL1l1. Test: `rest/integration/RSL1l1/publish-params-force-nack-0` (`RestTests.Integration.PublishTests`).
+- **What the features spec says:** `(RSL1l)` "The `publish(Message)` and `publish(Message[])` forms of the method should take an extra `Dict<String, Stringifiable>` argument. These parameters should be encoded using normal querystring-encoding and sent as part of the query string of the REST publish."; `(RSL1l1)` "Publish params can be tested by publishing with a `_forceNack=true` parameter, which will result in the publish being rejected with a `40099` error code".
+- **What the SDK does:** `IHttpChannel.PublishAsync` has no overload taking publish params, so `_forceNack` can't be sent.
+- **Test impact:** 1 skipped stub carrying the spec lines as comments; plus the unit stub `RestTests.Unit.PublishTests.RSL1l_ParamsAsQuerystring` (`rest/unit/RSL1l/params-as-querystring-0`).
+- **Status:** not implemented.
+
+### RTL10b — the `untilAttach` param of `RealtimeChannel#history` is missing
 
 - **Spec point:** RTL10b. Tests (`ChannelHistoryTests`, 2): `realtime/unit/RTL10b/adds-from-serial-0`, `RTL10b/errors-when-not-attached-1`.
 - **What the features spec says:** "`(RTL10b)` Additionally supports the param `untilAttach`, which if true, will only retrieve messages prior to the moment that the channel was attached …".
-- **What the SDK does:** the API is missing: `IRealtimeChannel.HistoryAsync` takes no `untilAttach` (presence history has it; `realtime-mapping.md` §12).
-- **Test impact:** 2 skipped stubs (`Skip = "Missing SDK API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **What the SDK does:** `IRealtimeChannel.HistoryAsync` takes no `untilAttach` (presence history has it; `realtime-mapping.md` §12).
+- **Test impact:** 2 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
 - **Other SDKs:** ably-java and ably-cocoa both support `untilAttach` on channel history.
-- **Status:** open: feature not implemented in this SDK (moved from Mock Infrastructure Limitations: a missing SDK API is SDK non-compliance, not a mock gap).
+- **Status:** not implemented.
 
-### TB4 / RTL7h / RTP6e / RTAN4e1 — `attachOnSubscribe` channel option is missing
+### RTL22 — `RealtimeChannel#subscribe(MessageFilter, …)` is missing
 
-- **Spec point:** TB4, RTL7h, RTP6e, RTAN4e1. Tests (4): `realtime/unit/TB4/attach-on-subscribe-default-0` (`ChannelOptionsTests`), `RTL7h/no-attach-on-subscribe-0` (`ChannelSubscribeTests`), `RTP6e/subscribe-no-attach-option-0` (`RealtimePresenceSubscribeTests`), `RTAN4e1/no-warn-unattached-0` (`ChannelAnnotationsTests`).
-- **What the features spec says:** "`(TB4)` `attachOnSubscribe` (for realtime client libraries only) a boolean which determines whether calling `subscribe` on a channel or presence object should trigger an implicit attach. Defaults to `true`."
-- **What the SDK does:** the API is missing: `ChannelOptions` has no `AttachOnSubscribe`; these tests depend on the option being false on an unattached channel (`realtime-mapping.md` §12). Where the option is only setup the other tests drop it with a `// NOTE:`.
-- **Test impact:** 4 skipped stubs (`Skip = "Missing SDK API: …"`, spec lines kept as comments); they can't be written until the API exists.
-- **Other SDKs:** ably-java and ably-cocoa both have `attachOnSubscribe`.
-- **Status:** open: feature not implemented in this SDK (moved from Mock Infrastructure Limitations: a missing SDK API is SDK non-compliance, not a mock gap).
+- **Spec point:** RTL22. Tests (`ChannelSubscribeTests`, 5): `realtime/unit/RTL22a/filter-matching-name-0`, `RTL22a/filter-matching-ref-timeserial-1`, `RTL22a/filter-matching-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0`.
+- **What the features spec says:** "`(RTL22)` Methods must be provided for attaching and removing a listener which only executes when the message matches a set of criteria."
+- **What the SDK does:** no `Subscribe` overload takes a `MessageFilter` (`realtime-mapping.md` §12).
+- **Test impact:** 5 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **Other SDKs:** Not present in ably-java or ably-cocoa either (no `MessageFilter`).
+- **Status:** not implemented.
+
+### RTN26 / RTL25 — `Connection#whenState` and `RealtimeChannel#whenState` are missing
+
+- **Spec point:** RTN26, RTL25. Tests: `WhenStateTests` (6: `realtime/unit/RTN26a/immediate-callback-current-state-0`, `RTN26b/deferred-callback-future-state-0`, `RTN26b/fires-only-once-1`, `RTN26a/multiple-whenstate-calls-1`, `RTN26a/no-fire-for-past-state-2`, `RTN26/whenstate-different-states-0`) and `ChannelWhenStateTests` (4: `RTL25a/resolves-immediately-current-0`, `RTL25b/waits-for-state-change-0`, `RTL25b/fires-once-only-1`, `RTL25a/past-state-does-not-resolve-1`).
+- **What the features spec says:** "`(RTN26)` `Connection#whenState` function" — "`(RTN26a)` If the connection is already in the given state, calls the listener with a \`null\` argument"; "`(RTL25)` `RealtimeChannel#whenState` function" — "`(RTL25a)` If the channel is already in the given state, calls the listener with a \`null\` argument".
+- **What the SDK does:** neither `Connection` nor `IRealtimeChannel` has `WhenState` (`realtime-mapping.md` §12, Missing APIs). Every test needs the method, so none can run.
+- **Test impact:** 10 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **Other SDKs:** Not present in ably-java or ably-cocoa either (no `whenState` in their sources); a newer spec point no SDK here implements.
+- **Status:** not implemented.
 
 ### RTS5 / DO2a — `Channels#getDerived` and `DeriveOptions` are missing
 
 - **Spec point:** RTS5, RTS5a, RTS5a1, RTS5a2, DO2a. Tests (`ChannelOptionsTests`, 5): `realtime/unit/RTS5a/creates-derived-channel-0`, `RTS5a1/filter-base64-encoded-0`, `RTS5a2/derived-with-params-0`, `RTS5/get-derived-with-options-0`, `DO2a/filter-attribute-0`.
 - **What the features spec says:** "`(RTS5)` `Channels#getDerived` function" — "`(RTS5a)` Takes `RealtimeChannel` name and `DeriveOptions` object as argument, to create a derived channel"; "`(DO2a)` `filter` (string) - A JMESPath string for filter expression."
-- **What the SDK does:** the API is missing: no `GetDerived` on `Channels`, no `DeriveOptions` type.
-- **Test impact:** 5 skipped stubs (`Skip = "Missing SDK API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **What the SDK does:** no `GetDerived` on `Channels`, no `DeriveOptions` type.
+- **Test impact:** 5 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
 - **Other SDKs:** Not present in ably-java or ably-cocoa either (no `getDerived`).
-- **Status:** open: feature not implemented in this SDK (moved from Mock Infrastructure Limitations: a missing SDK API is SDK non-compliance, not a mock gap).
+- **Status:** not implemented.
+
+### TB4 / RTL7h / RTP6e / RTAN4e1 — `ChannelOptions#attachOnSubscribe` is missing
+
+- **Spec point:** TB4, RTL7h, RTP6e, RTAN4e1. Tests (4): `realtime/unit/TB4/attach-on-subscribe-default-0` (`ChannelOptionsTests`), `RTL7h/no-attach-on-subscribe-0` (`ChannelSubscribeTests`), `RTP6e/subscribe-no-attach-option-0` (`RealtimePresenceSubscribeTests`), `RTAN4e1/no-warn-unattached-0` (`ChannelAnnotationsTests`).
+- **What the features spec says:** "`(TB4)` `attachOnSubscribe` (for realtime client libraries only) a boolean which determines whether calling `subscribe` on a channel or presence object should trigger an implicit attach. Defaults to `true`."
+- **What the SDK does:** `ChannelOptions` has no `AttachOnSubscribe`; these tests depend on the option being false on an unattached channel (`realtime-mapping.md` §12). Where the option is only setup the other tests drop it with a `// NOTE:`.
+- **Test impact:** 4 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **Other SDKs:** ably-java and ably-cocoa both have `attachOnSubscribe`.
+- **Status:** not implemented.
+
+### TG4 / TG5 — `PaginatedResult#first` is missing
+
+- **Spec point:** TG5 in the features spec (the UTS test is labelled TG4: `rest/integration/TG4/first-retrieves-page-0`, `RestTests.Integration.PaginationTests`).
+- **What the features spec says:** `(TG5)` "`PaginatedResult#first` function returns a new `PaginatedResult` for the first page of results" (IDL: `first() => io PaginatedResult<T> // TG5`).
+- **What the SDK does:** `PaginatedResult<T>` has `NextAsync`, `HasNext` and `IsLast` but no `FirstAsync` (only `HttpPaginatedResponse`, returned by `request()`, has one; `FirstQueryParams` is a property, not an operation).
+- **Test impact:** 1 skipped stub carrying the spec lines as comments; the unit test `rest/unit/TG4/first-returns-first-page-0` (`PaginatedResultTests.TG4_FirstReturnsFirstPage`) is a second skipped stub.
+- **Status:** not implemented.
+
+### TP4 — `PresenceMessage#fromEncoded` and `PresenceMessage#fromEncodedArray` are missing
+
+- **Spec point:** TP4 (test `rest/unit/TP4/from-encoded-presence-0`).
+- **What the features spec says:** `(TP4)` "`fromEncoded` and `fromEncodedArray` are alternative constructors that take an (already deserialized) `PresenceMessage`-like object (or array of such objects), and optionally a `channelOptions`, and return a `PresenceMessage` (or array of such `PresenceMessages`) that's decoded and decrypted as specified in `RSL6` ...".
+- **What the SDK does:** `PresenceMessage` has no such methods (only `Message` has; the internal `MessageHandler.FromEncoded<T>` is not public).
+- **Test impact:** `PresenceMessageTypesTests.TP4_FromEncodedPresence` is a skipped stub. See also the TP3 Failing Tests entry (presence JSON deserialisation does not decode).
+- **Status:** not implemented.
+
+### TP5 — `PresenceMessage#size` is missing
+
+- **Spec point:** TP5 (test `rest/unit/TP5/presence-message-size-0`).
+- **What the features spec says:** `(TP5)` "The size of the `PresenceMessage` for TO3l8 is calculated in the same way as for `Message`; see TM6".
+- **What the SDK does:** `PresenceMessage` has no size attribute (and the `maxMessageSize` option is missing too, see RSL1i).
+- **Test impact:** `PresenceMessageTypesTests.TP5_PresenceMessageSize` is a skipped stub.
+- **Status:** not implemented.
+
+### TS12c — `Stats#unit` is missing
+
+- **Spec point:** TS12c (test `rest/unit/RSC6a/returns-paginated-stats-0`, `uts/rest/unit/stats.md`).
+- **What the spec says:** `(TS12c)` "`unit` (property present in the JSON) - a `String` or (if idiomatic) a value of the enumerable type `StatsIntervalGranularity` ... This must be from the `unit` property of the JSON, not calculated from the `intervalId`".
+- **What the SDK does:** `Stats` maps `intervalGranularity` (the pre-2.1 schema) and has no `unit`; for `{"intervalId": "2024-01-01:00:00", "unit": "hour", ...}` `IntervalGranularity` is `Minute` (the enum default).
+- **Test impact:** `StatsTests.RSC6a_ReturnsPaginatedStats`, env-gated `[DeviationFact("TS12c")]`, asserting `IntervalGranularity == Hour` as the nearest member (with a `// NOTE:`). Inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), same outcome.
+- **Status:** not implemented.
 
 ## Adapted Tests
 
@@ -631,11 +1137,38 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Test impact:** `ConnectionRecoveryTests.RTN16f1_MalformedRecoveryKey` asserts a Warning-level log mentioning "recover", with a `// DEVIATION:` comment; the connection assertions are spec-correct.
 - **Status:** open bug (minor: log level).
 
+### RSA16 — `Auth#tokenDetails` is not public: tests read the internal `AblyAuth.CurrentToken`
+
+- **Spec point:** RSA16, RSA16a–RSA16d (`uts/rest/unit/auth/token_details.md` and the RSA10g / RSA10j reads in `authorize.md`).
+- **What the spec says:** `(RSA16)` "`Auth#tokenDetails`: ... `(RSA16a)` Holds a `TokenDetails` representing the token currently in use by the library, if any".
+- **What the SDK does:** `IAblyAuth` has no `TokenDetails`; the same value lives in the internal `AblyAuth.CurrentToken` (`rest-mapping.md` section 8, Missing APIs). `TokenDetails.Expires` / `Issued` are non-nullable `DateTimeOffset`, so "null" is asserted as `DateTimeOffset.MinValue`.
+- **Test impact:** the tests read `((AblyAuth)client.Auth).CurrentToken` (a private helper in `TokenDetailsTests`) with a `// DEVIATION:` comment: `TokenDetailsTests.RSA16a_TokenFromCallback`, `RSA16a_TokenFromRequestToken`, `RSA16b_TokenStringInOptions`, `RSA16c_SetOnInstantiation`, `RSA16c_UpdatedAfterAuthorize`, `RSA16c_UpdatedAfter40142Renewal`, `RSA16d_NullWithBasicAuth`, `RSA16d_NullBeforeTokenObtained`, `RSA16a_PreservedAcrossRequests`, `RSA16a_ReflectsCapability` (plus the gated `RSA16b_TokenStringFromCallback` and `RSA16d_NullAfterInvalidation`), and `AuthorizeTests.RSA10g_AuthorizeUpdatesTokenDetails`, `RSA10j_AuthorizeReplacesExistingToken`.
+- **Status:** open: public `Auth#tokenDetails` accessor not implemented.
+
+### RSL6 / TM3 — a fully decoded message has `encoding == ""`, not null
+
+- **Spec point:** RSL6a, RSL6 (tests `rest/unit/RSL6a/decode-base64-to-binary-0`, `rest/unit/RSL6a/decode-json-to-object-1`, `rest/unit/RSL6/decode-utf8-base64-data-2`, `rest/unit/RSL6/complex-chained-encoding-3`, and the `base64`, `json` cases of `rest/unit/TM3/from-encoded-decodes-encoding-1`).
+- **What the spec says:** `ASSERT message.encoding IS null  # Encoding consumed after decode`. The features spec says (RSL6b) the residual transforms are left in `encoding` but does not say what an empty residue is.
+- **What the SDK does:** once every encoding is consumed `Encoding` is `""` (the same SDK-wide empty-string-instead-of-null as the RTN8a entry above).
+- **Test impact:** the tests assert `BeEmpty()` with a `// DEVIATION:` comment (the TM3 test is also env-gated for the RSL6a / TM3 entry above, and keeps the null check for its plain-text case, whose encoding stays null). Also `RestPresenceTests.RSP5_DecodeJsonData` and `RSP5_DecodeBase64Binary` (`rest/unit/RSP5/decode-json-data-1`, `decode-base64-binary-2`, presence messages): `Encoding.Should().BeEmpty()` with a `// DEVIATION:` comment.
+- **Status:** intentional / SDK-wide.
+
+### TO3j10 / AO2g — `ClientOptions.QueryTime` defaults to null, not false
+
+- **Spec point:** TO3j10, AO2g (test `rest/unit/TO3/client-options-attributes-0`).
+- **What the features spec says:** IDL `queryTime: Bool default false // RSA9d, TO3j10, AO2g`.
+- **What the SDK does:** `AuthOptions.QueryTime` is a `bool?` that is null until set; null behaves as false.
+- **Test impact:** `OptionsTypesTests.TO3_ClientOptionsAttributes` asserts `QueryTime.Should().BeNull()` with a `// DEVIATION:` comment; every other attribute follows the spec.
+- **Status:** intentional (nullable option).
+
+### RSC19f1 — `request()` has no `version` argument: the version is sent as a request-level header
+
+- **Spec point:** RSC19f, RSC19f1 (test `rest/unit/RSC19f1/version-param-sets-header-0`, `uts/rest/unit/request.md`; the same adaptation, with a `// NOTE:`, is in every `request()` call of `RequestTests`).
+- **What the spec says:** `(RSC19f1)` "The `version` parameter specifies the protocol version that the Ably service should use when interpreting the request. The library must include an `X-Ably-Version` header in the request that it sends, with value given by this argument."
+- **What the SDK does:** `PubSubHttpClient.Request` has no `version` parameter; the SDK always sends its own `X-Ably-Version` (6).
+- **Test impact:** `RequestTests.RSC19f1_VersionParamSetsHeader` passes `["X-Ably-Version"] = "2"` / `"3"` in the `headers` argument and asserts the captured header equals it (so it guards that a request-level header takes precedence over the client default, RSC7e).
+- **Status:** open: a `version` argument is not implemented.
+
 ## Mock Infrastructure Limitations
 
-### RTC5 / RTC6 / RTC9 / RTL10a / RTL28 / RTL31 — delegated REST cases helpers don't exist yet
-
-- **Spec point:** RTC5, RTC6, RTC9, RTL10a, RTL28, RTL31. Tests (6): `realtime/unit/RTC5/stats-proxies-rest-0` (`RealtimeStatsTests`), `RTC6/time-proxies-rest-0` (`RealtimeTimeTests`), `RTC9/request-proxies-rest-0` (`RealtimeRequestTests`), `RTL10a/supports-rest-params-0` (`ChannelHistoryTests`), `RTL28/identical-to-rest-0` (`ChannelGetMessageTests`), `RTL31/identical-to-rest-0` (`ChannelMessageVersionsTests`).
-- **What the features spec says:** "`(RTL28)` `RealtimeChannel#getMessage` function: same as `RestChannel#getMessage`"; "`(RTL31)` `RealtimeChannel#getMessageVersions` function: same as `RestChannel#getMessageVersions`"; "`(RTL10a)` Supports all the same params as `RestChannel#history`"; "`(RTC9)` `RealtimeClient#request` is a wrapper around `RestClient#request` (see RSC19)"; RTC5/RTC6 `RealtimeClient#stats` / `#time` proxy the REST functions.
-- **Limitation:** each spec says to run the referenced `uts/rest/unit/…` cases against the realtime operation; the shared REST cases helpers (`StatsCases`, `TimeCases`, `RequestCases`, `HistoryCases`, `GetMessageCases`, `MessageVersionsCases`, `rest-mapping.md` §12) are not generated yet because the REST unit specs are not translated. Regenerate these after the REST unit tier exists.
-- **Test impact:** 6 skipped stubs.
+*(none)*

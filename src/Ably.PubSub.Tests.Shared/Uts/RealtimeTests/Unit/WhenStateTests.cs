@@ -2,7 +2,7 @@
 // Derived from uts/realtime/unit/connection/when_state_test.md
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: unit
-// Disclosures: none (every test is a MIL stub: Connection#whenState is not in this SDK)
+// Disclosures: none (every test is a missing-API stub: Connection#whenState is not in this SDK)
 
 using System;
 using System.Collections.Generic;
@@ -30,7 +30,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN26a/immediate-callback-current-state-0
-        [UtsFact(Skip = "Missing SDK API: Connection#whenState (RTN26) does not exist in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTN26a")]
         public Task RTN26a_ImmediateCallbackCurrentState()
         {
@@ -78,7 +78,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN26b/deferred-callback-future-state-0
-        [UtsFact(Skip = "Missing SDK API: Connection#whenState (RTN26) does not exist in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTN26b")]
         public Task RTN26b_DeferredCallbackFutureState()
         {
@@ -132,7 +132,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN26b/fires-only-once-1
-        [UtsFact(Skip = "Missing SDK API: Connection#whenState (RTN26) does not exist in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTN26b")]
         public Task RTN26b_FiresOnlyOnce()
         {
@@ -207,7 +207,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN26a/multiple-whenstate-calls-1
-        [UtsFact(Skip = "Missing SDK API: Connection#whenState (RTN26) does not exist in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTN26a")]
         public Task RTN26a_MultipleWhenstateCalls()
         {
@@ -260,7 +260,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN26a/no-fire-for-past-state-2
-        [UtsFact(Skip = "Missing SDK API: Connection#whenState (RTN26) does not exist in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTN26a")]
         public Task RTN26a_NoFireForPastState()
         {
@@ -305,7 +305,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN26/whenstate-different-states-0
-        [UtsFact(Skip = "Missing SDK API: Connection#whenState (RTN26) does not exist in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTN26")]
         public Task RTN26_WhenstateDifferentStates()
         {

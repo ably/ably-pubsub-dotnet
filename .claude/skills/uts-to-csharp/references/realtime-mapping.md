@@ -207,7 +207,7 @@ Fields and constructors: `rest-mapping.md` §7 (`Code`, `StatusCode` as `HttpSta
 How each row is rendered:
 
 - **Not applicable** (the input cannot exist in this SDK): omit the whole test and leave one marker alone on its line, in the standard form `// UTS-NA: <full Test ID> — not applicable: <reason>`. These are never deviations or coverage gaps. For a row or part of a test, keep the spec line as a comment under a `// NOTE:` instead.
-- **Missing API, whole test depends on it:** a Mock Infrastructure Limitation (MIL) stub as in SKILL.md *Test patterns for a diagnosed failure*, recorded in `deviations.md` in evaluate mode and listed in the run summary in translate-only mode.
+- **Missing API, whole test depends on it:** a missing-API stub as in SKILL.md *Test patterns for a diagnosed failure* (skip reason `Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`), recorded under *Missing SDK Public API / Features* in `deviations.md` in evaluate mode and listed in the run summary in translate-only mode. A missing *optional* feature is not applicable (`// UTS-NA:`) instead.
 - **Missing API, one incidental line:** comment the spec line out under a `// NOTE:` and translate the rest.
 
 ### Not applicable
@@ -246,15 +246,15 @@ Parts of tests (translate the rest):
 
 | Missing | Spec point | Tests | Rendering |
 |---|---|---|---|
-| `Connection#whenState` | RTN26 | all of `realtime/unit/connection/when_state_test.md` | MIL stub per test |
-| `RealtimeChannel#whenState` | RTL25 | all of `realtime/unit/channels/channel_when_state_test.md` | MIL stub per test |
-| `Channels#getDerived` | RTS5 | `realtime/unit/RTS5a/creates-derived-channel-0`, `RTS5a1/filter-base64-encoded-0`, `RTS5a2/derived-with-params-0`, `RTS5/get-derived-with-options-0` | MIL stub per test |
-| `attachOnSubscribe` channel option (`RealtimeChannelOptions`) | TB4, RTL7h | `realtime/unit/TB4/attach-on-subscribe-default-0`, `realtime/unit/RTL7h/no-attach-on-subscribe-0`, and the `attachOnSubscribe` assertions in `channel_options.md` | MIL stub for the two tests; the assertions commented under a `// NOTE:`; see the setup rule below |
-| `subscribe(MessageFilter, …)` | RTL22 | `realtime/unit/RTL22a/filter-matching-name-0`, `…-ref-timeserial-1`, `…-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0` | MIL stub per test |
-| `history(untilAttach:)` on a channel | RTL10b | `realtime/unit/RTL10b/adds-from-serial-0`, `realtime/unit/RTL10b/errors-when-not-attached-1` (presence history has it; the channel's `HistoryAsync` doesn't) | MIL stub per test |
+| `Connection#whenState` | RTN26 | all of `realtime/unit/connection/when_state_test.md` | missing-API stub per test |
+| `RealtimeChannel#whenState` | RTL25 | all of `realtime/unit/channels/channel_when_state_test.md` | missing-API stub per test |
+| `Channels#getDerived` | RTS5 | `realtime/unit/RTS5a/creates-derived-channel-0`, `RTS5a1/filter-base64-encoded-0`, `RTS5a2/derived-with-params-0`, `RTS5/get-derived-with-options-0` | missing-API stub per test |
+| `attachOnSubscribe` channel option (`RealtimeChannelOptions`) | TB4, RTL7h | `realtime/unit/TB4/attach-on-subscribe-default-0`, `realtime/unit/RTL7h/no-attach-on-subscribe-0`, and the `attachOnSubscribe` assertions in `channel_options.md` | missing-API stub for the two tests; the assertions commented under a `// NOTE:`; see the setup rule below |
+| `subscribe(MessageFilter, …)` | RTL22 | `realtime/unit/RTL22a/filter-matching-name-0`, `…-ref-timeserial-1`, `…-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0` | missing-API stub per test |
+| `history(untilAttach:)` on a channel | RTL10b | `realtime/unit/RTL10b/adds-from-serial-0`, `realtime/unit/RTL10b/errors-when-not-attached-1` (presence history has it; the channel's `HistoryAsync` doesn't) | missing-API stub per test |
 | `RealtimeClient#request` | RTC9 | not missing (default): idiomatic. The public `client.HttpClient` is the realtime client's REST client, and RTC9 asks for the wrapper "delivered in an idiomatic way" | translate through `client.HttpClient.Request(…)` |
 
-**`attachOnSubscribe` as setup.** Where `RealtimeChannelOptions(attachOnSubscribe: false)` is only setup (55 uses: the channel is attached before any `subscribe`), drop it with a `// NOTE: attachOnSubscribe (TB4) is not in this SDK; Subscribe attaches only when the channel is not ATTACHED or ATTACHING, and this test attaches first, so the outcome is unchanged`. Where the test subscribes before attaching and relies on the option, the test is a MIL stub. When a missing member is incidental to a broader test, comment the line with a `// NOTE:` instead.
+**`attachOnSubscribe` as setup.** Where `RealtimeChannelOptions(attachOnSubscribe: false)` is only setup (55 uses: the channel is attached before any `subscribe`), drop it with a `// NOTE: attachOnSubscribe (TB4) is not in this SDK; Subscribe attaches only when the channel is not ATTACHED or ATTACHING, and this test attaches first, so the outcome is unchanged`. Where the test subscribes before attaching and relies on the option, the test is a missing-API stub. When a missing member is incidental to a broader test, comment the line with a `// NOTE:` instead.
 
 ### REST-only extras filed under `uts/realtime`
 
@@ -264,17 +264,17 @@ Translate these in this module's tree; the REST rows apply: `realtime/integratio
 
 Seven, at the pinned SHA; each says "the tests in `uts/rest/unit/…` should be used to verify … on a `RealtimeChannel`/`RealtimeClient`":
 
-| Delegating Test ID (or section) | Delegated REST spec | Realtime operation |
-|---|---|---|
-| `realtime/unit/RTC6/time-proxies-rest-0` (`client/realtime_time.md`) | `uts/rest/unit/time.md` | `client.TimeAsync()` |
-| `realtime/unit/RTC9/request-proxies-rest-0` (`client/realtime_request.md`) | `uts/rest/unit/request.md` | `client.HttpClient.Request(…)` (no `Request` on the realtime client; see missing APIs) |
-| `realtime/unit/RTC5/stats-proxies-rest-0` (`client/realtime_stats.md`) | `uts/rest/unit/stats.md` | `client.StatsAsync(…)` |
-| `realtime/unit/RTL28/identical-to-rest-0` (`channels/channel_get_message.md`) | `uts/rest/unit/channel/get_message.md` | `channel.GetMessageAsync(…)` |
-| `realtime/unit/RTL31/identical-to-rest-0` (`channels/channel_message_versions.md`) | `uts/rest/unit/channel/message_versions.md` | `channel.GetMessageVersionsAsync(…)` |
-| `realtime/unit/RTL10a/supports-rest-params-0` (`channels/channel_history.md`) | `uts/rest/unit/channel/history.md` | `channel.HistoryAsync(…)` |
-| section `## RTAN3a — get is identical to RestAnnotations#get` (`channels/channel_annotations.md`, no Test ID) | `uts/rest/unit/channel/annotations.md` | `channel.Annotations.GetAsync(…)` |
+| Delegating Test ID (or section) | Delegated REST spec | Realtime operation | Inherited base (realtime class) |
+|---|---|---|---|
+| `realtime/unit/RTC6/time-proxies-rest-0` (`client/realtime_time.md`) | `uts/rest/unit/time.md` | `client.TimeAsync()` | `TimeTestsBase<PubSubRealtimeClient>` (`RealtimeTimeTests`) |
+| `realtime/unit/RTC9/request-proxies-rest-0` (`client/realtime_request.md`) | `uts/rest/unit/request.md` | `client.HttpClient.Request(…)` (no `Request` on the realtime client; see missing APIs) | `RequestTestsBase` (`RealtimeRequestTests`) |
+| `realtime/unit/RTC5/stats-proxies-rest-0` (`client/realtime_stats.md`) | `uts/rest/unit/stats.md` | `client.StatsAsync(…)` | `StatsTestsBase` (`RealtimeStatsTests`) |
+| `realtime/unit/RTL28/identical-to-rest-0` (`channels/channel_get_message.md`) | `uts/rest/unit/channel/get_message.md` | `channel.GetMessageAsync(…)` | `GetMessageTestsBase<PubSubRealtimeClient, IRealtimeChannel>` (`ChannelGetMessageTests`) |
+| `realtime/unit/RTL31/identical-to-rest-0` (`channels/channel_message_versions.md`) | `uts/rest/unit/channel/message_versions.md` | `channel.GetMessageVersionsAsync(…)` | `MessageVersionsTestsBase<PubSubRealtimeClient, IRealtimeChannel>` (`ChannelMessageVersionsTests`) |
+| `realtime/unit/RTL10a/supports-rest-params-0` (`channels/channel_history.md`) | `uts/rest/unit/channel/history.md` | `channel.HistoryAsync(…)` | `HistoryTestsBase<PubSubRealtimeClient, IRealtimeChannel>` (`ChannelHistoryTests`) |
+| section `## RTAN3a — get is identical to RestAnnotations#get` (`channels/channel_annotations.md`, no Test ID) | `uts/rest/unit/channel/annotations.md` | `channel.Annotations.GetAsync(…)` | none (no Test ID) |
 
-Rule: one test per delegating tag that runs the referenced REST cases against a realtime client through the shared helper `<targetDir>/<Stem>Cases.cs` that sits flat beside the owning REST suite in the REST unit tier's target directory (see `rest-mapping.md` §12). The helper takes the operation as a delegate (the REST channel and the realtime channel share no interface). Build the realtime client with `AutoConnect = false` so only the HTTP mock is exercised. Annotate each call site (`// NOTE: assertions run inside <Stem>Cases; the audit can't see them`). RTAN3a has no Test ID: no invented tag, a `// NOTE:` naming the heading. If the helper does not exist yet (the REST spec isn't translated in this run), the delegating test is a MIL stub with a `// NOTE:` naming the delegated spec.
+Rule: the realtime class derives the REST suite's client-agnostic base (`rest-mapping.md` §12: `TimeTestsBase<PubSubRealtimeClient>`, `StatsTestsBase`, `RequestTestsBase`, `HistoryTestsBase<PubSubRealtimeClient, IRealtimeChannel>`, `GetMessageTestsBase<…>`, `MessageVersionsTestsBase<…>`), so every REST test runs again against the realtime client. It overrides only the hooks: `NewClient` sets `AutoConnect = false` (only the HTTP mock is exercised) and returns `Realtime(options)` (`Realtime(options).HttpClient` for RTC9), and the channel hooks use `client.Channels.Get(name)` and the `IRealtimeChannel` operation. The delegating spec's own `// UTS: realtime/unit/…` tag sits above those overrides, followed by a `// NOTE:` naming the base and the REST spec; the delegating Test IDs have no pseudo code, so the audit reports full coverage with no shortfall. Other tests of the same realtime spec (e.g. RTL10b in `channel_history.md`) stay in the class as usual. Inherited deviations are the REST suite's: their `deviations.md` entries name the realtime class as inheriting them. RTAN3a has no Test ID: no invented tag, a `// NOTE:` naming the heading.
 
 ## 13. Known SDK behaviour differences <a id="13-known-differences"></a>
 
@@ -356,13 +356,13 @@ Each paragraph names the SKILL.md step it overrides; everything not listed follo
 
 **Naming and deviations file: no override.** Test naming follows SKILL.md Step 4; deviations go in the shared `src/Ably.PubSub.Tests.Shared/Uts/deviations.md` (SKILL.md Step 6).
 
-**Addition to SKILL.md Step 2 (output path), delegating specs** (not an override). The shared cases helper lives flat in the REST unit target directory (`rest-mapping.md` §12); a REST-only extra filed under `uts/realtime` (§12) is still written to this module's target directory.
+**Addition to SKILL.md Step 2 (output path), delegating specs** (not an override). The client-agnostic base of a delegated REST suite lives in that suite's file in the REST unit target directory (`rest-mapping.md` §12); the realtime class that inherits it stays in this module's target directory; a REST-only extra filed under `uts/realtime` (§12) is still written to this module's target directory.
 
 **Applies at SKILL.md Step 7 (expected audit results)** (not an override).
 
 - Omitted not-applicable Test IDs (msgpack-only, RTN23b, PC3 no-plugin) are reported under `idCoverage.notApplicableInCSharp` (their `// UTS-NA:` markers), never under `missingInCSharp`.
-- NOTE-annotated omissions and MIL stubs show as assertion shortfall: account for each in Step 7.
-- Delegating tests run their assertions in a helper: review those by hand.
+- NOTE-annotated omissions, missing-API stubs and MIL stubs show as assertion shortfall: account for each in Step 7.
+- Delegating tests inherit their assertions from the REST base: the realtime file's audit covers only its own tag (no pseudo code); the assertions are audited in the REST file.
 - Sections with no Test ID (RTAN3a, the `realtime_client.md` "Shared Options" sections) carry a `// NOTE:` instead of a tag.
 
 ## 17. Integration & proxy helpers <a id="17-integration"></a>

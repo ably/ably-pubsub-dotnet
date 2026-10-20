@@ -2,7 +2,7 @@
 // Derived from uts/realtime/unit/channels/channel_history.md
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: unit
-// Disclosures: none
+// Disclosures: delegating spec (RTL10a): the uts/rest/unit/channel/history.md tests run through an inherited client-agnostic base (HistoryTestsBase); realtime client built with AutoConnect = false (infra-driving: only the HTTP mock is exercised)
 
 using System;
 using System.Collections.Generic;
@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Tests.Uts.Infra;
 using Ably.PubSub.Tests.Uts.Infra.Unit;
+using Ably.PubSub.Tests.Uts.RestTests.Unit;
 using Ably.PubSub.Types;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
@@ -22,7 +23,7 @@ using Xunit.Abstractions;
 namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
 {
     [Trait("uts", "unit")]
-    public class ChannelHistoryTests : UtsUnitTestBase
+    public class ChannelHistoryTests : HistoryTestsBase<PubSubRealtimeClient, IRealtimeChannel>
     {
         public ChannelHistoryTests(ITestOutputHelper output)
             : base(output)
@@ -30,20 +31,24 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL10a/supports-rest-params-0
-        [UtsFact(Skip = "Mock infrastructure limitation: the shared REST cases helper for uts/rest/unit/channel/history.md (HistoryCases) does not exist yet; see deviations.md")]
-        [Trait("spec", "RTL10a")]
-        public async Task RTL10a_SupportsRestParams()
+        // NOTE: the spec runs the uts/rest/unit/channel/history.md tests against a realtime channel in place of a REST channel. They are
+        // inherited unchanged from HistoryTestsBase (RestTests/Unit/HistoryTests.cs) and run here through the overrides below; the
+        // realtime client is built with AutoConnect = false so only the HTTP mock is exercised (realtime-mapping.md section 12).
+        // RTL10c (a PaginatedResult page of the first messages) is covered by the inherited rest/unit/RSL2a/returns-paginated-result-0.
+        protected override PubSubRealtimeClient NewClient(ClientOptions options)
         {
-            // NOTE: delegating spec: the tests in uts/rest/unit/channel/history.md (RSL2) are to be run against a
-            // RealtimeChannel (channel.HistoryAsync) through the shared helper HistoryCases beside the REST suite;
-            // that REST spec is not translated in this run, so the helper does not exist.
-            // RTL10a: Supports all the same params as RestChannel#history
-            // RTL10c: Returns a PaginatedResult page containing the first page of messages
-            await Task.CompletedTask;
+            options.AutoConnect = false;
+            return Realtime(options);
         }
 
+        protected override IRealtimeChannel GetChannel(PubSubRealtimeClient client, string channelName) => client.Channels.Get(channelName);
+
+        protected override Task<PaginatedResult<Message>> HistoryAsync(IRealtimeChannel channel) => channel.HistoryAsync();
+
+        protected override Task<PaginatedResult<Message>> HistoryAsync(IRealtimeChannel channel, PaginatedRequestParams query) => channel.HistoryAsync(query);
+
         // UTS: realtime/unit/RTL10b/adds-from-serial-0
-        [UtsFact(Skip = "Missing SDK API: the SDK has no untilAttach history parameter (RealtimeChannel history takes no untilAttach); see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#history(untilAttach) (RTL10b); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL10b")]
         public async Task RTL10b_AddsFromSerial()
         {
@@ -65,7 +70,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL10b/errors-when-not-attached-1
-        [UtsFact(Skip = "Missing SDK API: the SDK has no untilAttach history parameter (RealtimeChannel history takes no untilAttach); see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#history(untilAttach) (RTL10b); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL10b")]
         public async Task RTL10b_ErrorsWhenNotAttached()
         {

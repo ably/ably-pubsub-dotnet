@@ -85,19 +85,26 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration
         public static string ExtractKeySecret(string apiKey) => SplitKey(apiKey)[1];
 
         /// <summary>
-        /// The specs' <c>generate_jwt(key_name, key_secret, ttl, client_id, capability)</c>: an Ably JWT signed
-        /// locally with HS256 (header <c>kid</c> = the key name; claims <c>iat</c>, <c>exp</c>, and <c>x-ably-
+        /// The specs' <c>generate_jwt(key_name, key_secret, ttl, client_id, capability, expires_at)</c>: an Ably JWT
+        /// signed locally with HS256 (header <c>kid</c> = the key name; claims <c>iat</c>, <c>exp</c>, and <c>x-ably-
         /// clientId</c> / <c>x-ably-capability</c> when given).
         /// </summary>
+        /// <param name="expiresAt">
+        /// The specs' <c>expires_at</c>: when set, <c>exp</c> is this instant and <c>iat</c> is <paramref name="ttl"/>
+        /// (default 1 h) before it, so a past value gives an expired token (40142) rather than an invalid one. When
+        /// null, <c>iat</c> is now and <c>exp</c> is <c>iat + ttl</c>.
+        /// </param>
         public static string GenerateJwt(
             string keyName,
             string keySecret,
             TimeSpan? ttl = null,
             string clientId = null,
-            string capability = null)
+            string capability = null,
+            DateTimeOffset? expiresAt = null)
         {
-            var issuedAt = DateTimeOffset.UtcNow;
-            var expires = issuedAt.Add(ttl ?? TimeSpan.FromHours(1));
+            var lifetime = ttl ?? TimeSpan.FromHours(1);
+            var issuedAt = expiresAt.HasValue ? expiresAt.Value - lifetime : DateTimeOffset.UtcNow;
+            var expires = expiresAt ?? issuedAt.Add(lifetime);
 
             var header = new JObject
             {

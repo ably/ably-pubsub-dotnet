@@ -2,7 +2,7 @@
 // Derived from uts/realtime/unit/channels/channel_when_state_test.md
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: unit
-// Disclosures: every test is a skipped MIL stub: RealtimeChannel#whenState (RTL25) is missing from this SDK
+// Disclosures: every test is a skipped missing-API stub: RealtimeChannel#whenState (RTL25) is missing from this SDK
 
 using Ably.PubSub.Tests.Uts.Infra;
 using System.Threading.Tasks;
@@ -21,7 +21,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL25a/resolves-immediately-current-0
-        [UtsFact(Skip = "Missing SDK API: RealtimeChannel#whenState (RTL25) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#whenState (RTL25); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL25a")]
         public async Task RTL25a_ResolvesImmediatelyCurrent()
         {
@@ -74,7 +74,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL25b/waits-for-state-change-0
-        [UtsFact(Skip = "Missing SDK API: RealtimeChannel#whenState (RTL25) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#whenState (RTL25); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL25b")]
         public async Task RTL25b_WaitsForStateChange()
         {
@@ -134,7 +134,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL25b/fires-once-only-1
-        [UtsFact(Skip = "Missing SDK API: RealtimeChannel#whenState (RTL25) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#whenState (RTL25); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL25b")]
         public async Task RTL25b_FiresOnceOnly()
         {
@@ -208,7 +208,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL25a/past-state-does-not-resolve-1
-        [UtsFact(Skip = "Missing SDK API: RealtimeChannel#whenState (RTL25) is missing from this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#whenState (RTL25); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTL25a")]
         public async Task RTL25a_PastStateDoesNotResolve()
         {

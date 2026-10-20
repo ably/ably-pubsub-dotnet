@@ -184,10 +184,36 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
         /// </summary>
         public static JObject SuppressOnwards() => NewAction("suppress_onwards");
 
-        /// <summary><c>{ "type": "http_respond", "status", "body"?, "headers"? }</c>.</summary>
+        /// <summary><c>{ "type": "http_respond", "status", "body"?, "headers"? }</c>: answer without forwarding upstream.</summary>
         public static JObject HttpRespond(int status, JToken body = null, IDictionary<string, string> headers = null)
+            => HttpResponseAction("http_respond", status, body, headers);
+
+        /// <summary>
+        /// <c>{ "type": "http_replace_response", "status", "body"?, "headers"? }</c>: forward the request upstream
+        /// (so the server acts on it), discard the real response and answer with this one instead. Supported by
+        /// uts-proxy v0.3.0; not yet in <c>proxy.md</c>.
+        /// </summary>
+        public static JObject HttpReplaceResponse(int status, JToken body = null, IDictionary<string, string> headers = null)
+            => HttpResponseAction("http_replace_response", status, body, headers);
+
+        /// <summary><c>{ "type": "http_delay", "delayMs" }</c>.</summary>
+        public static JObject HttpDelay(int delayMs)
         {
-            var action = NewAction("http_respond");
+            var action = NewAction("http_delay");
+            action["delayMs"] = delayMs;
+            return action;
+        }
+
+        /// <summary><c>{ "type": "http_drop" }</c>: close the HTTP connection without answering.</summary>
+        public static JObject HttpDrop() => NewAction("http_drop");
+
+        private static JObject NewMatch(string type) => new JObject { ["type"] = type };
+
+        private static JObject NewAction(string type) => new JObject { ["type"] = type };
+
+        private static JObject HttpResponseAction(string type, int status, JToken body, IDictionary<string, string> headers)
+        {
+            var action = NewAction(type);
             action["status"] = status;
             if (body != null)
             {
@@ -207,21 +233,6 @@ namespace Ably.PubSub.Tests.Uts.Infra.Integration.Proxy
 
             return action;
         }
-
-        /// <summary><c>{ "type": "http_delay", "delayMs" }</c>.</summary>
-        public static JObject HttpDelay(int delayMs)
-        {
-            var action = NewAction("http_delay");
-            action["delayMs"] = delayMs;
-            return action;
-        }
-
-        /// <summary><c>{ "type": "http_drop" }</c>: close the HTTP connection without answering.</summary>
-        public static JObject HttpDrop() => NewAction("http_drop");
-
-        private static JObject NewMatch(string type) => new JObject { ["type"] = type };
-
-        private static JObject NewAction(string type) => new JObject { ["type"] = type };
 
         private static JObject Frame(string type, int action, string channel)
         {

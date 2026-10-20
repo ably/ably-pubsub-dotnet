@@ -254,7 +254,7 @@ Every row was read in the SDK source. "Throws" means `AblyException`.
 How each row is rendered:
 
 - **Not applicable** (the input cannot exist in this SDK): omit the whole test and leave one marker alone on its line, in the standard form `// UTS-NA: <full Test ID> — not applicable: <reason>`. These are never deviations or coverage gaps. For a row or part of a test, keep the spec line as a comment under a `// NOTE:` instead.
-- **Missing API, whole test depends on it:** a Mock Infrastructure Limitation (MIL) stub as in SKILL.md *Test patterns for a diagnosed failure*, recorded in `deviations.md` in evaluate mode and listed in the run summary in translate-only mode.
+- **Missing API, whole test depends on it:** a missing-API stub as in SKILL.md *Test patterns for a diagnosed failure* (skip reason `Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`), recorded under *Missing SDK Public API / Features* in `deviations.md` in evaluate mode and listed in the run summary in translate-only mode. A missing *optional* feature is not applicable (`// UTS-NA:`) instead.
 - **Missing API, one incidental line:** comment the spec line out under a `// NOTE:` and translate the rest.
 
 ### Msgpack-only inputs (not applicable)
@@ -273,6 +273,7 @@ Msgpack is compiled out of this SDK build (`UseBinaryProtocol` is a no-op). Whol
 // UTS-NA: rest/unit/RSL4/msgpack-protocol-content-type-3 — not applicable: msgpack is compiled out of this SDK build (UseBinaryProtocol is a no-op)
 // UTS-NA: rest/unit/RSL4c/binary-direct-msgpack-protocol-1 — not applicable: msgpack is compiled out of this SDK build (UseBinaryProtocol is a no-op)
 // UTS-NA: rest/unit/RSL6/msgpack-binary-stays-binary-0 — not applicable: msgpack is compiled out of this SDK build (UseBinaryProtocol is a no-op)
+// UTS-NA: rest/unit/RSL6/msgpack-string-stays-string-1 — not applicable: msgpack is compiled out of this SDK build (UseBinaryProtocol is a no-op)
 // rest/unit/presence/rest_presence.md
 // UTS-NA: rest/unit/RSP5/decode-msgpack-binary-3 — not applicable: msgpack is compiled out of this SDK build (UseBinaryProtocol is a no-op)
 ```
@@ -283,14 +284,14 @@ Partial cases (translate the rest; mark the omitted part with a `// NOTE:`):
 |---|---|---|
 | `rest/unit/rest_client.md` | `rest/unit/RSC8a/protocol-selection-0` | table row 1 (`true`, `application/x-msgpack`) |
 | `rest/unit/request.md` | `rest/unit/RSC19c/body-encoded-per-protocol-2`, `rest/unit/RSC19c/response-decoded-by-content-type-3` | the msgpack parts (translate the JSON parts) |
-| `rest/unit/encoding/message_encoding.md` | `rest/unit/RSL4/encoding-fixtures-ably-common-0` | fixtures with `use_binary_protocol: true` (the test also needs `encoding.json`; see the MIL below) |
+| `rest/unit/encoding/message_encoding.md` | `rest/unit/RSL4/encoding-fixtures-ably-common-0` | fixtures with `use_binary_protocol: true` (the test also needs `encoding.json`, which doesn't exist: a UTS spec error, see below) |
 | `rest/unit/encoding/msgpack_interop.md` | both `RSL6a3` sections (no Test IDs) | whole file: no file is written; list it in the run summary |
 | `rest/unit/types/options_types.md` | `rest/unit/TO3/client-options-attributes-0` | the line `ASSERT options.useBinaryProtocol == true` (comment it with the reason) |
 | integration specs with `## Protocol Variants` (`batch_presence`, `history`, `publish`, `presence`, `mutable_messages`) | | the msgpack variant: one JSON test, tag and name singular, with SKILL.md's `// NOTE: msgpack variant not applicable: …` line |
 
 ### Deprecated host options (not applicable)
 
-The SDK replaced `environment`, `restHost`, `realtimeHost` and `fallbackHostsUseDefault` with `Endpoint`. The features spec marks all four "(optional, deprecated)" (TO3k1, TO3k2, TO3k3, TO3k7: "Client libraries with no backwards-compatibility requirement may omit this option"; REC1b1 and REC2a1 apply "only to client libraries that support these deprecated options"). Tests about those options are therefore not applicable (default). Sixteen tests, one marker each:
+The SDK replaced `environment`, `restHost`, `realtimeHost` and `fallbackHostsUseDefault` with `Endpoint`. The features spec marks all four "(optional, deprecated)" (TO3k1, TO3k2, TO3k3, TO3k7: "Client libraries with no backwards-compatibility requirement may omit this option"; REC1b1 and REC2a1 apply "only to client libraries that support these deprecated options"). Tests about those options are therefore not applicable (default). Fifteen tests, one marker each:
 
 ```csharp
 // UTS-NA: rest/unit/REC1b1/endpoint-conflicts-environment-0 — not applicable: removed option (Endpoint replaces it)
@@ -308,29 +309,28 @@ The SDK replaced `environment`, `restHost`, `realtimeHost` and `fallbackHostsUse
 // UTS-NA: rest/unit/REC2c5/production-environment-fallback-domains-0 — not applicable: removed option (Endpoint replaces it)
 // UTS-NA: rest/unit/REC2c6/custom-resthost-no-fallbacks-0 — not applicable: removed option (Endpoint replaces it)
 // UTS-NA: rest/unit/REC2c6/custom-realtimehost-no-fallbacks-1 — not applicable: removed option (Endpoint replaces it)
-// UTS-NA: rest/unit/TO/conflicting-options-validation-1 — not applicable: removed option (Endpoint replaces it)
 ```
 
-Where the deprecated option is incidental (`rest/unit/TO3/client-options-custom-hosts-1`'s `restHost` line; `rest/unit/TG/pagination-relative-urls-5`'s `restHost: "rest.ably.io"`), keep the spec line as a comment with a `// NOTE:`; where a host is needed, `Endpoint = "<host>"` gives the same primary domain (REC1b2), noted as such.
+`rest/unit/TO/conflicting-options-validation-1` is a Test Cases table: translate rows 1 (`key` + `authCallback`, valid) and 3 (no auth options, invalid), and omit row 2 (`restHost` + `endpoint`) with a `// NOTE:` (removed option). Where the deprecated option is incidental (`rest/unit/TO3/client-options-custom-hosts-1`'s `restHost` line; `rest/unit/TG/pagination-relative-urls-5`'s `restHost: "rest.ably.io"`), keep the spec line as a comment with a `// NOTE:`; where a host is needed, `Endpoint = "<host>"` gives the same primary domain (REC1b2), noted as such.
 
 ### Missing APIs
 
 | Missing | Spec point | Tests | Rendering |
 |---|---|---|---|
-| `RestClient#batchPresence` | RSC24 | `rest/unit/batch_presence.md`, `rest/integration/batch_presence.md` | MIL stub per test |
-| `RestClient#batchPublish` | RSC22 | `rest/unit/batch_publish.md` | MIL stub per test |
-| `Auth#revokeTokens` | RSA17 | `rest/unit/auth/revoke_tokens.md`, `rest/integration/revoke_tokens.md` | MIL stub per test |
-| `maxMessageSize` option and the 40009 check | TO3l8, RSL1i | `rest/unit/channel/publish.md` (the RSL1i test); in `options_types.md` the single `maxMessageSize` line | MIL stub for the RSL1i test; the `options_types.md` line commented under a `// NOTE:` |
-| `connectivityCheckUrl` option | REC3b | `rest/unit/REC3b/custom-connectivity-check-url-0` | MIL stub |
-| `PresenceMessage.fromEncoded` / `fromEncodedArray` | TP4 | `rest/unit/TP4/from-encoded-presence-0` (internal `MessageHandler.FromEncoded<T>` exists; an adapted test may call it only as a documented deviation) | MIL stub |
-| `PresenceMessage.size` | TP5 | `rest/unit/TP5/presence-message-size-0` | MIL stub |
-| `Auth#tokenDetails` (public) | RSA16 | every `client.auth.tokenDetails` read. The value exists internally (`((AblyAuth)client.Auth).CurrentToken`) | adapted (default): the public value is stable, so read the internal one as a documented deviation (Adapted Test, `// DEVIATION: see deviations.md`); otherwise a MIL stub |
+| `RestClient#batchPresence` | RSC24 | `rest/unit/batch_presence.md`, `rest/integration/batch_presence.md` | missing-API stub per test |
+| `RestClient#batchPublish` | RSC22 | `rest/unit/batch_publish.md` | missing-API stub per test |
+| `Auth#revokeTokens` | RSA17 | `rest/unit/auth/revoke_tokens.md`, `rest/integration/revoke_tokens.md` | missing-API stub per test |
+| `maxMessageSize` option and the 40009 check | TO3l8, RSL1i | `rest/unit/channel/publish.md` (the RSL1i test); in `options_types.md` the single `maxMessageSize` line | missing-API stub for the RSL1i test; the `options_types.md` line commented under a `// NOTE:` |
+| `connectivityCheckUrl` option | REC3b | `rest/unit/REC3b/custom-connectivity-check-url-0` | missing-API stub |
+| `PresenceMessage.fromEncoded` / `fromEncodedArray` | TP4 | `rest/unit/TP4/from-encoded-presence-0` (internal `MessageHandler.FromEncoded<T>` exists; an adapted test may call it only as a documented deviation) | missing-API stub |
+| `PresenceMessage.size` | TP5 | `rest/unit/TP5/presence-message-size-0` | missing-API stub |
+| `Auth#tokenDetails` (public) | RSA16 | every `client.auth.tokenDetails` read. The value exists internally (`((AblyAuth)client.Auth).CurrentToken`) | adapted (default): the public value is stable, so read the internal one as a documented deviation (Adapted Test, `// DEVIATION: see deviations.md`); otherwise a missing-API stub |
 | `version` argument of `request()` | RSC19f, RSC19f1 | the SDK owner's idiom is a request-level `X-Ably-Version` header (`headers: {"X-Ably-Version": "3"}` takes precedence over the client default, RSC7e) | `rest/unit/RSC19f1/version-param-sets-header-0` is an Adapted Test with `// DEVIATION:`; elsewhere add the header with a `// NOTE:` |
 | `ClientOptions.fallbackHosts` getter | TO3k6 | `rest/unit/TO3/client-options-custom-hosts-1` | comment the line under a `// NOTE:`, or read the internal `GetFallbackHosts()` as a documented deviation |
 
 ### Mock Infrastructure Limitations
 
-`load_fixtures("encoding.json")`: the vendored ably-common submodule (`common` @ 133665b) has no `encoding.json`, and bumping the submodule is a dependency change for the user. `rest/unit/RSL4/encoding-fixtures-ably-common-0` is therefore a MIL stub with a `// NOTE:`. Don't substitute `messages-encoding.json` (different format).
+`load_fixtures("encoding.json")` is **not** a MIL: no `encoding.json` exists in ably-common, neither vendored (`common` @ 133665b) nor upstream (origin/main bb51cc9). `test-resources` has only `messages-encoding.json` and `presence-messages-encoding.json`, whose shape (`data`, `encoding`, `expectedType`, `expectedValue`) doesn't match the spec's fields (`input_data`, `expected_wire_data`, `expected_encoding`, `use_binary_protocol`). The spec references a fixture that doesn't exist, so `rest/unit/RSL4/encoding-fixtures-ably-common-0` is a **UTS spec error**: a skipped spec-error placeholder plus a UTS Spec Errors entry. The draft fix: point the spec at `messages-encoding.json` and use its field names, or add the fixture to ably-common. Don't substitute `messages-encoding.json` in the test.
 
 ## 9. Known SDK behaviour differences <a id="9-known-differences"></a>
 
@@ -384,7 +384,7 @@ The symbol tables live in the infra README; don't copy signatures here. REST row
 | `create_proxy_session`, rules, log | `UtsProxyTestBase.CreateProxySession`, `ProxySession`, `ProxyRules`, `ProxyEvent` | "Proxy tier" |
 
 - **Fixture-helper scope:** the REST module has no fixture helpers (README "Scope": nothing to index). The only shared fixture is the sandbox app: one app per xUnit collection (`SandboxAppFixture` through `[Collection(UtsSandboxCollection.Name)]`; the proxy collection provisions its own).
-- **Fixtures:** `ResourceHelper.GetResource("<name>")` (native, namespace `Ably.PubSub.Tests`) reads the embedded ably-common files: `crypto-data-128.json`, `crypto-data-256.json`, `messages-encoding.json`, `test-app-setup.json`. `encoding.json` is not in the vendored submodule (§8).
+- **Fixtures:** `ResourceHelper.GetResource("<name>")` (native, namespace `Ably.PubSub.Tests`) reads the embedded ably-common files: `crypto-data-128.json`, `crypto-data-256.json`, `messages-encoding.json`, `test-app-setup.json`. `encoding.json` exists nowhere in ably-common (a UTS spec error, §8).
 
 **Sanctioned stand-ins** (disclose in the file header, never in `deviations.md`):
 
@@ -403,14 +403,17 @@ Each paragraph names the SKILL.md step it overrides; everything not listed follo
 
 **Naming and deviations file: no override.** Test naming follows SKILL.md Step 4; deviations go in the shared `src/Ably.PubSub.Tests.Shared/Uts/deviations.md` (SKILL.md Step 6).
 
-**Addition to SKILL.md Step 2 (output path), delegated cases** (an extra helper file, not an override). Five realtime specs delegate to REST specs (`time.md`, `request.md`, `stats.md`, `channel/get_message.md`, `channel/message_versions.md`), plus `channel/history.md` (RTL10a) and `channel/annotations.md` (RTAN3a). When translating those REST specs, put the reusable cases in a helper file beside the suite, flat in the tier's target directory: `<targetDir>/<Stem>Cases.cs` (for example `TimeCases.cs`), taking the operation under test as a delegate, so the realtime tests can run them. Register it in the projitems like any new file. Annotate each call site: the audit can't see assertions inside the helper.
+**Delegated REST specs: client-agnostic base classes (addition to SKILL.md Step 2).** Six realtime unit specs delegate to REST unit specs ("the tests in `uts/rest/unit/…` should be used to test a `RealtimeClient`/`RealtimeChannel` instance"): `time.md` (RTC6), `stats.md` (RTC5), `request.md` (RTC9), `channel/history.md` (RTL10a), `channel/get_message.md` (RTL28), `channel/message_versions.md` (RTL31); `channel/annotations.md` (RTAN3a) is the seventh, but its realtime section has no Test ID. Translate each of those REST specs into one file holding two classes:
+- `public abstract class <ClassName>Base` (generic over the client, and the channel for the channel specs, where the two clients share no interface: `TimeTestsBase<TClient>`, `HistoryTestsBase<TClient, TChannel>`, `GetMessageTestsBase<TClient, TChannel>`, `MessageVersionsTestsBase<TClient, TChannel>`; `StatsTestsBase` uses `IStatsCommands` and `RequestTestsBase` uses `PubSubHttpClient`, which both clients expose). It derives `UtsUnitTestBase`, holds every translated `[UtsFact]` with its `// UTS: rest/unit/…` tag, carries no `[Trait("uts", …)]`, and reaches the client only through small abstract hooks: `NewClient(ClientOptions)` for the spec's `client = Rest(options: …)`, plus `GetChannel(client, name)` and the operation (`TimeAsync(client)`, `HistoryAsync(channel[, query])`, `GetMessageAsync(channel, serial)`, `GetMessageVersionsAsync(channel, serial, query)`) where no shared interface carries it. The test bodies stay a line-by-line translation; only `Rest(` → `NewClient(` and `x.Op(` → `Op(x, ` change.
+- `[Trait("uts", "unit")] public class <ClassName> : <ClassName>Base<…>`: the REST implementation of the hooks (`Rest(options)`, `client.Channels.Get(name)`, `channel.Op(…)`).
+The realtime class (`realtime-mapping.md` §12) derives the same base. xUnit runs the inherited facts once per concrete class, under each class's own name and traits. No other REST spec gets a base: add one only when a realtime spec delegates to it.
 
 **Applies at SKILL.md Step 7 (expected audit results)** (not an override).
 
 - Each not-applicable Test ID in §8 is reported under `idCoverage.notApplicableInCSharp` (its `// UTS-NA:` marker), never under `missingInCSharp`.
 - `rest/unit/encoding/msgpack_interop.md` has no Test IDs and is wholly not applicable: it gets no file and is listed in the run summary.
-- NOTE-annotated omissions and MIL stubs show as assertion shortfall: account for each in Step 7.
-- Assertions inside a delegated-cases helper are invisible to the audit: review those by hand.
+- NOTE-annotated omissions, missing-API stubs and MIL stubs show as assertion shortfall: account for each in Step 7.
+- The delegated REST specs keep their tests in the base class in the same file, so the audit of the REST file sees every tag and assertion (no helper to review by hand).
 
 ## 13. Integration & proxy helpers <a id="13-integration"></a>
 
@@ -418,9 +421,9 @@ REST-specific items only; the rest is in SKILL.md *Integration tests*.
 
 - **Base and collection:** direct-sandbox classes derive `UtsIntegrationTestBase`, carry `[Trait("uts", "integration")]`, `[Trait("type", "integration")]` and `[Collection(UtsSandboxCollection.Name)]`, and take `(SandboxAppFixture fixture, ITestOutputHelper output)`. Proxy classes derive `UtsProxyTestBase` with `[Trait("uts", "proxy")]`, `[Trait("type", "integration")]` and `[Collection(UtsProxyCollection.Name)]`.
 - **App and keys:** `App` (`SandboxApp`: `Keys[i].KeyStr`, `KeyName`, `KeySecret`, `Capability`), `ApiKey` (first key), `SandboxEndpoint`. `keys[2]` in a spec → `App.Keys[2].KeyStr`.
-- **Helpers:** `RandomId()`, `UniqueChannelName(prefix)`, `ExtractKeyName`, `ExtractKeySecret`, `GenerateJwt(keyName, keySecret, ttl?, clientId?, capability?)` (spec ttl in ms → `TimeSpan.FromMilliseconds`), `RequestTokenFromSandbox(apiKey?, tokenParams?)`, `SandboxTokenCallback(apiKey?, onInvoked)` (counts `auth_callback_count++`), `AssertSucceeded(result, what)` for `Result`s. Use a unique channel name in every integration test.
+- **Helpers:** `RandomId()`, `UniqueChannelName(prefix)`, `ExtractKeyName`, `ExtractKeySecret`, `GenerateJwt(keyName, keySecret, ttl?, clientId?, capability?, expiresAt?)` (spec ttl in ms → `TimeSpan.FromMilliseconds`; spec `expires_at: now() - N` → `expiresAt: DateTimeOffset.UtcNow.AddSeconds(-N)`, an expired rather than invalid token), `RequestTokenFromSandbox(apiKey?, tokenParams?)`, `SandboxTokenCallback(apiKey?, onInvoked)` (counts `auth_callback_count++`), `AssertSucceeded(result, what)` for `Result`s. Use a unique channel name in every integration test.
 - **Waits:** wall-clock; `PollUntil` takes the spec's timeout and interval (defaults in SKILL.md *Integration tests*).
-- **Proxy:** `var session = await CreateProxySession(rules: new[] { ProxyRules.Rule(ProxyRules.HttpRequest(…), ProxyRules.HttpRespond(503)) });` (no endpoint argument: it defaults to the sandbox; `rules: []` is plain `CreateProxySession()`), then `ProxyRest(session, options)`; `session.GetLogAsync()` returns typed `ProxyEvent`s (filter with `HttpRequests(pathContains)`, `HttpResponses()`). Spec-local functions (`token_auth_callback(api_key)` in `rest/integration/proxy/rest_fallback.md`) become file-local helpers.
+- **Proxy:** `var session = await CreateProxySession(rules: new[] { ProxyRules.Rule(ProxyRules.HttpRequest(…), ProxyRules.HttpRespond(503)) });` (no endpoint argument: it defaults to the sandbox; `rules: []` is plain `CreateProxySession()`), then `ProxyRest(session, options)`; `session.GetLogAsync()` returns typed `ProxyEvent`s (filter with `HttpRequests(pathContains)`, `HttpResponses()`). The spec-local `token_auth_callback(api_key)` in `rest/integration/proxy/rest_fallback.md` (a sandbox token fetched directly, bypassing the proxy) is `SandboxTokenCallback(ApiKey)`; `http_replace_response` is `ProxyRules.HttpReplaceResponse(status, body, headers)`. Never add file-local helpers for infra gaps: extend the infra.
 
 ## 14. Worked example <a id="14-worked-example"></a>
 

@@ -2,19 +2,19 @@
 // Derived from uts/realtime/unit/client/realtime_request.md
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: unit
-// Disclosures: none
+// Disclosures: delegating spec: the uts/rest/unit/request.md tests run through an inherited client-agnostic base (RequestTestsBase); realtime client built with AutoConnect = false (infra-driving: only the HTTP mock is exercised)
 
-using Ably.PubSub.Tests.Uts.Infra;
 using System;
 using System.Threading.Tasks;
-using Ably.PubSub.Tests.Uts.Infra.Unit;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests.Uts.RestTests.Unit;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
 {
     [Trait("uts", "unit")]
-    public class RealtimeRequestTests : UtsUnitTestBase
+    public class RealtimeRequestTests : RequestTestsBase
     {
         public RealtimeRequestTests(ITestOutputHelper output)
             : base(output)
@@ -22,15 +22,15 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC9/request-proxies-rest-0
-        [UtsFact(Skip = "Mock infrastructure limitation: the shared REST cases helper RequestCases.cs for uts/rest/unit/request.md does not exist yet; see deviations.md")]
-        [Trait("spec", "RTC9")]
-        public Task RTC9_RequestProxiesRest()
+        // NOTE: the spec runs the uts/rest/unit/request.md tests against a realtime client in place of a REST client. They are inherited
+        // unchanged from RequestTestsBase (RestTests/Unit/RequestTests.cs) and run here through the overrides below; the realtime
+        // client is built with AutoConnect = false so only the HTTP mock is exercised (realtime-mapping.md section 12).
+        // NOTE: RTC9 asks for the RestClient#request wrapper "delivered in an idiomatic way"; this SDK delivers it as the
+        // realtime client's own REST client, client.HttpClient, whose Request runs the inherited cases (realtime-mapping.md section 12).
+        protected override PubSubHttpClient NewClient(ClientOptions options)
         {
-            // NOTE: this spec delegates to uts/rest/unit/request.md: the tests there are run against a realtime client through
-            // the shared helper beside the REST suite (realtime-mapping.md section 12), which is not translated yet.
-            // Realtime operation: client.HttpClient.Request(...)
-            // Spec: RealtimeClient#request is a direct proxy to RestClient#request. The tests in uts/rest/unit/request.md (covering RSC19) should be used to test a RealtimeClient instance in place of a RestClient instance.
-            return Task.CompletedTask;
+            options.AutoConnect = false;
+            return Realtime(options).HttpClient;
         }
     }
 }

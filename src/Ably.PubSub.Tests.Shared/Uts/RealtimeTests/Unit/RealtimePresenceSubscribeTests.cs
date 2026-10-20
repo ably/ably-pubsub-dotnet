@@ -218,7 +218,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTP6e/subscribe-no-attach-option-0
-        [UtsFact(Skip = "Missing SDK API: attachOnSubscribe channel option (TB4, RTP6e) is not in this SDK; see deviations.md (Failing Tests)")]
+        [UtsFact(Skip = "Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)")]
         [Trait("spec", "RTP6e")]
         public async Task RTP6e_SubscribeNoAttachOption()
         {

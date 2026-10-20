@@ -54,6 +54,20 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Unit
         }
 
         [Fact]
+        public async Task ACapturedRequestCarriesTheHostHeaderHttpClientSends()
+        {
+            var mock = new MockHttpClient(onRequest: request => request.RespondWith(200, new[] { 1704067200000L }));
+            InstallMock(mock);
+            var rest = Rest(NoFallbacks());
+
+            await rest.TimeAsync();
+
+            var captured = mock.CapturedRequests.Should().ContainSingle().Subject;
+            captured.Headers.Should().ContainKey("Host");
+            captured.Headers["Host"].Should().Be(captured.Url.Uri.Authority);
+        }
+
+        [Fact]
         public async Task DnsErrorIsAConnectionLevelFailure()
         {
             var mock = new MockHttpClient(onConnectionAttempt: connection => connection.RespondWithDnsError());

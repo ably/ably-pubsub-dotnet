@@ -18,7 +18,8 @@ give the same report.
      <reason>` marker; they are listed here instead of in missingInCSharp. Nothing else is checked about them.
 
 2. Per-test ledger. Within each spec test block (from one Test ID to the next Test ID, or to a heading at or
-   above the heading level the Test ID sits under) every non-blank, non-comment line inside a pseudo fence is
+   above the heading level the Test ID sits under; a same-level sub-section heading such as Setup, Test Steps,
+   Assertions, Cleanup or Notes does not end it) every non-blank, non-comment line inside a pseudo fence is
    extracted, grouped by section, each line tagged "assert", "await" or "step". Spec assert keywords are
    matched first, longest first (AWAIT_ERROR, EXPECT THROW, FAILS WITH, THROWS, ASSERT_*, ASSERT), then await
    keywords (poll_until_success, AWAIT_STATE, AWAIT UNTIL, POLL_UNTIL, WAIT UNTIL, poll_until, AWAIT_ALL,
@@ -46,6 +47,9 @@ Output (one JSON object on stdout):
   perTest [{testId, title, sections [{heading, lines [{text, kind}]}], specCodeLineTotal, specAsserts [],
             specAwaits [], specAssertCount, specAwaitCount, csharpPresent, csharpAssertionCalls [],
             csharpAssertionCount, csharpAwaitCalls [], csharpAwaitCount, assertionShortfall, awaitShortfall}],
+  idlessSections [{heading, level, afterTestId, sections, lines [{text, kind}], assertCount, awaitCount}]
+              (sections after the first Test ID that have pseudo code but no Test ID of their own; reported
+              separately and never counted toward the preceding test or the summary totals),
   summary {specAssertTotal, specAwaitTotal, csharpAssertionTotal, csharpAwaitTotal,
            testsWithShortfall [], testsWithAwaitShortfall []}.
 On failure: {"ok": false, "error": "USAGE" | "FILE_NOT_FOUND" | "INTERNAL_ERROR", "message": ...}.
@@ -66,6 +70,12 @@ HEADING_RE = re.compile(r"^(#{1,4})(?:\s+(.*?))?\s*#*\s*$")
 # Any opening or closing fence (``` or ~~~, three or more); PSEUDO_FENCE_RE says whether an opener is a pseudo block.
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})\s*([^`\s]*)")
 PSEUDO_FENCE_RE = re.compile(r"^\s*(?:```+|~~~+)\s*pseudo\b", re.I)
+
+# Headings that name a part of one test (not a new test or group): a same-level heading with one of these titles
+# continues the current test region instead of ending it (e.g. a `### Setup` under a `### RSP3a - ...` test).
+SUBSECTION_TITLE_RE = re.compile(
+    r"^(?:common\s+)?(?:setup|test\s+steps?|assertions?|test\s+steps\s+and\s+assertions?|cleanup|teardown|"
+    r"notes?|steps|expected(?:\s+\w+)?|verification|preconditions?|arrange|act)\b", re.I)
 
 SPEC_ASSERT_KEYWORDS = [
     r"\bAWAIT_ERROR\b", r"\bEXPECT\s+THROW\b", r"\bFAILS\s+WITH\b", r"\bTHROWS\b", r"\bASSERT_[A-Z0-9_]+\b",
@@ -158,12 +168,35 @@ def line_kind(code):
     return "step"
 
 
+def is_subsection(title):
+    return bool(SUBSECTION_TITLE_RE.match(title))
+
+
 def parse_spec(path):
-    """Ordered list of {testId, title, sections [{heading, lines [{text, kind}]}], asserts, awaits, codeLineTotal}.
-    A block runs from its Test ID to the next Test ID or to a heading at or above the level it sits under."""
-    tests, cur = [], None
+    """Return (tests, idless). tests: ordered list of {testId, title, sections [{heading, lines [{text, kind}]}],
+    asserts, awaits, codeLineTotal}. A test block runs from its Test ID to the next Test ID or to a heading that
+    is not part of the test: one above its level, or at its level unless it is a sub-section heading such as
+    Setup / Test Steps / Assertions (see SUBSECTION_TITLE_RE); deeper headings stay inside the test.
+    idless: sections after the first Test ID that open with such a boundary heading but have no Test ID of their
+    own, [{heading, level, afterTestId, sections, lines, assertCount, awaitCount}]; only those holding pseudo
+    code are kept, and their lines are never counted toward a test."""
+    tests, idless = [], []
+    cur = None     # open test block
+    loose = None   # open ID-less block (only after the first test)
     last_heading = (0, "")
     fence = None  # (marker char, length, is_pseudo) while inside a fence
+
+    def close_loose():
+        nonlocal loose
+        if loose is not None:
+            loose["sections"] = [s for s in loose["sections"] if s["lines"]]
+            if loose["sections"]:
+                loose["lines"] = [ln for s in loose["sections"] for ln in s["lines"]]
+                loose["assertCount"] = sum(1 for ln in loose["lines"] if ln["kind"] == "assert")
+                loose["awaitCount"] = sum(1 for ln in loose["lines"] if ln["kind"] == "await")
+                idless.append(loose)
+            loose = None
+
     for line in read_text(path).splitlines():
         fm = FENCE_RE.match(line)
         if fm:
@@ -174,37 +207,53 @@ def parse_spec(path):
                 fence = None
             continue
         if fence is not None:
-            if cur is not None and fence[2]:
+            target = cur if cur is not None else loose
+            if target is not None and fence[2]:
                 code = spec_code(line)
                 if code is not None:
-                    cur["sections"][-1]["lines"].append({"text": line.strip(), "kind": line_kind(code)})
+                    target["sections"][-1]["lines"].append({"text": line.strip(), "kind": line_kind(code)})
             continue
         hm = HEADING_RE.match(line)
         if hm:
             level, title = len(hm.group(1)), (hm.group(2) or "").strip()
-            if cur is not None and level <= cur["level"]:
-                tests.append(cur)
-                cur = None
             last_heading = (level, title)
             if cur is not None:
-                cur["sections"].append({"heading": title, "lines": []})
+                if level > cur["level"] or (level == cur["level"] and is_subsection(title)):
+                    cur["sections"].append({"heading": title, "lines": []})
+                    continue
+                tests.append(cur)
+                cur = None
+                loose = {"heading": title, "level": level, "afterTestId": tests[-1]["testId"],
+                         "sections": [{"heading": title, "lines": []}]}
+            elif loose is not None:
+                if level > loose["level"] or (level == loose["level"] and is_subsection(title)):
+                    loose["sections"].append({"heading": title, "lines": []})
+                else:
+                    close_loose()
+                    loose = {"heading": title, "level": level, "afterTestId": tests[-1]["testId"] if tests else "",
+                             "sections": [{"heading": title, "lines": []}]}
+            elif tests:
+                loose = {"heading": title, "level": level, "afterTestId": tests[-1]["testId"],
+                         "sections": [{"heading": title, "lines": []}]}
             continue
         tm = TEST_ID_RE.search(line)
         if tm:
             if cur is not None:
                 tests.append(cur)
+            close_loose()
             level, title = last_heading
             cur = {"testId": tm.group(1), "title": title, "level": level,
                    "sections": [{"heading": title, "lines": []}]}
     if cur is not None:
         tests.append(cur)
+    close_loose()
     for t in tests:
         t["sections"] = [s for s in t["sections"] if s["lines"]]
         t["asserts"] = [ln["text"] for s in t["sections"] for ln in s["lines"] if ln["kind"] == "assert"]
         t["awaits"] = [ln["text"] for s in t["sections"] for ln in s["lines"] if ln["kind"] == "await"]
         t["codeLineTotal"] = sum(len(s["lines"]) for s in t["sections"])
         del t["level"]
-    return tests
+    return tests, idless
 
 
 # --------------------------------------------------------------------------- C# side
@@ -390,7 +439,7 @@ def parse_csharp(path):
     return blocks, duplicates, na_ids
 
 
-def build_report(spec_path, test_path, spec_tests, blocks, duplicates, na_ids):
+def build_report(spec_path, test_path, spec_tests, blocks, duplicates, na_ids, idless=()):
     spec_ids = [t["testId"] for t in spec_tests]
     spec_set, test_set, na_set = set(spec_ids), set(blocks), set(na_ids)
     missing = [i for i in spec_ids if i not in test_set and i not in na_set]
@@ -430,6 +479,7 @@ def build_report(spec_path, test_path, spec_tests, blocks, duplicates, na_ids):
             "notApplicableInCSharp": not_applicable,
         },
         "perTest": per_test,
+        "idlessSections": list(idless),
         "summary": {
             "specAssertTotal": sum(len(t["asserts"]) for t in spec_tests),
             "specAwaitTotal": sum(len(t["awaits"]) for t in spec_tests),
@@ -452,9 +502,9 @@ def main():
         if not Path(p).is_file():
             fail("FILE_NOT_FOUND", f"{p!r} not found.")
     try:
-        spec_tests = parse_spec(spec_path)
+        spec_tests, idless = parse_spec(spec_path)
         blocks, duplicates, na_ids = parse_csharp(test_path)
-        report = build_report(spec_path, test_path, spec_tests, blocks, duplicates, na_ids)
+        report = build_report(spec_path, test_path, spec_tests, blocks, duplicates, na_ids, idless)
     except Exception as exc:  # noqa: BLE001 - deliberate catch-all; this tool must not crash
         fail("INTERNAL_ERROR", f"{type(exc).__name__}: {exc}", spec=spec_path, csharp=test_path)
     print(json.dumps(report, indent=2, ensure_ascii=False))

@@ -58,6 +58,8 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Integration.Proxy
             ProxyRules.Close().ToString(Formatting.None).Should().Be("{\"type\":\"close\",\"closeCode\":1000}");
             ProxyRules.Disconnect().ToString(Formatting.None).Should().Be("{\"type\":\"disconnect\"}");
             ProxyRules.HttpRespond(401).ToString(Formatting.None).Should().Be("{\"type\":\"http_respond\",\"status\":401}");
+            ProxyRules.HttpReplaceResponse(503, new JObject { ["error"] = new JObject { ["code"] = 50300 } }).ToString(Formatting.None)
+                .Should().Be("{\"type\":\"http_replace_response\",\"status\":503,\"body\":{\"error\":{\"code\":50300}}}");
             ProxyRules.Rule(ProxyRules.WsConnect(), ProxyRules.RefuseConnection()).ContainsKey("times").Should().BeFalse();
         }
 

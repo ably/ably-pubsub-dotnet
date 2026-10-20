@@ -232,7 +232,7 @@ inherited, and a class without them runs in no UTS job and leaks into the native
 Then read **every file in `infra.tiers.<tier>.sources`** (the resolver's list for the chosen tier — never a
 hard-coded list; you need exact method signatures). Use the infra smoke tests under `infra.testsRoot` as
 API-usage examples only — never copy their scenarios. (`infra.tiers.<tier>.tests` is only the command that
-runs the infra self-tests; this skill never runs it.) Reference tests: none yet, for every tier.
+runs the infra self-tests; run it only after fixing an infra gap — see "Infra gaps are fixed in the infra".) Reference tests: none yet, for every tier.
 
 The README's "SDK behaviour a translator meets" lists known SDK deviations: translate as written; the
 evaluation step gates them.
@@ -542,9 +542,22 @@ once open); for HTTP it's the `PendingHttpConnection` passed to the `MockHttpCli
 | `queue_response(…)` | `mockHttp.QueueResponse(status, body, headers)` and friends |
 | `mock_ws.events…` / `connect_attempts` / `last_connect_url` / `reset()` | `mockWs.Events` / `EventsOfType(MockEventType.X)`; `ConnectionAttempts`; `LastConnectUrl`; `Reset()` (also `mockHttp.Reset()`) |
 
-Remaining gaps are in the README's "Known gaps"; never silently substitute a similar outcome. The skill
-**never changes the UTS infra**: a missing capability is a MIL stub (see "Test patterns for a diagnosed
-failure") in evaluate mode, or a run-summary item in translate-only mode; infra changes are a separate task.
+Remaining gaps are in the README's "Known gaps"; never silently substitute a similar outcome.
+
+**Infra gaps are fixed in the infra, never worked around in the test.** A translation is meant to be a
+straight, line-by-line port that only calls existing infra helpers. When a spec uses a helper, mock
+capability, rule/action builder or parameter the infra lacks (e.g. `generate_jwt(expires_at:)`,
+`http_replace_response`):
+- **Small and clearly scoped** (a missing parameter, builder, filter or alias that the spec's helper
+  vocabulary defines) → fix it in place under `infra.root`, update `infra.readme` (symbol map and
+  "Known gaps") and this skill's text or the module notes where they list the signature, and run the
+  tier's infra self-tests (`infra.tiers.<tier>.tests`) plus the Cake gate.
+- **Large or uncertain** (new transport behaviour, threading, teardown, anything touching SDK seams) →
+  stop and ask the user, with the gap and a proposed change; meanwhile the test is a MIL stub.
+- **Never** add a file-local helper, signer, builder or other workaround code to a test file to cover an
+  infra gap, and never use a MIL stub to dodge a gap you can fix. A MIL stub stays the answer for an
+  infra gap deferred to the user. A missing **SDK** API is not an infra gap: it's a missing-API stub
+  (see "Test patterns for a diagnosed failure"); the SDK is never changed.
 
 ### Protocol messages and types
 
@@ -888,6 +901,8 @@ every failure via the decision tree below. Each test must end in exactly one of 
 - a documented **SDK deviation** — env-gated or adapted, stays green (SDK ≠ spec; fix belongs in the SDK); or
 - a documented **UTS spec error** — **fails fast** (the spec is wrong; fix belongs in the spec). This is the
   one acceptable red; or
+- a **missing-API stub** — a skipped test for a required public API or feature the SDK doesn't implement
+  (recorded under Missing SDK Public API / Features); or
 - a **MIL stub** — a skipped test whose whole body needs a mock capability the infra lacks (recorded as a
   Mock Infrastructure Limitation, not an SDK deviation); or
 - a **not-applicable** ID — no test at all, just a `// UTS-NA:` line (Step 1).
@@ -925,8 +940,8 @@ Test fails
 ### Test patterns for a diagnosed failure
 
 Two patterns are for an **SDK deviation** (both write the spec-correct assertions); the third,
-**spec-error fail-fast**, is for a **UTS spec error** and is not a deviation. The **MIL stub** and the
-**not-applicable omission** complete the list.
+**spec-error fail-fast**, is for a **UTS spec error** and is not a deviation. The **missing-API stub**, the
+**MIL stub** and the **not-applicable omission** complete the list.
 
 **Env-gated skip** *(preferred for a deviation you expect to be fixed)* — the test carries the
 **spec-correct** assertions, but is disabled by default via `[DeviationFact]`, so it only runs when
@@ -982,13 +997,37 @@ public async Task RTN15c4_ResumeWithTokenErrorReattaches()
 
 List each in the run summary with the features-spec quote.
 
-**MIL stub** *(a missing mock capability, SDK API, or delegated helper blocks the whole test)* — a skipped stub whose body is a
+**Missing-API stub** *(the SDK doesn't implement a public API or feature that the features spec requires,
+including one missing parameter, option or overload; manual: `writing-derived-tests.md`, section 2c and
+"Missing API or feature")* — first rule out a UTS spec error (the features spec doesn't require it) and a
+translation error (the API is renamed or on another class). An optional feature ("may", "may optionally",
+"optional") is not applicable (`// UTS-NA:`), a missing internal member in a white-box test is an
+internal-shape difference, and a missing test-only hook is a MIL stub. In C# a call to a missing member
+doesn't compile, so the test is a stub: the spec lines as comments, skipped unconditionally (never
+`[DeviationFact]`, never reflection or `dynamic`). The skip reason must be exactly
+`Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`.
+Record it under *Missing SDK Public API / Features* with the status *not implemented* (or *intentionally
+not implemented: <reason>*). When only one line of a test needs the missing member, comment that line under
+a `// NOTE:` and translate the rest:
+
+```csharp
+// UTS: realtime/unit/RTN26a/immediate-callback-current-state-0
+[UtsFact(Skip = "Missing SDK public API: Connection#whenState (RTN26); see deviations.md (Missing SDK Public API / Features)")]
+[Trait("spec", "RTN26a")]
+public async Task RTN26a_ImmediateCallbackCurrentState()
+{
+    // NOTE: Connection has no WhenState in this SDK
+    // <the spec lines, as comments>
+}
+```
+
+**MIL stub** *(a missing mock capability or test helper blocks the whole test; a delegating spec instead inherits the REST base, see `rest-mapping.md` §12)* — a skipped stub whose body is a
 `// NOTE:` plus the spec lines as comments; recorded under *Mock Infrastructure Limitations* in evaluate
 mode (a skipped stub, not an SDK deviation), listed in the run summary in translate-only mode:
 
 ```csharp
 // UTS: realtime/unit/RTN22a/server-initiated-auth-0
-[UtsFact(Skip = "Mock infrastructure limitation: <missing capability, API or helper>; see deviations.md")]
+[UtsFact(Skip = "Mock infrastructure limitation: <missing capability or helper>; see deviations.md")]
 [Trait("spec", "RTN22a")]
 public async Task RTN22a_ServerInitiatedAuth()
 {
@@ -1015,13 +1054,15 @@ Record in the respective section of the shared deviations file
 `src/Ably.PubSub.Tests.Shared/Uts/deviations.md` (not registered in the projitems), unless a module's notes
 declare another location (Step 1), using the manual's **Recording deviations** entry format and sections
 (the `writing-derived-tests.md` you read up front — not a home-grown format). Create it in evaluate mode
-when absent: a title line; one paragraph saying env-gated tests run with `RUN_DEVIATIONS=1`; then the four
-headings **in this order** — `## UTS Spec Errors`, `## Failing Tests`, `## Adapted Tests`,
-`## Mock Infrastructure Limitations` — each `*(none)*` when empty. Entries are `### <point> — <title>`
+when absent: a title line; one paragraph saying env-gated tests run with `RUN_DEVIATIONS=1`; then the five
+headings **in this order** — `## UTS Spec Errors`, `## Failing Tests`, `## Missing SDK Public API / Features`,
+`## Adapted Tests`, `## Mock Infrastructure Limitations` — each `*(none)*` when empty. Entries are `### <point> — <title>`
 with the manual's fields, and new entries are inserted into their category's section, never appended at
 the file end. A **UTS Spec Error** (test fails fast — fix in the spec) goes under *UTS Spec Errors*; an
 **SDK deviation** (env-gated/adapted — fix in the SDK) goes under *Failing Tests* / *Adapted Tests*; a
-mock-capability gap goes under *Mock Infrastructure Limitations*. A module's own shape vocabulary stays in
+**missing public API or feature** (missing-API stub — a feature request) goes under *Missing SDK Public API /
+Features*, titled `### <spec point> — <Type#member or option> is missing`; a mock-capability gap goes under
+*Mock Infrastructure Limitations*. A module's own shape vocabulary stays in
 its notes and is cited from the entry.
 
 ---
@@ -1071,7 +1112,13 @@ you must then reconcile by hand:
   the proxy session calls `TriggerActionAsync`/`GetLogAsync`/`AddRulesAsync` → `csharpAwaitCount`).
   `UtsAssert.Fail`, `ProcessPendingEvents`, `AdvanceTime`, `Task.Delay` and a plain `await` of an SDK op
   count as neither. `assertionShortfall` and `awaitShortfall` are the differences.
-- **`summary`** — `testsWithShortfall` and `testsWithAwaitShortfall`.
+  A test's region ends at the next Test ID or the next heading that isn't a sub-section of it; a same-level
+  `Setup` / `Test Steps` / `Assertions` / `Cleanup` / `Notes` heading stays inside the test.
+- **`idlessSections[]`** — sections after the first Test ID that hold pseudo code but have no `**Test ID**`
+  of their own (`heading`, `afterTestId`, `lines[]`, `assertCount`, `awaitCount`). They are never counted toward
+  a test or the summary: judge by hand whether the spec meant them as a test the C# should cover.
+- **`summary`** — `testsWithShortfall` and `testsWithAwaitShortfall` (a test omitted via `// UTS-NA:` has no C#
+  block, so it also appears there).
 
 The audit is a review aid, not a gate — it never crashes, it degrades. If `idCoverage.specCount` is `0`
 for a file you know is a real spec, the extractor couldn't find any `**Test ID**` markers (an unusual spec
@@ -1112,7 +1159,7 @@ This is the guarantee that no setup step, operation, or assertion was dropped �
 - [ ] `assertionShortfall > 0` for a test (`summary.testsWithShortfall`) is a **tripwire** — fewer C#
       assertions than spec `ASSERT`s strongly suggests a dropped assertion; open that test and account for
       each one. (A negative shortfall is fine — the SDK mapping often needs *more* C# lines per spec
-      `ASSERT`; an annotated omission — a MIL stub, a `// NOTE:` omission, a helper-hidden assertion or a
+      `ASSERT`; an annotated omission — a missing-API stub, a MIL stub, a `// NOTE:` omission, a helper-hidden assertion or a
       value-type `IS <Type>` comment — is a valid account.)
 - [ ] `awaitShortfall > 0` (`summary.testsWithAwaitShortfall`) is the **softer secondary signal** — fewer
       infra wait calls than spec `AWAIT`s. Every .NET SDK op is natively async, so a spec `AWAIT op`
@@ -1362,11 +1409,12 @@ firings: `ProxyRules.Rule(match, action, times: n, comment: "…")`.
 
 Actions: `RefuseConnection()`, `AcceptAndClose(code)`, `Disconnect()`, `Close(code)`, `Suppress()`,
 `SuppressOnwards()`, `Delay(ms)`, `InjectToClient(JObject)`, `InjectToClientAndClose(…)`, `Replace(JObject)`,
-`Passthrough()`, `HttpRespond(status, body, headers)`, `HttpDelay(ms)`, `HttpDrop()`.
+`Passthrough()`, `HttpRespond(status, body, headers)`, `HttpReplaceResponse(status, body, headers)`, `HttpDelay(ms)`,
+`HttpDrop()`.
 `"__PASSTHROUGH__"` as a field value in a `replace` message is an ordinary string. The action is the
 protocol action **number** (`ProtocolMessages.X`, e.g. 4 CONNECTED, 6 DISCONNECTED, 9 ERROR, 10 ATTACH,
-11 ATTACHED) — see the action-number table in `proxy.md`. `http_replace_response` has no builder (README
-"Known gaps": a MIL stub).
+11 ATTACHED) — see the action-number table in `proxy.md`. `http_replace_response` (forward upstream, then answer
+with the given status/body) → `HttpReplaceResponse(…)`; never substitute `HttpRespond`, which doesn't forward.
 
 ### Verifying the event log
 
@@ -1453,7 +1501,7 @@ End every run with this short summary, filled in:
 ```
 UTS translation: <module>/<tier> @ ably/specification@<specClone.sha>  (mode: translate-only | evaluate)
 | Spec file | Test file | IDs (spec/test/NA) | Audit | Compile | Run | Deviations added |
-Not applicable (UTS-NA), MIL stubs, ID-less sections for hand review: …
+Not applicable (UTS-NA), missing-API stubs, MIL stubs, ID-less sections for hand review: …
 Ambiguity NOTEs for review; suspected UTS spec errors (features-spec quote, draft fix): …
 Changed files (incl. projitems lines added): …
 ```

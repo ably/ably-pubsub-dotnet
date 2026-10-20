@@ -281,6 +281,13 @@ namespace Ably.PubSub.Tests.Uts.Infra.Unit
                 }
             }
 
+            // HttpClient adds Host from the URI at send time, below this handler; record what goes on the wire
+            // (the authority, without a default port) unless the request set its own (RSC15j).
+            if (!headers.ContainsKey("Host") && request.RequestUri != null && request.RequestUri.IsAbsoluteUri)
+            {
+                headers["Host"] = request.RequestUri.Authority;
+            }
+
             return headers;
         }
 

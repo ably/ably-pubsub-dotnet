@@ -2,19 +2,19 @@
 // Derived from uts/realtime/unit/client/realtime_time.md
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: unit
-// Disclosures: none
+// Disclosures: delegating spec: the uts/rest/unit/time.md tests run through an inherited client-agnostic base (TimeTestsBase); realtime client built with AutoConnect = false (infra-driving: only the HTTP mock is exercised)
 
-using Ably.PubSub.Tests.Uts.Infra;
 using System;
 using System.Threading.Tasks;
-using Ably.PubSub.Tests.Uts.Infra.Unit;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Tests.Uts.RestTests.Unit;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
 {
     [Trait("uts", "unit")]
-    public class RealtimeTimeTests : UtsUnitTestBase
+    public class RealtimeTimeTests : TimeTestsBase<PubSubRealtimeClient>
     {
         public RealtimeTimeTests(ITestOutputHelper output)
             : base(output)
@@ -22,15 +22,15 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC6/time-proxies-rest-0
-        [UtsFact(Skip = "Mock infrastructure limitation: the shared REST cases helper TimeCases.cs for uts/rest/unit/time.md does not exist yet; see deviations.md")]
-        [Trait("spec", "RTC6")]
-        public Task RTC6_TimeProxiesRest()
+        // NOTE: the spec runs the uts/rest/unit/time.md tests against a realtime client in place of a REST client. They are inherited
+        // unchanged from TimeTestsBase (RestTests/Unit/TimeTests.cs) and run here through the overrides below; the realtime
+        // client is built with AutoConnect = false so only the HTTP mock is exercised (realtime-mapping.md section 12).
+        protected override PubSubRealtimeClient NewClient(ClientOptions options)
         {
-            // NOTE: this spec delegates to uts/rest/unit/time.md: the tests there are run against a realtime client through
-            // the shared helper beside the REST suite (realtime-mapping.md section 12), which is not translated yet.
-            // Realtime operation: client.TimeAsync()
-            // Spec: RealtimeClient#time is a direct proxy to RestClient#time. The tests in uts/rest/unit/time.md (covering RSC16) should be used to test a RealtimeClient instance in place of a RestClient instance.
-            return Task.CompletedTask;
+            options.AutoConnect = false;
+            return Realtime(options);
         }
+
+        protected override Task<DateTimeOffset> TimeAsync(PubSubRealtimeClient client) => client.TimeAsync();
     }
 }
