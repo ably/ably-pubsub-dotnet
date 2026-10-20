@@ -73,7 +73,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
                 var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
-                // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+                // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
                 var response = await client.Request(
                     new HttpMethod(testCase.Method),
                     testCase.Path,
@@ -106,7 +106,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/channels/test/messages",
@@ -140,7 +140,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -182,7 +182,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Post,
                 "/channels/test/messages",
@@ -198,7 +198,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSC19f1/version-param-sets-header-0
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSC19f1")]
         public async Task RSC19f1_VersionParamSetsHeader()
@@ -225,7 +224,8 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
                 mockHttp.Reset();
                 mockHttp.QueueResponse(200, new JArray());
 
-                // NOTE: the version argument has no SDK equivalent: sent as a request-level X-Ably-Version header, which should take precedence over the client default (RSC7e; rest-mapping.md section 8)
+                // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
+                // NOTE: the request-level header should take precedence over the client default (RSC7e)
                 var response = await client.Request(
                     HttpMethod.Get,
                     "/test",
@@ -258,7 +258,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -291,7 +291,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var clientToken = NewClient(new ClientOptions { Token = "my-token-string" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var responseToken = await clientToken.Request(
                 HttpMethod.Get,
                 "/test",
@@ -323,7 +323,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Post,
                 "/test",
@@ -359,7 +359,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Post,
                 "/test",
@@ -410,7 +410,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -472,7 +472,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -505,7 +505,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -539,7 +539,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -573,7 +573,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/channels/test/messages",
@@ -612,7 +612,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/channels/test/messages",
@@ -647,7 +647,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/time",
@@ -680,7 +680,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             Func<Task> act = () => client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -719,7 +719,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var requestTask = client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -760,7 +760,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -803,7 +803,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -834,7 +834,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
             // Test Steps
             // Attempt to override auth with custom header
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Get,
                 "/test",
@@ -883,7 +883,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
                 mockHttp.Reset();
                 mockHttp.QueueResponse(200, new JArray());
 
-                // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+                // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
                 var response = await client.Request(
                     HttpMethod.Get,
                     testCase.Path,
@@ -912,7 +912,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var client = NewClient(new ClientOptions { Key = "appId.keyId:keySecret" });
 
             // Test Steps
-            // NOTE: version: 3 has no SDK argument: sent as a request-level X-Ably-Version header (rest-mapping.md section 8)
+            // DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header
             var response = await client.Request(
                 HttpMethod.Delete,
                 "/channels/test/messages/123",

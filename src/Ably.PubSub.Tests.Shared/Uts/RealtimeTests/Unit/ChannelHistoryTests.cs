@@ -48,46 +48,102 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         protected override Task<PaginatedResult<Message>> HistoryAsync(IRealtimeChannel channel, PaginatedRequestParams query) => channel.HistoryAsync(query);
 
         // UTS: realtime/unit/RTL10b/adds-from-serial-0
-        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#history(untilAttach) (RTL10b); see deviations.md (Missing SDK Public API / Features)")]
+        [UtsFact]
         [Trait("spec", "RTL10b")]
         public async Task RTL10b_AddsFromSerial()
         {
-            // NOTE: IRealtimeChannel.HistoryAsync has no untilAttach option (realtime-mapping.md, Missing APIs); the whole test depends on it.
-            // channel_name = "test-RTL10b-${random_id()}"
-            // attach_serial = "serial-abc:0"
-            // mock_http answers history with 200 [] and captures requests; the mock WebSocket answers ATTACH with
-            // ATTACHED(channel: channel_name, channelSerial: attach_serial)
-            // client = Realtime(options: ClientOptions(key: "appId.keyId:keySecret", autoConnect: false), ...)
-            // channel = client.channels.get(channel_name, RealtimeChannelOptions(attachOnSubscribe: false))
-            // client.connect()
-            // AWAIT_STATE connection == CONNECTED
-            // AWAIT channel.attach()
-            // ASSERT channel.state == ATTACHED
+            // Setup
+            var channelName = "test-RTL10b-" + Guid.NewGuid().ToString("N");
+            var capturedRequests = new CaptureList<PendingHttpRequest>();
+            var attachSerial = "serial-abc:0";
+
+            var mockHttp = new MockHttpClient(
+                onConnectionAttempt: conn => conn.RespondWithSuccess(),
+                onRequest: req =>
+                {
+                    capturedRequests.Add(req);
+                    req.RespondWith(200, new JArray());
+                });
+            InstallMock(mockHttp);
+
+            MockWebSocket mockWs = null;
+            mockWs = new MockWebSocket(
+                onConnectionAttempt: conn => conn.RespondWithSuccess(ProtocolMessages.ConnectedMessage()),
+                onMessageFromClient: msg =>
+                {
+                    if (msg.Action == ProtocolMessage.MessageAction.Attach)
+                    {
+                        mockWs.ActiveConnection.SendToClient(ProtocolMessages.AttachedMessage(
+                            channelName,
+                            new Dictionary<string, JToken> { ["channelSerial"] = attachSerial }));
+                    }
+                });
+            InstallMock(mockWs);
+
+            var client = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
+
+            // NOTE: RealtimeChannelOptions(attachOnSubscribe: false) is dropped: the SDK has no attachOnSubscribe (TB4) and this test never subscribes, so the outcome is unchanged
+            var channel = client.Channels.Get(channelName);
+
+            // Test Steps
+            client.Connect();
+            await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Connected);
+            var attachResult = await UtsWait.WithTimeout(channel.AttachAsync(), TimeSpan.FromSeconds(10), "AttachAsync");
+            attachResult.IsSuccess.Should().BeTrue("AWAIT channel.attach() succeeds ({0})", attachResult.Error?.Message);
+            channel.State.Should().Be(ChannelState.Attached);
+
+            // DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)
             // AWAIT channel.history(untilAttach: true)
-            // request = captured_requests[0]
-            // ASSERT request.url.query_params["fromSerial"] == attach_serial
-            await Task.CompletedTask;
+            var query = new PaginatedRequestParams();
+            ((RealtimeChannel)channel).AddUntilAttachParameter(query);
+            await UtsWait.WithTimeout(channel.HistoryAsync(query), TimeSpan.FromSeconds(10), "HistoryAsync");
+
+            // Assertions
+            var request = capturedRequests[0];
+            request.Url.QueryParams["fromSerial"].Should().Be(attachSerial);
+            await CloseClient(client);
         }
 
         // UTS: realtime/unit/RTL10b/errors-when-not-attached-1
-        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#history(untilAttach) (RTL10b); see deviations.md (Missing SDK Public API / Features)")]
+        [UtsFact]
         [Trait("spec", "RTL10b")]
         public async Task RTL10b_ErrorsWhenNotAttached()
         {
-            // NOTE: IRealtimeChannel.HistoryAsync has no untilAttach option (realtime-mapping.md, Missing APIs); the whole test depends on it.
-            // channel_name = "test-RTL10b-err-${random_id()}"
-            // client = Realtime(options: ClientOptions(key: "appId.keyId:keySecret", autoConnect: false), webSocketClient: mock_ws)
-            // channel = client.channels.get(channel_name, RealtimeChannelOptions(attachOnSubscribe: false))
-            // client.connect()
-            // AWAIT_STATE connection == CONNECTED
-            // ASSERT channel.state == INITIALIZED
-            // error = null
-            // TRY:
-            //   AWAIT channel.history(untilAttach: true)
-            // CATCH e:
-            //   error = e
-            // ASSERT error IS AblyException
-            await Task.CompletedTask;
+            // Setup
+            var channelName = "test-RTL10b-err-" + Guid.NewGuid().ToString("N");
+
+            var mockWs = new MockWebSocket(
+                onConnectionAttempt: conn => conn.RespondWithSuccess(ProtocolMessages.ConnectedMessage()));
+            InstallMock(mockWs);
+
+            var client = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
+
+            // NOTE: RealtimeChannelOptions(attachOnSubscribe: false) is dropped: the SDK has no attachOnSubscribe (TB4) and this test never subscribes, so the outcome is unchanged
+            var channel = client.Channels.Get(channelName);
+
+            // Test Steps
+            client.Connect();
+            await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Connected);
+
+            channel.State.Should().Be(ChannelState.Initialized);
+
+            Exception error = null;
+            try
+            {
+                // DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)
+                // AWAIT channel.history(untilAttach: true)
+                var query = new PaginatedRequestParams();
+                ((RealtimeChannel)channel).AddUntilAttachParameter(query);
+                await channel.HistoryAsync(query);
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+
+            // Assertions
+            error.Should().BeOfType<AblyException>();
+            await CloseClient(client);
         }
     }
 }

@@ -4,7 +4,12 @@ Findings from evaluating the UTS-derived tests against the .NET SDK. Tests marke
 
 ## UTS Spec Errors
 
-Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see deviations.md (UTS Spec Errors)"`) rather than left as a fail-fast placeholder, so CI stays green while the specs are fixed upstream. This departs from the manual's fail-fast convention by decision of the SDK team; each entry's draft fix says what the spec should change. Once a spec is fixed, regenerate the test from it and remove the skip.
+A spec error normally leads to one of two outcomes, and each entry's **Test impact** says which (a few entries say why they use another form, e.g. RTP11c1 is env-gated and RTB1 is a skipped stub):
+
+- **The defect is in the test's subject** (the behaviour the test exists to check): the test is a skipped placeholder (`Skip = "UTS spec error <point>: …; see deviations.md (UTS Spec Errors)"`) rather than a fail-fast placeholder, so CI stays green while the spec is fixed upstream. This departs from the manual's fail-fast convention by decision of the SDK team. Once the spec is fixed, regenerate the test from it and remove the skip.
+- **The defect is incidental** (an over-specification the features spec permits otherwise, or an inconsistent fixture, stub or member that isn't what the test checks): the test is corrected inline to what the features spec allows, with a `// NOTE:` naming the spec point at each corrected line, and recorded as "adapted, not skipped" (for example RSA3b, RSC1b, the `/time` stub under RSC16 / RSA10k, RSL1k1 / RSL1k3, RSL4d3, TP3h, RSC7d1, RSC18, RSC17, RTP8). Every other assertion stays verbatim, so the test keeps guarding the SDK.
+
+Either way, the entry's draft fix says what the spec should change.
 
 ### RTN4b — successful-connection test asserts INITIALIZED on a client that auto-connects
 
@@ -339,6 +344,23 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **What the UTS spec gets wrong:** it asserts `request.query_params IS empty` after `stats()` with no arguments. Sending the defaults (the SDK sends `direction=backwards`, `limit=100`, `by=minute`) is permitted.
 - **Draft fix:** assert each parameter "absent OR the default", as `direction-defaults-backwards-1`, `limit-defaults-to-100-1`, `unit-defaults-to-minute-1` and `rest_presence.md` do.
 - **Test impact:** `StatsTests.RSC6a_NoParamsCleanRequest` is a skipped placeholder (the test's subject is the omission). The test is inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), where it is skipped the same way.
+
+### RTP8 — lifecycle test reads presence events by position, but a re-sync can legitimately add a PRESENT event
+
+- **Spec point:** RTP8, RTP9, RTP10, RTP2a, RTP2b2, RTP2d1 (test `realtime/integration/RTP8/enter-update-leave-lifecycle-0`, `uts/realtime/integration/presence_lifecycle_test.md`).
+- **What the features spec says:** `(RTP2a)` an incoming presence message is discarded only "if there is an existing message but it is `RTP2b`-newer than the incoming message"; `(RTP2b2)` ids `connid:msgSerial:index` compare by `msgSerial` then `index`, "larger being newer"; `(RTP2d1)` an `ENTER`, `UPDATE` or `PRESENT` that passes the newness check "must be emitted to `RealtimePresence` subscribers".
+- **What the UTS spec gets wrong:** it waits with `poll_until(all_events.length >= N)` and asserts `all_events[0] == ENTER`, `all_events[1] == UPDATE`, `all_events[2] == LEAVE`. When client B receives a presence SYNC after the live ENTER (a late or server-initiated re-sync), the SYNC copy of the member carries the same id, is not older, and is emitted as `PRESENT` (`PresenceMap.Put`). The extra event shifts the indexes, and "2 events" no longer means the UPDATE arrived (the following `get()` check races the UPDATE). The sibling test `RTP4/bulk-enter-observed-0` already allows for this by counting `ENTER` and `PRESENT`.
+- **Observed:** intermittent CI failure on the integration job, `Expected the enum to be PresenceAction.Update {value: 4}, but found PresenceAction.Present {value: 1}` at the `update_event.action` assertion (two first attempts in a row; both re-runs passed).
+- **Draft fix:** poll for the specific action (`ANY e IN all_events: e.action == UPDATE`), and assert the order on the non-`PRESENT` events (`CONTAINS_IN_ORDER [ENTER, UPDATE, LEAVE]`, or filter `PRESENT` before indexing).
+- **Test impact:** `RealtimeTests.Integration.PresenceLifecycleTests.RTP8_EnterUpdateLeaveLifecycle` adapted, not skipped: each wait polls for its action, and `PRESENT` events are filtered out before the positional assertions, with a `// NOTE:` naming RTP8 at each point; every assertion is otherwise verbatim.
+
+### RSC17 — tests assert `RestClient#clientId`, which the features spec doesn't define
+
+- **Spec point:** RSC17 (tests `rest/unit/RSC17/client-id-from-options-0`, `rest/unit/RSC17/client-id-matches-auth-1`, `uts/rest/unit/rest_client.md`).
+- **What the features spec says:** `(RSC17)` "When instantiating a `RestClient`, if a `clientId` attribute is set in `ClientOptions`, then the `Auth#clientId` attribute will contain the provided `clientId`". The IDL's `class RestClient` has no `clientId`; only `RealtimeClient` has one (`clientId: String? // RTC17`).
+- **What the UTS spec gets wrong:** both tests assert `client.clientId == "explicit-client-id"` and `client.clientId == client.auth.clientId` on a REST client, a member the features spec doesn't define. The requirement is on `Auth#clientId`.
+- **Draft fix:** assert `client.auth.clientId == "explicit-client-id"` and drop the `client.clientId == client.auth.clientId` line (or move it to a realtime RTC17 test).
+- **Test impact:** adapted, not skipped: `RestClientTests.RSC17_ClientIdFromOptions`, `RSC17_ClientIdMatchesAuth` assert `client.Auth.ClientId`, and the `client.clientId == client.auth.clientId` line is kept as a comment with a `// NOTE:`.
 
 ## Failing Tests
 
@@ -796,13 +818,13 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **What the spec says:** a Link header such as `</path>; rel="first"`, alone or after `</path?cursor=abc>; rel="next"`, is parsed to the right pagination state (`hasNext` false or true). `(TG2)` "Instantiating this type should not result in an error if paging headers are not returned from the REST API"; features is silent on the link URL's form, so the UTS is the requirement.
 - **What the SDK does:** `PaginatedRequestParams.GetLinkQuery` does `url.Split('?')[1]`, so a link without `?` throws `IndexOutOfRangeException` while the `PaginatedResult` is built.
 - **Root cause:** `PaginatedRequestParams.cs` (`GetLinkQuery`).
-- **Test impact:** `PaginatedResultTests.TG_LinkHeaderParsing` is env-gated (`[DeviationFact("TG")]`); it fails on its second case.
+- **Test impact:** `PaginatedResultTests.TG_LinkHeaderParsing` is env-gated (`[DeviationFact("TG")]`); it fails on its second case. `PaginatedResultTests.TG4_FirstReturnsFirstPage` (`rest/unit/TG4/first-returns-first-page-0`) is gated the same way: its mock's first response already carries the query-less `</channels/test/messages>; rel="first"` link, so the `IndexOutOfRangeException` is thrown while page 1 is built (the initial `channel.history()`), before `next()` or the `first` re-query is reached (see the TG4 / TG5 entry under Adapted Tests).
 - **Status:** open bug.
 
 ### TP3 — `PresenceMessage` JSON deserialisation does not decode `data` / `encoding`
 
 - **Spec point:** TP3 (test `rest/unit/TP3/presence-encoded-data-from-json-1`).
-- **What the spec says:** "Deserialization must decode data based on the encoding field" (`json` gives an object, `base64` gives bytes, and the encoding is consumed). The features spec does not define a `fromJson`; the decoding operation it defines for presence messages is `fromEncoded` (TP4, missing, see Mock Infrastructure Limitations), so the UTS is the requirement for this API.
+- **What the spec says:** "Deserialization must decode data based on the encoding field" (`json` gives an object, `base64` gives bytes, and the encoding is consumed). The features spec does not define a `fromJson`; the decoding operation it defines for presence messages is `fromEncoded` (TP4; not public in this SDK, and the TP4 test reaches it through the internal `MessageHandler.FromEncoded`, see Adapted Tests), so the UTS is the requirement for this API.
 - **What the SDK does:** `JsonHelper.DeserializeObject<PresenceMessage>` copies `data` and `encoding` as received (the `json` case leaves the string, so `JToken.DeepEquals` is false).
 - **Test impact:** `PresenceMessageTypesTests.TP3_PresenceEncodedDataFromJson` is env-gated (`[DeviationFact("TP3")]`).
 - **Status:** open (resolved by adding `PresenceMessage.FromEncoded`, TP4).
@@ -897,6 +919,14 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Test impact:** `StatsTests.RSC6b4_UnitParamValues`, `RSC6b_AllParamsCombined` (key `unit` absent), env-gated `[DeviationFact("RSC6b4")]`. The "absent or default" tests (`direction-defaults-backwards-1`, `limit-defaults-to-100-1`, `unit-defaults-to-minute-1`) pass. Both are inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), same outcome.
 - **Status:** open bug.
 
+### TS12c — `Stats.IntervalGranularity` (the TS12c `unit`) reads `intervalGranularity`, not the `unit` property
+
+- **Spec point:** TS12c (test `rest/unit/RSC6a/returns-paginated-stats-0`, `uts/rest/unit/stats.md`).
+- **What the spec says:** `(TS12c)` "`unit` (property present in the JSON) - a `String` or (if idiomatic) a value of the enumerable type `StatsIntervalGranularity` ... This must be from the `unit` property of the JSON, not calculated from the `intervalId`".
+- **What the SDK does:** `Stats.IntervalGranularity` is the TS12c member: TS12c allows the `StatsIntervalGranularity` enum, so the different name is idiomatic. But it is deserialised from the pre-2.1 `intervalGranularity` field, not from `unit`, so for `{"intervalId": "2024-01-01:00:00", "unit": "hour", ...}` it is `Minute` (the enum default).
+- **Test impact:** `StatsTests.RSC6a_ReturnsPaginatedStats`, env-gated `[DeviationFact("TS12c")]`, asserts `IntervalGranularity == Hour` (with a `// NOTE:`). Inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), same outcome.
+- **Status:** open bug: `IntervalGranularity` reads the wrong JSON field.
+
 ### TO3b / TO3c2 — no debug log message mentions "HTTP request"
 
 - **Spec point:** TO3b, TO3c2 (tests `rest/unit/TO3b/log-level-changeable-0`, `rest/unit/TO3c2/context-contains-expected-keys-0`, `uts/rest/unit/logging.md`).
@@ -921,22 +951,14 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Spec point:** CHM2g, CHM2h (tests `rest/unit/CHM2/parses-all-metrics-fields-0`, `rest/unit/CHM2/zero-and-missing-metrics-1`, `uts/rest/unit/channel/rest_channel_attributes.md`).
 - **What the features spec says:** `ChannelMetrics` has `objectPublishers` (CHM2g) and `objectSubscribers` (CHM2h).
 - **What the SDK does:** `ChannelMetrics` has only `Connections`, `Publishers`, `Subscribers`, `PresenceConnections`, `PresenceMembers`, `PresenceSubscribers`.
-- **Test impact:** the two tests run; the object* assertions (2 and 2) are commented under a `// NOTE: missing SDK API`. The second test's "missing fields default to 0" check for CHM2g/h is therefore not exercised.
-- **Status:** not implemented.
-
-### MOP2 — `MessageOperation#toJson` is missing
-
-- **Spec point:** MOP2a-c (test `rest/unit/MOP2a/message-operation-fields-0`).
-- **What the features spec says:** the IDL defines `MessageOperation` with `clientId`, `description` and `metadata` (MOP2a-c); it defines no serialisation of its own.
-- **What the SDK does:** the UTS test calls `op.toJson()`; `MessageOperation` has no such method and no JSON property names (the SDK sends it as the message `version`, RSL15b7), so `JsonHelper.Serialize(op)` gives PascalCase keys.
-- **Test impact:** the test runs; the serialisation assertions (4 for the filled operation, 3 for the empty one) are commented under a `// NOTE:`.
+- **Test impact:** the two tests run; the object* assertions (2 and 2) are commented out under the `// Missing SDK public API: ChannelMetrics#objectPublishers (CHM2g)` skip-reason comment (`#objectSubscribers`, CHM2h, for the other). The second test's "missing fields default to 0" check for CHM2g/h is therefore not exercised.
 - **Status:** not implemented.
 
 ### REC3b — `ClientOptions#connectivityCheckUrl` is missing
 
 - **Spec point:** REC3b (test `rest/unit/REC3b/custom-connectivity-check-url-0`, `uts/rest/unit/fallback.md`).
 - **What the features spec says:** `(REC3b)` "The `connectivity check URL` may be specified explicitly by the `connectivityCheckUrl` option".
-- **What the SDK does:** `ClientOptions` has no such option; the internet check always uses `Defaults.InternetCheckUrl`.
+- **What the SDK does:** `ClientOptions` has no such option; the internet check always uses the constant `Defaults.InternetCheckUrl` (`PubSubHttpClient.CanConnectToAbly`), with no internal setting to override it, so there is no equivalent.
 - **Test impact:** `FallbackTests.REC3b_CustomConnectivityCheckUrl` is a skipped stub carrying the spec lines as comments.
 - **Status:** not implemented.
 
@@ -946,14 +968,6 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **What the features spec says:** `(RSA17g)` "Takes a `TokenRevocationTargetSpecifier` or an array of `TokenRevocationTargetSpecifier`s and sends them in a POST request to /keys/{API_KEY_NAME}/revokeTokens".
 - **What the SDK does:** `IAblyAuth` has no `revokeTokens` and there are no `TokenRevocationTargetSpecifier` / `TokenRevocationSuccessResult` / `TokenRevocationFailureResult` types (`rest-mapping.md` section 8).
 - **Test impact:** 4 skipped stubs carrying the spec lines as comments; plus the 17 unit stubs in `RestTests.Unit.RevokeTokensTests` (`rest/unit/RSA17g`, `RSA17b` x2, `RSA17c` x3, `TRS2`, `TRF2`, `RSA17d` x2, `RSA17e` x2, `RSA17f` x3, `RSA17/server-error-propagated-0`, `RSA17/request-uses-basic-auth-0`).
-- **Status:** not implemented.
-
-### RSC17 — `RestClient#clientId` is missing
-
-- **Spec point:** RSC17 (tests `rest/unit/RSC17/client-id-from-options-0`, `rest/unit/RSC17/client-id-matches-auth-1`, `uts/rest/unit/rest_client.md`).
-- **What the features spec says:** `(RSC17)` "When instantiating a `RestClient`, if a `clientId` attribute is set in `ClientOptions`, then the `Auth#clientId` attribute will contain the provided `clientId`".
-- **What the SDK does:** `PubSubHttpClient` has no `ClientId` (only `PubSubRealtimeClient.ClientId` exists); `client.Auth.ClientId` does. Both UTS tests assert through `client.clientId`.
-- **Test impact:** `RestClientTests.RSC17_ClientIdFromOptions`, `RSC17_ClientIdMatchesAuth` are skipped stubs carrying the spec lines as comments.
 - **Status:** not implemented.
 
 ### RSC22 — `RestClient#batchPublish` is missing
@@ -977,7 +991,8 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Spec point:** RSL1i, TO3l8 (test `rest/unit/RSL1i/message-size-limit-0`, `uts/rest/unit/channel/publish.md`).
 - **What the features spec says:** messages larger than `maxMessageSize` are rejected before transmission with error code 40009.
 - **What the SDK does:** `ClientOptions` has no `MaxMessageSize` (only `ConnectionDetails.MaxMessageSize`, a server-sent value) and `PublishAsync` performs no size check.
-- **Test impact:** `PublishTests.RSL1i_MessageSizeLimit` is a skipped stub carrying the spec lines as comments.
+- **Test impact:** `PublishTests.RSL1i_MessageSizeLimit` is a skipped stub carrying the spec lines as comments. `OptionsTypesTests.TO3_ClientOptionsAttributes` runs, with its `options.maxMessageSize == 65536` assertion (TO3l8) commented out under the `// Missing SDK public API: ClientOptions#maxMessageSize (TO3l8)` skip-reason comment.
+- **Searched for an equivalent:** `ConnectionDetails.MaxMessageSize` is the server-sent realtime limit, not a client option, and there is no size calculation (TM6) or 40009 check on the REST publish path (`ErrorCodes.MaxMessageLengthExceeded` is defined but never used on it).
 - **Status:** not implemented.
 
 ### RSL1l1 — the `params` argument of `RestChannel#publish` is missing
@@ -988,21 +1003,12 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Test impact:** 1 skipped stub carrying the spec lines as comments; plus the unit stub `RestTests.Unit.PublishTests.RSL1l_ParamsAsQuerystring` (`rest/unit/RSL1l/params-as-querystring-0`).
 - **Status:** not implemented.
 
-### RTL10b — the `untilAttach` param of `RealtimeChannel#history` is missing
-
-- **Spec point:** RTL10b. Tests (`ChannelHistoryTests`, 2): `realtime/unit/RTL10b/adds-from-serial-0`, `RTL10b/errors-when-not-attached-1`.
-- **What the features spec says:** "`(RTL10b)` Additionally supports the param `untilAttach`, which if true, will only retrieve messages prior to the moment that the channel was attached …".
-- **What the SDK does:** `IRealtimeChannel.HistoryAsync` takes no `untilAttach` (presence history has it; `realtime-mapping.md` §12).
-- **Test impact:** 2 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
-- **Other SDKs:** ably-java and ably-cocoa both support `untilAttach` on channel history.
-- **Status:** not implemented.
-
 ### RTL22 — `RealtimeChannel#subscribe(MessageFilter, …)` is missing
 
-- **Spec point:** RTL22. Tests (`ChannelSubscribeTests`, 5): `realtime/unit/RTL22a/filter-matching-name-0`, `RTL22a/filter-matching-ref-timeserial-1`, `RTL22a/filter-matching-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0`.
+- **Spec point:** RTL22. Tests (`ChannelSubscribeTests`, 4): `realtime/unit/RTL22a/filter-matching-ref-timeserial-1`, `RTL22a/filter-matching-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0`. (`RTL22a/filter-matching-name-0` runs through `Subscribe(name, …)`; see the RTL22a entry under Adapted Tests.)
 - **What the features spec says:** "`(RTL22)` Methods must be provided for attaching and removing a listener which only executes when the message matches a set of criteria."
-- **What the SDK does:** no `Subscribe` overload takes a `MessageFilter` (`realtime-mapping.md` §12).
-- **Test impact:** 5 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **What the SDK does:** no `Subscribe` overload takes a `MessageFilter` (`realtime-mapping.md` §12), and nothing filters on `extras.ref.timeserial`, `extras.ref.type`, `isRef` or `clientId`, so these 4 tests have no equivalent.
+- **Test impact:** 4 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
 - **Other SDKs:** Not present in ably-java or ably-cocoa either (no `MessageFilter`).
 - **Status:** not implemented.
 
@@ -1029,40 +1035,24 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 - **Spec point:** TB4, RTL7h, RTP6e, RTAN4e1. Tests (4): `realtime/unit/TB4/attach-on-subscribe-default-0` (`ChannelOptionsTests`), `RTL7h/no-attach-on-subscribe-0` (`ChannelSubscribeTests`), `RTP6e/subscribe-no-attach-option-0` (`RealtimePresenceSubscribeTests`), `RTAN4e1/no-warn-unattached-0` (`ChannelAnnotationsTests`).
 - **What the features spec says:** "`(TB4)` `attachOnSubscribe` (for realtime client libraries only) a boolean which determines whether calling `subscribe` on a channel or presence object should trigger an implicit attach. Defaults to `true`."
 - **What the SDK does:** `ChannelOptions` has no `AttachOnSubscribe`; these tests depend on the option being false on an unattached channel (`realtime-mapping.md` §12). Where the option is only setup the other tests drop it with a `// NOTE:`.
-- **Test impact:** 4 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists.
+- **Test impact:** 4 skipped stubs (`Skip = "Missing SDK public API: …"`, spec lines kept as comments); they can't be written until the API exists. Three more tests run with only their `attachOnSubscribe` assertion commented out under the `// Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4)` skip-reason comment: `ChannelOptionsTests.TB2_ChannelOptionsAttributes`, `RTS3c_OptionsUpdatedExisting`, `RTL16_SetOptionsUpdates`.
 - **Other SDKs:** ably-java and ably-cocoa both have `attachOnSubscribe`.
 - **Status:** not implemented.
 
-### TG4 / TG5 — `PaginatedResult#first` is missing
+### TP3i — `PresenceMessage#extras` is missing
 
-- **Spec point:** TG5 in the features spec (the UTS test is labelled TG4: `rest/integration/TG4/first-retrieves-page-0`, `RestTests.Integration.PaginationTests`).
-- **What the features spec says:** `(TG5)` "`PaginatedResult#first` function returns a new `PaginatedResult` for the first page of results" (IDL: `first() => io PaginatedResult<T> // TG5`).
-- **What the SDK does:** `PaginatedResult<T>` has `NextAsync`, `HasNext` and `IsLast` but no `FirstAsync` (only `HttpPaginatedResponse`, returned by `request()`, has one; `FirstQueryParams` is a property, not an operation).
-- **Test impact:** 1 skipped stub carrying the spec lines as comments; the unit test `rest/unit/TG4/first-returns-first-page-0` (`PaginatedResultTests.TG4_FirstReturnsFirstPage`) is a second skipped stub.
-- **Status:** not implemented.
-
-### TP4 — `PresenceMessage#fromEncoded` and `PresenceMessage#fromEncodedArray` are missing
-
-- **Spec point:** TP4 (test `rest/unit/TP4/from-encoded-presence-0`).
-- **What the features spec says:** `(TP4)` "`fromEncoded` and `fromEncodedArray` are alternative constructors that take an (already deserialized) `PresenceMessage`-like object (or array of such objects), and optionally a `channelOptions`, and return a `PresenceMessage` (or array of such `PresenceMessages`) that's decoded and decrypted as specified in `RSL6` ...".
-- **What the SDK does:** `PresenceMessage` has no such methods (only `Message` has; the internal `MessageHandler.FromEncoded<T>` is not public).
-- **Test impact:** `PresenceMessageTypesTests.TP4_FromEncodedPresence` is a skipped stub. See also the TP3 Failing Tests entry (presence JSON deserialisation does not decode).
+- **Spec point:** TP3i (tests `rest/unit/TP3a/presence-message-attributes-0`, `rest/unit/TP3/presence-from-json-0`).
+- **What the features spec says:** `(TP3i)` "`extras` JSON-encodable object, used to contain any arbitrary key value pairs ... should treat it opaquely, encoding it and passing it to realtime unaltered."
+- **What the SDK does:** `PresenceMessage` has no `Extras` member (only `Message` has), and nothing else holds or produces the value, so there is no equivalent.
+- **Test impact:** `PresenceMessageTypesTests.TP3a_PresenceMessageAttributes` and `TP3_PresenceFromJson` run; their extras assertions (1 each) are commented out under the `// Missing SDK public API: PresenceMessage#extras (TP3i)` skip-reason comment.
 - **Status:** not implemented.
 
 ### TP5 — `PresenceMessage#size` is missing
 
 - **Spec point:** TP5 (test `rest/unit/TP5/presence-message-size-0`).
 - **What the features spec says:** `(TP5)` "The size of the `PresenceMessage` for TO3l8 is calculated in the same way as for `Message`; see TM6".
-- **What the SDK does:** `PresenceMessage` has no size attribute (and the `maxMessageSize` option is missing too, see RSL1i).
+- **What the SDK does:** `PresenceMessage` has no size attribute, and there is no internal size calculation either: `Message` has none (TM6) and nothing in the message handler computes one. The `maxMessageSize` option is missing too, see RSL1i. So there is no equivalent.
 - **Test impact:** `PresenceMessageTypesTests.TP5_PresenceMessageSize` is a skipped stub.
-- **Status:** not implemented.
-
-### TS12c — `Stats#unit` is missing
-
-- **Spec point:** TS12c (test `rest/unit/RSC6a/returns-paginated-stats-0`, `uts/rest/unit/stats.md`).
-- **What the spec says:** `(TS12c)` "`unit` (property present in the JSON) - a `String` or (if idiomatic) a value of the enumerable type `StatsIntervalGranularity` ... This must be from the `unit` property of the JSON, not calculated from the `intervalId`".
-- **What the SDK does:** `Stats` maps `intervalGranularity` (the pre-2.1 schema) and has no `unit`; for `{"intervalId": "2024-01-01:00:00", "unit": "hour", ...}` `IntervalGranularity` is `Minute` (the enum default).
-- **Test impact:** `StatsTests.RSC6a_ReturnsPaginatedStats`, env-gated `[DeviationFact("TS12c")]`, asserting `IntervalGranularity == Hour` as the nearest member (with a `// NOTE:`). Inherited by `RealtimeTests.Unit.RealtimeStatsTests` (RTC5), same outcome.
 - **Status:** not implemented.
 
 ## Adapted Tests
@@ -1141,16 +1131,65 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 
 - **Spec point:** RSA16, RSA16a–RSA16d (`uts/rest/unit/auth/token_details.md` and the RSA10g / RSA10j reads in `authorize.md`).
 - **What the spec says:** `(RSA16)` "`Auth#tokenDetails`: ... `(RSA16a)` Holds a `TokenDetails` representing the token currently in use by the library, if any".
-- **What the SDK does:** `IAblyAuth` has no `TokenDetails`; the same value lives in the internal `AblyAuth.CurrentToken` (`rest-mapping.md` section 8, Missing APIs). `TokenDetails.Expires` / `Issued` are non-nullable `DateTimeOffset`, so "null" is asserted as `DateTimeOffset.MinValue`.
-- **Test impact:** the tests read `((AblyAuth)client.Auth).CurrentToken` (a private helper in `TokenDetailsTests`) with a `// DEVIATION:` comment: `TokenDetailsTests.RSA16a_TokenFromCallback`, `RSA16a_TokenFromRequestToken`, `RSA16b_TokenStringInOptions`, `RSA16c_SetOnInstantiation`, `RSA16c_UpdatedAfterAuthorize`, `RSA16c_UpdatedAfter40142Renewal`, `RSA16d_NullWithBasicAuth`, `RSA16d_NullBeforeTokenObtained`, `RSA16a_PreservedAcrossRequests`, `RSA16a_ReflectsCapability` (plus the gated `RSA16b_TokenStringFromCallback` and `RSA16d_NullAfterInvalidation`), and `AuthorizeTests.RSA10g_AuthorizeUpdatesTokenDetails`, `RSA10j_AuthorizeReplacesExistingToken`.
+- **What the SDK does:** the public `Auth#tokenDetails` accessor the spec names is absent (`IAblyAuth` has no `TokenDetails`); the same value lives in the internal `AblyAuth.CurrentToken` (`rest-mapping.md` section 8, Missing APIs). `TokenDetails.Expires` / `Issued` are non-nullable `DateTimeOffset`, so "null" is asserted as `DateTimeOffset.MinValue`.
+- **Test impact:** the tests read `((AblyAuth)client.Auth).CurrentToken` (a private helper in `TokenDetailsTests`), marked `// DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken` at each test's first read: `TokenDetailsTests.RSA16a_TokenFromCallback`, `RSA16a_TokenFromRequestToken`, `RSA16b_TokenStringInOptions`, `RSA16c_SetOnInstantiation`, `RSA16c_UpdatedAfterAuthorize`, `RSA16c_UpdatedAfter40142Renewal`, `RSA16d_NullWithBasicAuth`, `RSA16d_NullBeforeTokenObtained`, `RSA16a_PreservedAcrossRequests`, `RSA16a_ReflectsCapability` (plus the gated `RSA16b_TokenStringFromCallback` and `RSA16d_NullAfterInvalidation`), and `AuthorizeTests.RSA10g_AuthorizeUpdatesTokenDetails`, `RSA10j_AuthorizeReplacesExistingToken`.
 - **Status:** open: public `Auth#tokenDetails` accessor not implemented.
+
+### RTL10b — `untilAttach` is not a public option of `RealtimeChannel#history`: tests call the internal `RealtimeChannel.AddUntilAttachParameter`
+
+- **Spec point:** RTL10b. Tests (`ChannelHistoryTests`, 2): `realtime/unit/RTL10b/adds-from-serial-0`, `RTL10b/errors-when-not-attached-1`.
+- **What the spec says:** `(RTL10b)` "Additionally supports the param `untilAttach`, which if true, will only retrieve messages prior to the moment that the channel was attached ... passing the querystring param `fromSerial` with the `RealtimeChannel#properties.attachSerial` ... If the `untilAttach` param is specified when the channel is not attached, it results in an error."
+- **What the SDK does:** the public `untilAttach` param of `IRealtimeChannel.HistoryAsync` is absent (presence history has it). The internal `RealtimeChannel.AddUntilAttachParameter(query)` adds `fromSerial` = the attach serial and throws an `AblyException` when the channel is not ATTACHED, which is the RTL10b behaviour. A public `PaginatedRequestParams.ExtraParameters["fromSerial"]` would bypass the attach-serial lookup and the not-attached error, so it is not used.
+- **Test impact:** both tests call `((RealtimeChannel)channel).AddUntilAttachParameter(query)` and then `HistoryAsync(query)`, marked `// DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)`. The `RealtimeChannelOptions(attachOnSubscribe: false)` setup is dropped (see the TB4 entry under Missing SDK Public API / Features).
+- **Other SDKs:** ably-java and ably-cocoa both support `untilAttach` on channel history.
+- **Status:** open: public `untilAttach` param of `RealtimeChannel#history` not implemented.
+
+### MOP2 — `MessageOperation#toJson` is not public: tests assert the operation in the request the SDK sends
+
+- **Spec point:** MOP2a-c (test `rest/unit/MOP2a/message-operation-fields-0`).
+- **What the features spec says:** the IDL defines `MessageOperation` with `clientId`, `description` and `metadata` (MOP2a-c); it defines no serialisation of its own. `(RSL15b7)` the update request's `version` is "set to the `MessageOperation` object if provided".
+- **What the SDK does:** the public `MessageOperation#toJson` the UTS calls is absent, and `JsonHelper.Serialize(op)` gives PascalCase keys. The public `UpdateMessageAsync(message, op)` sends the operation as the `version` of the PATCH body, serialised as `clientId`, `description` and `metadata` with null members omitted, which is the JSON the spec asserts.
+- **Test impact:** `MutableMessageTypesTests.MOP2a_MessageOperationFields` sends each operation with `channel.UpdateMessageAsync(new Message { Serial = ... }, op)` against a capturing `MockHttpClient` and asserts the request body's `version` object: the filled operation (3 assertions; `metadata` is checked through its `reason` entry) and the empty one (3 absent keys), each marked `// DEVIATION: MessageOperation#toJson absent; using the "version" object of the UpdateMessageAsync request body`. Every spec assertion runs through this public route, so no internal member is used.
+- **Status:** open: public `MessageOperation#toJson` not implemented.
+
+### TP4 — `PresenceMessage#fromEncoded` and `#fromEncodedArray` are not public: tests call the internal `MessageHandler.FromEncoded`
+
+- **Spec point:** TP4 (test `rest/unit/TP4/from-encoded-presence-0`).
+- **What the features spec says:** `(TP4)` "`fromEncoded` and `fromEncodedArray` are alternative constructors that take an (already deserialized) `PresenceMessage`-like object (or array of such objects), and optionally a `channelOptions`, and return a `PresenceMessage` (or array of such `PresenceMessages`) that's decoded and decrypted as specified in `RSL6` ...".
+- **What the SDK does:** the public `PresenceMessage.FromEncoded` / `FromEncodedArray` are absent (only `Message` has them). The internal `MessageHandler.FromEncoded<T>` / `FromEncodedArray<T>` accept any `IMessage`, so they decode a `PresenceMessage` the way RSL6 describes.
+- **Test impact:** `PresenceMessageTypesTests.TP4_FromEncodedPresence` deserialises the raw JSON with `JsonHelper` and passes it to `MessageHandler.FromEncoded` / `FromEncodedArray`, each call marked `// DEVIATION: PresenceMessage#fromEncoded absent; using internal MessageHandler.FromEncoded<PresenceMessage>` (and the array form). The `encoding IS null` check is asserted as `BeEmpty()` with a `// DEVIATION:` comment (see the RSL6 / TM3 entry). See also the TP3 Failing Tests entry (presence JSON deserialisation does not decode).
+- **Status:** open: public `PresenceMessage#fromEncoded` / `#fromEncodedArray` not implemented.
+
+### TG4 / TG5 — `PaginatedResult#first` is not public: tests re-query `FirstQueryParams`
+
+- **Spec point:** TG5 in the features spec (the UTS tests are labelled TG4: `rest/unit/TG4/first-returns-first-page-0`, `rest/integration/TG4/first-retrieves-page-0`).
+- **What the features spec says:** `(TG5)` "`PaginatedResult#first` function returns a new `PaginatedResult` for the first page of results" (IDL: `first() => io PaginatedResult<T> // TG5`).
+- **What the SDK does:** the public `PaginatedResult#first` is absent (`PaginatedResult<T>` has `NextAsync`, `HasNext` and `IsLast`; only the `HttpPaginatedResponse` returned by `request()` has a `FirstAsync`). The public `FirstQueryParams` holds the first-page query, and passing it to the channel's `HistoryAsync(query)` re-runs it, which is what `first()` does.
+- **Test impact:** `PaginationTests.TG4_FirstRetrievesPage` (integration) and `PaginatedResultTests.TG4_FirstReturnsFirstPage` (unit) call `channel.HistoryAsync(page2.FirstQueryParams)`, marked `// DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)`. The integration test runs. The unit test is env-gated (`[DeviationFact("TG")]`) because its mock's query-less `first` link hits the TG link-parser crash (see that entry under Failing Tests).
+- **Status:** open: public `PaginatedResult#first` not implemented.
+
+### RTL22a — `RealtimeChannel#subscribe(MessageFilter, …)` is absent: the name-filter test subscribes by event name
+
+- **Spec point:** RTL22, RTL22a, MFI2d (test `realtime/unit/RTL22a/filter-matching-name-0`, `uts/realtime/unit/channels/channel_subscribe.md`).
+- **What the features spec says:** `(RTL22)` "Methods must be provided for attaching and removing a listener which only executes when the message matches a set of criteria"; `(RTL22a)` the filter matches "one or more of: extras.ref.timeserial, extras.ref.type or name".
+- **What the SDK does:** the public `RealtimeChannel#subscribe(MessageFilter, …)` is absent (see the RTL22 entry under Missing SDK Public API / Features). For a filter on `name` alone, the public event-name subscribe `IRealtimeChannel.Subscribe(string eventName, Action<Message>)` (RTL7b) delivers exactly the messages whose name matches, and none without a name, which is what the test observes.
+- **Test impact:** `ChannelSubscribeTests.RTL22a_FilterMatchingName` subscribes with `channel.Subscribe("target-event", listener)` in place of `subscribe(MessageFilter(name: "target-event"), listener)`, marked `// DEVIATION: RealtimeChannel#subscribe(MessageFilter) absent; using channel.Subscribe("target-event", listener)`; all 5 assertions are verbatim. The `attachOnSubscribe: false` setup is dropped as elsewhere (the test attaches first).
+- **Status:** open: public `RealtimeChannel#subscribe(MessageFilter, …)` not implemented.
+
+### TO3k6 — `ClientOptions#fallbackHosts` has no public getter: the test reads the internal `GetFallbackHosts()`
+
+- **Spec point:** TO3k6 (test `rest/unit/TO3/client-options-custom-hosts-1`, `uts/rest/unit/types/options_types.md`).
+- **What the features spec says:** the IDL lists `fallbackHosts` as a `ClientOptions` attribute (TO3k6), which the test reads back.
+- **What the SDK does:** the public `ClientOptions#fallbackHosts` getter is absent (`ClientOptions.FallbackHosts` is set-only). The internal `ClientOptions.GetFallbackHosts()` returns a copy of the array that was set (or the endpoint's defaults when none was), which is the value the spec asserts.
+- **Test impact:** `OptionsTypesTests.TO3_ClientOptionsCustomHosts` asserts `options.GetFallbackHosts()` equals `["fallback1.example.com", "fallback2.example.com"]`, marked `// DEVIATION: ClientOptions#fallbackHosts absent; using internal ClientOptions.GetFallbackHosts()` (unit tier only).
+- **Status:** open: public `ClientOptions#fallbackHosts` getter not implemented.
 
 ### RSL6 / TM3 — a fully decoded message has `encoding == ""`, not null
 
 - **Spec point:** RSL6a, RSL6 (tests `rest/unit/RSL6a/decode-base64-to-binary-0`, `rest/unit/RSL6a/decode-json-to-object-1`, `rest/unit/RSL6/decode-utf8-base64-data-2`, `rest/unit/RSL6/complex-chained-encoding-3`, and the `base64`, `json` cases of `rest/unit/TM3/from-encoded-decodes-encoding-1`).
 - **What the spec says:** `ASSERT message.encoding IS null  # Encoding consumed after decode`. The features spec says (RSL6b) the residual transforms are left in `encoding` but does not say what an empty residue is.
 - **What the SDK does:** once every encoding is consumed `Encoding` is `""` (the same SDK-wide empty-string-instead-of-null as the RTN8a entry above).
-- **Test impact:** the tests assert `BeEmpty()` with a `// DEVIATION:` comment (the TM3 test is also env-gated for the RSL6a / TM3 entry above, and keeps the null check for its plain-text case, whose encoding stays null). Also `RestPresenceTests.RSP5_DecodeJsonData` and `RSP5_DecodeBase64Binary` (`rest/unit/RSP5/decode-json-data-1`, `decode-base64-binary-2`, presence messages): `Encoding.Should().BeEmpty()` with a `// DEVIATION:` comment.
+- **Test impact:** the tests assert `BeEmpty()` with a `// DEVIATION:` comment (the TM3 test is also env-gated for the RSL6a / TM3 entry above, and keeps the null check for its plain-text case, whose encoding stays null). Also `RestPresenceTests.RSP5_DecodeJsonData` and `RSP5_DecodeBase64Binary` (`rest/unit/RSP5/decode-json-data-1`, `decode-base64-binary-2`, presence messages): `Encoding.Should().BeEmpty()` with a `// DEVIATION:` comment, and `PresenceMessageTypesTests.TP4_FromEncodedPresence` (`rest/unit/TP4/from-encoded-presence-0`).
 - **Status:** intentional / SDK-wide.
 
 ### TO3j10 / AO2g — `ClientOptions.QueryTime` defaults to null, not false
@@ -1163,11 +1202,11 @@ Every test in this section is skipped (`Skip = "UTS spec error <point>: …; see
 
 ### RSC19f1 — `request()` has no `version` argument: the version is sent as a request-level header
 
-- **Spec point:** RSC19f, RSC19f1 (test `rest/unit/RSC19f1/version-param-sets-header-0`, `uts/rest/unit/request.md`; the same adaptation, with a `// NOTE:`, is in every `request()` call of `RequestTests`).
+- **Spec point:** RSC19f, RSC19f1 (test `rest/unit/RSC19f1/version-param-sets-header-0`, `uts/rest/unit/request.md`; the same adaptation is in every `request()` call of `RequestTests`, each marked `// DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header`).
 - **What the spec says:** `(RSC19f1)` "The `version` parameter specifies the protocol version that the Ably service should use when interpreting the request. The library must include an `X-Ably-Version` header in the request that it sends, with value given by this argument."
-- **What the SDK does:** `PubSubHttpClient.Request` has no `version` parameter; the SDK always sends its own `X-Ably-Version` (6).
+- **What the SDK does:** the public `version` argument the spec names is absent (`PubSubHttpClient.Request` has no `version` parameter); the SDK always sends its own `X-Ably-Version` (6), and a request-level header reaches the same behaviour.
 - **Test impact:** `RequestTests.RSC19f1_VersionParamSetsHeader` passes `["X-Ably-Version"] = "2"` / `"3"` in the `headers` argument and asserts the captured header equals it (so it guards that a request-level header takes precedence over the client default, RSC7e).
-- **Status:** open: a `version` argument is not implemented.
+- **Status:** open: public `request` `version` argument not implemented.
 
 ## Mock Infrastructure Limitations
 

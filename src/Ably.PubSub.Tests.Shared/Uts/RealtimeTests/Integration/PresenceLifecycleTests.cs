@@ -159,8 +159,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
             AssertSucceeded(await channelA.Presence.EnterAsync("hello"), "channel_a.presence.enter()");
 
             // Wait for ENTER event on client B
+            // NOTE: polls for the ENTER action, not an event count: a presence re-sync can legitimately emit PRESENT for a member
+            // already in the map (RTP2a/RTP2b2/RTP2d1) - see deviations.md (UTS Spec Errors, RTP8)
+            // poll_until(condition: all_events.length >= 1)
             await UtsWait.PollUntil(
-                () => allEvents.Count >= 1,
+                () => allEvents.Snapshot().Any(e => e.Action == PresenceAction.Enter),
                 timeout: TimeSpan.FromSeconds(10),
                 interval: TimeSpan.FromMilliseconds(200),
                 description: "client B observed the ENTER event");
@@ -175,8 +178,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
             AssertSucceeded(await channelA.Presence.UpdateAsync("world"), "channel_a.presence.update()");
 
             // Wait for UPDATE event on client B
+            // NOTE: polls for the UPDATE action, not an event count: a presence re-sync can legitimately emit PRESENT for a member
+            // already in the map (RTP2a/RTP2b2/RTP2d1) - see deviations.md (UTS Spec Errors, RTP8)
+            // poll_until(condition: all_events.length >= 2)
             await UtsWait.PollUntil(
-                () => allEvents.Count >= 2,
+                () => allEvents.Snapshot().Any(e => e.Action == PresenceAction.Update),
                 timeout: TimeSpan.FromSeconds(10),
                 interval: TimeSpan.FromMilliseconds(200),
                 description: "client B observed the UPDATE event");
@@ -190,8 +196,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
             AssertSucceeded(await channelA.Presence.LeaveAsync("goodbye"), "channel_a.presence.leave()");
 
             // Wait for LEAVE event on client B
+            // NOTE: polls for the LEAVE action, not an event count: a presence re-sync can legitimately emit PRESENT for a member
+            // already in the map (RTP2a/RTP2b2/RTP2d1) - see deviations.md (UTS Spec Errors, RTP8)
+            // poll_until(condition: all_events.length >= 3)
             await UtsWait.PollUntil(
-                () => allEvents.Count >= 3,
+                () => allEvents.Snapshot().Any(e => e.Action == PresenceAction.Leave),
                 timeout: TimeSpan.FromSeconds(10),
                 interval: TimeSpan.FromMilliseconds(200),
                 description: "client B observed the LEAVE event");
@@ -202,7 +211,10 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
 
             // Assertions
             // Verify the sequence of events
-            var observedEvents = allEvents.Snapshot();
+            // NOTE: PRESENT events are excluded before indexing: a presence re-sync can emit PRESENT for the member between
+            // the live events (RTP2a/RTP2b2/RTP2d1), so all_events[1] is not necessarily the UPDATE - see deviations.md
+            // (UTS Spec Errors, RTP8)
+            var observedEvents = allEvents.Snapshot().Where(e => e.Action != PresenceAction.Present).ToList();
             observedEvents.Count.Should().BeGreaterThanOrEqualTo(3);
 
             var enterEvent = observedEvents[0];

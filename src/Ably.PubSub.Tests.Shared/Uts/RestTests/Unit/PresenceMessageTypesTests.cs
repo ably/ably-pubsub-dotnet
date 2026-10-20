@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Ably.PubSub.MessageEncoders;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Tests.Uts.Infra;
 using Ably.PubSub.Tests.Uts.Infra.Unit;
@@ -81,7 +82,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             msg.Timestamp.Should().Be(DateTimeOffset.FromUnixTimeMilliseconds(1234567890000));
 
             // TP3i - extras attribute
-            // NOTE: no assertion: PresenceMessage has no extras attribute (TP3i) in this SDK, so the spec lines are kept as comments (missing SDK API)
+            // Missing SDK public API: PresenceMessage#extras (TP3i); see deviations.md (Missing SDK Public API / Features)
             // msg = PresenceMessage(extras: { "headers": { "x-custom": "value" } })
             // ASSERT msg.extras["headers"]["x-custom"] == "value"
         }
@@ -264,7 +265,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             msg.Data.Should().Be("hello");
             msg.Timestamp.Should().Be(DateTimeOffset.FromUnixTimeMilliseconds(1234567890000));
 
-            // NOTE: no assertion: PresenceMessage has no extras attribute (TP3i) in this SDK (missing SDK API)
+            // Missing SDK public API: PresenceMessage#extras (TP3i); see deviations.md (Missing SDK Public API / Features)
             // ASSERT msg.extras["headers"]["x-key"] == "x-value"
         }
 
@@ -336,40 +337,46 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/TP4/from-encoded-presence-0
-        [UtsFact(Skip = "Missing SDK public API: PresenceMessage#fromEncoded (TP4); see deviations.md (Missing SDK Public API / Features)")]
+        [UtsFact]
         [Trait("spec", "TP4")]
-        public Task TP4_FromEncodedPresence()
+        public void TP4_FromEncodedPresence()
         {
-            // NOTE: missing SDK API: the SDK has no PresenceMessage.FromEncoded / FromEncodedArray (rest-mapping.md section 8, Missing APIs; only the internal MessageHandler.FromEncoded<T> exists), so the whole test is a stub. Spec lines:
-            // # fromEncoded — single message
-            // raw = {
-            //   "action": "enter",
-            //   "clientId": "user-1",
-            //   "data": "{\"status\":\"online\"}",
-            //   "encoding": "json"
-            // }
-            //
+            // fromEncoded - single message
+            var raw = JsonHelper.DeserializeObject<PresenceMessage>(new JObject
+            {
+                ["action"] = "enter",
+                ["clientId"] = "user-1",
+                ["data"] = "{\"status\":\"online\"}",
+                ["encoding"] = "json",
+            });
+
+            // DEVIATION: PresenceMessage#fromEncoded absent; using internal MessageHandler.FromEncoded<PresenceMessage>
             // msg = PresenceMessage.fromEncoded(raw)
-            //
-            // ASSERT msg.action == ENTER
-            // ASSERT msg.clientId == "user-1"
-            // ASSERT msg.data == { "status": "online" }
-            // ASSERT msg.encoding IS null
-            //
-            // # fromEncodedArray — array of messages
-            // raw_array = [
-            //   { "action": "enter", "clientId": "alice", "data": "hello" },
-            //   { "action": "enter", "clientId": "bob", "data": "world" }
-            // ]
-            //
+            var msg = MessageHandler.FromEncoded(raw);
+
+            msg.Action.Should().Be(PresenceAction.Enter);
+            msg.ClientId.Should().Be("user-1");
+            JToken.DeepEquals(msg.Data as JToken, new JObject { ["status"] = "online" }).Should().BeTrue();
+
+            // DEVIATION: the SDK leaves an empty string, not null, once every encoding is consumed; see deviations.md (Adapted Tests, RSL6 / TM3)
+            msg.Encoding.Should().BeEmpty();
+
+            // fromEncodedArray - array of messages
+            var rawArray = JsonHelper.Deserialize<PresenceMessage[]>(new JArray
+            {
+                new JObject { ["action"] = "enter", ["clientId"] = "alice", ["data"] = "hello" },
+                new JObject { ["action"] = "enter", ["clientId"] = "bob", ["data"] = "world" },
+            }.ToString());
+
+            // DEVIATION: PresenceMessage#fromEncodedArray absent; using internal MessageHandler.FromEncodedArray<PresenceMessage>
             // messages = PresenceMessage.fromEncodedArray(raw_array)
-            //
-            // ASSERT messages.length == 2
-            // ASSERT messages[0].clientId == "alice"
-            // ASSERT messages[0].data == "hello"
-            // ASSERT messages[1].clientId == "bob"
-            // ASSERT messages[1].data == "world"
-            return Task.CompletedTask;
+            var messages = MessageHandler.FromEncodedArray(rawArray);
+
+            messages.Should().HaveCount(2);
+            messages[0].ClientId.Should().Be("alice");
+            messages[0].Data.Should().Be("hello");
+            messages[1].ClientId.Should().Be("bob");
+            messages[1].Data.Should().Be("world");
         }
 
         // UTS: rest/unit/TP5/presence-message-size-0

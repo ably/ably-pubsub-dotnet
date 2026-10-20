@@ -203,7 +203,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
             // Test Steps
             // Before authorize
-            // DEVIATION: Auth#tokenDetails is not public; the internal AblyAuth.CurrentToken is read instead (see deviations.md)
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             ((AblyAuth)client.Auth).CurrentToken.Should().BeNull();
 
             var result = await client.Auth.AuthorizeAsync();
@@ -344,7 +344,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             result1.Token.Should().Be("token-1");
             result2.Token.Should().Be("token-2");
 
-            // DEVIATION: Auth#tokenDetails is not public; the internal AblyAuth.CurrentToken is read instead (see deviations.md)
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             ((AblyAuth)client.Auth).CurrentToken.Token.Should().Be("token-2");
         }
 

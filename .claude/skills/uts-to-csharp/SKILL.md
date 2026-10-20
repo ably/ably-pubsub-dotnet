@@ -256,9 +256,13 @@ the tests. When a spec needs an internal class/method/field, work down this list
    failure") when the whole test depends on it; otherwise record the line under *Mock Infrastructure
    Limitations* in `deviations.md` in evaluate mode, or list it in the run summary in translate-only mode.
 
-Only white-box specs listed in the module notes reach internals; integration and proxy specs never do
+Only white-box specs listed in the module notes reach internals, plus a unit test adapted to an existing internal member because the public API it names is absent (see below); integration and proxy specs never do
 unless the notes list them as white-box because the spec itself prescribes the internal write. White-box
 access stays in the test body or a file-local helper; it never moves into the infra.
+
+This ladder is for specs that are themselves white-box. When a spec names a *public* API the SDK lacks,
+"First, try to adapt the test" under "Test patterns for a diagnosed failure" applies instead (at the unit
+tier only, its equivalent may be an existing internal member).
 
 ### Client construction
 
@@ -556,8 +560,9 @@ capability, rule/action builder or parameter the infra lacks (e.g. `generate_jwt
   stop and ask the user, with the gap and a proposed change; meanwhile the test is a MIL stub.
 - **Never** add a file-local helper, signer, builder or other workaround code to a test file to cover an
   infra gap, and never use a MIL stub to dodge a gap you can fix. A MIL stub stays the answer for an
-  infra gap deferred to the user. A missing **SDK** API is not an infra gap: it's a missing-API stub
-  (see "Test patterns for a diagnosed failure"); the SDK is never changed.
+  infra gap deferred to the user. A missing **SDK** API is not an infra gap: first try to adapt the
+  test ("First, try to adapt the test", under "Test patterns for a diagnosed failure"), and only when that
+  fails is it a missing-API stub or a partial test; the SDK is never changed.
 
 ### Protocol messages and types
 
@@ -901,8 +906,11 @@ every failure via the decision tree below. Each test must end in exactly one of 
 - a documented **SDK deviation** — env-gated or adapted, stays green (SDK ≠ spec; fix belongs in the SDK); or
 - a documented **UTS spec error** — **fails fast** (the spec is wrong; fix belongs in the spec). This is the
   one acceptable red; or
-- a **missing-API stub** — a skipped test for a required public API or feature the SDK doesn't implement
-  (recorded under Missing SDK Public API / Features); or
+- an **adapted test through an equivalent** — the spec-named public API is absent but the test runs
+  through another public mechanism (or, at the unit tier, an existing internal member), recorded under
+  Adapted Tests; or
+- a **missing-API stub** — a skipped test for a required public API or feature the SDK doesn't implement,
+  when the test can't be adapted (recorded under Missing SDK Public API / Features); or
 - a **MIL stub** — a skipped test whose whole body needs a mock capability the infra lacks (recorded as a
   Mock Infrastructure Limitation, not an SDK deviation); or
 - a **not-applicable** ID — no test at all, just a `// UTS-NA:` line (Step 1).
@@ -934,7 +942,11 @@ Test fails
   |     YES
   |       +-- Does test accurately translate the UTS spec?
   |             NO  → fix the test (no deviation entry needed)
-  |             YES → SDK deviation — env-gated skip or adapted assertion (below); record in the deviations file
+  |             YES → Does the SDK have the public API or feature the spec names?
+  |                     YES → SDK deviation — env-gated skip or adapted assertion (below); record in the deviations file
+  |                     NO  → Can the test be adapted to an equivalent? (below, "First, try to adapt the test")
+  |                             YES → adapted assertion; record under Adapted Tests (note the absent public API)
+  |                             NO  → missing-API stub (below); record under Missing SDK Public API / Features
 ```
 
 ### Test patterns for a diagnosed failure
@@ -997,18 +1009,38 @@ public async Task RTN15c4_ResumeWithTokenErrorReattaches()
 
 List each in the run summary with the features-spec quote.
 
+**This repo's override:** by SDK-team decision a spec-error test is a skipped placeholder
+(`Skip = "UTS spec error <point>: …; see deviations.md (UTS Spec Errors)"`) when the defect is the test's
+subject, and is corrected inline with a `// NOTE:` naming the spec point ("adapted, not skipped") when the
+defect is incidental; see the UTS Spec Errors intro in `deviations.md`. Where this section and the decision
+tree say "fail fast", apply this override.
+
+**First, try to adapt the test** *(manual: `writing-derived-tests.md`, section 2c)* — when the SDK lacks a
+*required* public API or feature the spec names, look for an equivalent: another public mechanism that
+reaches the same behaviour, or, at the unit tier only, an existing internal member (visible via
+`InternalsVisibleTo`). (The same API under another name or shape is just translation; record nothing.)
+**Adapted Tests always takes precedence:** if the test can run through an equivalent, it does, as an adapted
+assertion recorded under *Adapted Tests*, and the entry notes the absent public API. Mark the adaptation
+point with exactly `// DEVIATION: <Type#member> absent; using <equivalent>`, for example
+`// DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken`. If the adapted test gives a
+different result from the spec, that's an ordinary SDK deviation (above). A generic escape hatch such as
+`client.Request(…)` is not an equivalent when the test checks the SDK's typed result or the missing method.
+
 **Missing-API stub** *(the SDK doesn't implement a public API or feature that the features spec requires,
-including one missing parameter, option or overload; manual: `writing-derived-tests.md`, section 2c and
-"Missing API or feature")* — first rule out a UTS spec error (the features spec doesn't require it) and a
-translation error (the API is renamed or on another class). An optional feature ("may", "may optionally",
-"optional") is not applicable (`// UTS-NA:`), a missing internal member in a white-box test is an
-internal-shape difference, and a missing test-only hook is a MIL stub. In C# a call to a missing member
-doesn't compile, so the test is a stub: the spec lines as comments, skipped unconditionally (never
-`[DeviationFact]`, never reflection or `dynamic`). The skip reason must be exactly
-`Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`.
-Record it under *Missing SDK Public API / Features* with the status *not implemented* (or *intentionally
-not implemented: <reason>*). When only one line of a test needs the missing member, comment that line under
-a `// NOTE:` and translate the rest:
+including one missing parameter, option or overload, and the test can't be adapted; manual: `writing-derived-tests.md`, section 2c and "Missing API or feature")* — first rule out a
+UTS spec error (the features spec has no such API) and a translation error (the API is renamed or on
+another class). An optional feature ("may", "may optionally", "optional") is not applicable (`// UTS-NA:`), a
+missing internal member in a white-box test is an internal-shape difference, and a missing test-only hook is a
+MIL stub. In C# a call to a missing member doesn't compile, so the test is a stub: the spec lines as
+comments, skipped unconditionally (never `[DeviationFact]`, never reflection or `dynamic`). The skip reason
+must be exactly
+`Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`
+(the feature's name if it has no member). Record it under *Missing SDK Public API / Features* with the status
+*not implemented* (or *intentionally not implemented: <reason>*).
+
+**If only part of a test needs the missing member**, comment out just those lines under the same
+skip-reason text (as a comment) and keep the rest running; stub the whole test only if nothing meaningful
+would remain. Either way, list the test under the entry's **Test impact**:
 
 ```csharp
 // UTS: realtime/unit/RTN26a/immediate-callback-current-state-0
@@ -1019,6 +1051,10 @@ public async Task RTN26a_ImmediateCallbackCurrentState()
     // NOTE: Connection has no WhenState in this SDK
     // <the spec lines, as comments>
 }
+
+// a partial test: the rest of the test runs
+// Missing SDK public API: ChannelMetrics#objectPublishers (CHM2g); see deviations.md (Missing SDK Public API / Features)
+// ASSERT metrics.objectPublishers == 2
 ```
 
 **MIL stub** *(a missing mock capability or test helper blocks the whole test; a delegating spec instead inherits the REST base, see `rest-mapping.md` §12)* — a skipped stub whose body is a
@@ -1059,9 +1095,11 @@ headings **in this order** — `## UTS Spec Errors`, `## Failing Tests`, `## Mis
 `## Adapted Tests`, `## Mock Infrastructure Limitations` — each `*(none)*` when empty. Entries are `### <point> — <title>`
 with the manual's fields, and new entries are inserted into their category's section, never appended at
 the file end. A **UTS Spec Error** (test fails fast — fix in the spec) goes under *UTS Spec Errors*; an
-**SDK deviation** (env-gated/adapted — fix in the SDK) goes under *Failing Tests* / *Adapted Tests*; a
-**missing public API or feature** (missing-API stub — a feature request) goes under *Missing SDK Public API /
-Features*, titled `### <spec point> — <Type#member or option> is missing`; a mock-capability gap goes under
+**SDK deviation** (env-gated/adapted — fix in the SDK) goes under *Failing Tests* / *Adapted Tests*, and so
+does a test adapted to an **equivalent** because the spec-named public API is absent (the entry notes the
+absent API and names the equivalent); a **missing public API or feature** whose test can't be adapted
+(missing-API stub — a feature request) goes under *Missing SDK Public API / Features*, titled
+`### <spec point> — <Type#member or option> is missing`; a mock-capability gap goes under
 *Mock Infrastructure Limitations*. A module's own shape vocabulary stays in
 its notes and is cited from the entry.
 
@@ -1155,7 +1193,10 @@ This is the guarantee that no setup step, operation, or assertion was dropped �
       reconcile them as a group.
 - [ ] The pseudocode's inline `#` comments are carried over as `//` comments at the matching steps verbatim
 - [ ] A spec line with no C# equivalent is annotated per "Comments and assertion fidelity" (spec line
-      kept + `//` note), never silently dropped
+      kept + `//` note), never silently dropped; a test whose spec-named public API the SDK lacks was first
+      adapted where possible (see "First, try to adapt the test", marked `// DEVIATION: <Type#member> absent;
+      using <equivalent>`), and a partial test comments out only the lines that need the missing member, under
+      the exact skip-reason comment
 - [ ] `assertionShortfall > 0` for a test (`summary.testsWithShortfall`) is a **tripwire** — fewer C#
       assertions than spec `ASSERT`s strongly suggests a dropped assertion; open that test and account for
       each one. (A negative shortfall is fine — the SDK mapping often needs *more* C# lines per spec

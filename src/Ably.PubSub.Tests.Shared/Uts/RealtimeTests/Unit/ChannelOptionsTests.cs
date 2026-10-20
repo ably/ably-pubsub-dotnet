@@ -68,7 +68,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             options.Params.Should().BeEmpty();
             options.Modes.Should().BeEmpty();
 
-            // NOTE: attachOnSubscribe (TB4) is not in this SDK: no assertion is emitted
+            // Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)
             // ASSERT options.attachOnSubscribe == true
         }
 
@@ -175,7 +175,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             sameChannel.Should().BeSameAs(channel);
             channel.Options.CipherParams.Should().NotBeNull();
 
-            // NOTE: attachOnSubscribe (TB4) is not in this SDK: no assertion is emitted
+            // Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)
             // ASSERT channel.options.attachOnSubscribe == true
             await CloseClient(client);
         }
@@ -262,7 +262,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             // Assertions
             channel.Options.Params["delta"].Should().Be("vcdiff");
 
-            // NOTE: attachOnSubscribe (TB4) is not in this SDK: no assertion is emitted
+            // Missing SDK public API: ChannelOptions#attachOnSubscribe (TB4); see deviations.md (Missing SDK Public API / Features)
             // ASSERT channel.options.attachOnSubscribe == false
             await CloseClient(client);
         }

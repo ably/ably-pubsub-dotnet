@@ -793,78 +793,48 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL22a/filter-matching-name-0
-        [UtsFact(Skip = "Missing SDK public API: RealtimeChannel#subscribe(MessageFilter) (RTL22); see deviations.md (Missing SDK Public API / Features)")]
+        [UtsFact]
         [Trait("spec", "RTL22a")]
         public async Task RTL22a_FilterMatchingName()
         {
-            // NOTE: subscribe(MessageFilter, ...) (RTL22) is missing from this SDK
-            await Task.CompletedTask;
-            // channel_name = "test-RTL22a-name-${random_id()}"
-            //
-            // mock_ws = MockWebSocket(
-            //   onConnectionAttempt: (conn) => conn.respond_with_success(CONNECTED_MESSAGE),
-            //   onMessageFromClient: (msg) => {
-            //     IF msg.action == ATTACH:
-            //       mock_ws.send_to_client(ProtocolMessage(
-            //         action: ATTACHED,
-            //         channel: channel_name
-            //       ))
-            //   }
-            // )
-            // install_mock(mock_ws)
-            //
-            // client = Realtime(options: ClientOptions(key: "appId.keyId:keySecret", autoConnect: false))
-            // channel = client.channels.get(channel_name, RealtimeChannelOptions(attachOnSubscribe: false))
+            // Setup
+            var channelName = "test-RTL22a-name-" + Guid.NewGuid().ToString("N");
 
-            // client.connect()
-            // AWAIT_STATE client.connection.state == ConnectionState.connected
-            // AWAIT channel.attach()
-            //
-            // filtered_messages = []
+            // NOTE: attachOnSubscribe (TB4) is not in this SDK; Subscribe attaches only when the channel is not ATTACHED or ATTACHING, and this test attaches first, so the outcome is unchanged
+            var mockWs = AttachingMock(channelName);
+
+            var client = NewClient();
+            var channel = client.Channels.Get(channelName);
+
+            // Test Steps
+            await ConnectAndAttach(client, channel);
+
+            var filteredMessages = new CaptureList<Message>();
+
+            // DEVIATION: RealtimeChannel#subscribe(MessageFilter) absent; using channel.Subscribe("target-event", listener)
             // filter = MessageFilter(name: "target-event")
             // channel.subscribe(filter, (message) => {
-            //   filtered_messages.append(message)
-            // })
-            //
-            // # Server sends messages with different names
-            // mock_ws.active_connection.send_to_client(ProtocolMessage(
-            //   action: MESSAGE,
-            //   channel: channel_name,
-            //   messages: [
-            //     Message(name: "target-event", data: "match-1")
-            //   ]
-            // ))
-            //
-            // mock_ws.active_connection.send_to_client(ProtocolMessage(
-            //   action: MESSAGE,
-            //   channel: channel_name,
-            //   messages: [
-            //     Message(name: "other-event", data: "no-match")
-            //   ]
-            // ))
-            //
-            // mock_ws.active_connection.send_to_client(ProtocolMessage(
-            //   action: MESSAGE,
-            //   channel: channel_name,
-            //   messages: [
-            //     Message(name: "target-event", data: "match-2")
-            //   ]
-            // ))
-            //
-            // mock_ws.active_connection.send_to_client(ProtocolMessage(
-            //   action: MESSAGE,
-            //   channel: channel_name,
-            //   messages: [
-            //     Message(name: null, data: "no-name")
-            //   ]
-            // ))
+            channel.Subscribe("target-event", message =>
+            {
+                filteredMessages.Add(message);
+            });
 
-            // ASSERT length(filtered_messages) == 2
-            // ASSERT filtered_messages[0].name == "target-event"
-            // ASSERT filtered_messages[0].data == "match-1"
-            // ASSERT filtered_messages[1].name == "target-event"
-            // ASSERT filtered_messages[1].data == "match-2"
-            // CLOSE_CLIENT(client)
+            // Server sends messages with different names
+            SendMessages(mockWs, channelName, M("target-event", "match-1"));
+            SendMessages(mockWs, channelName, M("other-event", "no-match"));
+            SendMessages(mockWs, channelName, M("target-event", "match-2"));
+            SendMessages(mockWs, channelName, M(null, "no-name"));
+
+            // NOTE: delivery to subscribers is asynchronous; ProcessPendingEvents drains it before the assertions
+            await ProcessPendingEvents();
+
+            // Assertions
+            filteredMessages.Count.Should().Be(2);
+            filteredMessages[0].Name.Should().Be("target-event");
+            filteredMessages[0].Data.Should().Be("match-1");
+            filteredMessages[1].Name.Should().Be("target-event");
+            filteredMessages[1].Data.Should().Be("match-2");
+            await CloseClient(client);
         }
 
         // UTS: realtime/unit/RTL22a/filter-matching-ref-timeserial-1

@@ -50,7 +50,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // DEVIATION: the SDK leaves QueryTime unset (null, behaves as false), the spec says it defaults to false - see deviations.md
             options.QueryTime.Should().BeNull();
 
-            // NOTE: no assertion: the SDK has no maxMessageSize option (TO3l8; rest-mapping.md section 8, Missing APIs)
+            // Missing SDK public API: ClientOptions#maxMessageSize (TO3l8); see deviations.md (Missing SDK Public API / Features)
             // ASSERT options.maxMessageSize == 65536
 
             // Test Steps - Setting Values
@@ -94,8 +94,10 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // ASSERT options.restHost == "custom.ably.example.com"
             options.Endpoint.Should().Be("custom.ably.example.com");
 
-            // NOTE: no assertion: ClientOptions.FallbackHosts is set-only in this SDK (no public getter; TO3k6; rest-mapping.md section 8, Missing APIs)
             // ASSERT options.fallbackHosts == ["fallback1.example.com", "fallback2.example.com"]
+            // DEVIATION: ClientOptions#fallbackHosts absent; using internal ClientOptions.GetFallbackHosts()
+            // NOTE: ClientOptions.FallbackHosts is set-only (TO3k6); GetFallbackHosts() returns the array that was set
+            options.GetFallbackHosts().Should().Equal("fallback1.example.com", "fallback2.example.com");
         }
 
         // UTS: rest/unit/TO3/client-options-auth-url-2

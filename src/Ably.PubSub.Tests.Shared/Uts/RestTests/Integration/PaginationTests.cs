@@ -128,36 +128,48 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Integration
         }
 
         // UTS: rest/integration/TG4/first-retrieves-page-0
-        [Fact(Skip = "Missing SDK public API: PaginatedResult#first (TG4); see deviations.md (Missing SDK Public API / Features)", Timeout = TestTimeoutMs)]
+        [Fact(Timeout = TestTimeoutMs)]
         [Trait("spec", "TG4")]
-        public Task TG4_FirstRetrievesPage()
+        public async Task TG4_FirstRetrievesPage()
         {
-            // NOTE: PaginatedResult<T> exposes NextAsync, HasNext and IsLast but no FirstAsync (only the
-            // HttpPaginatedResponse returned by request() has one), so page2.first() can't be called and the whole
-            // test is a stub. Spec lines:
-            // client = Rest(options: ClientOptions(key: api_key, endpoint: "nonprod:sandbox"))
-            // channel_name = "pagination-first-" + random_id()
-            // channel = client.channels.get(channel_name)
-            // FOR i IN 1..10:
-            // AWAIT channel.publish(name: "event-" + str(i), data: str(i))
-            // # Poll until all messages are persisted
-            // poll_until(
-            // condition: FUNCTION() =>
-            // result = AWAIT channel.history()
-            // RETURN result.items.length == 10,
-            // interval: 500ms,
-            // timeout: 15s
-            // )
-            // page1 = AWAIT channel.history(limit: 3)
-            // page2 = AWAIT page1.next()
+            // Setup
+            var client = Rest(new ClientOptions { Key = ApiKey });
+            var channelName = "pagination-first-" + RandomId();
+            var channel = client.Channels.Get(channelName);
+
+            for (var i = 1; i <= 10; i++)
+            {
+                await channel.PublishAsync("event-" + i, i.ToString());
+            }
+
+            // Poll until all messages are persisted
+            await UtsWait.PollUntil(
+                async () =>
+                {
+                    var result = await channel.HistoryAsync();
+                    return result.Items.Count == 10;
+                },
+                timeout: TimeSpan.FromSeconds(15),
+                interval: TimeSpan.FromMilliseconds(500),
+                description: "history has 10 items");
+
+            // Test Steps
+            var page1 = await channel.HistoryAsync(new PaginatedRequestParams { Limit = 3 });
+            var page2 = await page1.NextAsync();
+
+            // DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)
             // first_page = AWAIT page2.first()
-            // # first_page should have same items as page1
-            // ASSERT first_page.items.length == page1.items.length
-            // FOR i IN 0..first_page.items.length:
-            // ASSERT first_page.items[i].id == page1.items[i].id
-            // NOTE: the loop bound 0..first_page.items.length is ambiguous (inclusive would index past the end);
-            // read it as 0..length-1 when the test is regenerated.
-            return Task.CompletedTask;
+            var firstPage = await channel.HistoryAsync(page2.FirstQueryParams);
+
+            // Assertions
+            // first_page should have same items as page1
+            firstPage.Items.Count.Should().Be(page1.Items.Count);
+
+            // NOTE: the spec's loop bound 0..first_page.items.length is read as 0..length-1
+            for (var i = 0; i < firstPage.Items.Count; i++)
+            {
+                firstPage.Items[i].Id.Should().Be(page1.Items[i].Id);
+            }
         }
 
         // UTS: rest/integration/TG5/iterate-all-pages-0

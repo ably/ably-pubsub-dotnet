@@ -270,39 +270,43 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSC17/client-id-from-options-0
-        [UtsFact(Skip = "Missing SDK public API: RestClient#clientId (RSC17); see deviations.md (Missing SDK Public API / Features)")]
+        [UtsFact]
         [Trait("spec", "RSC17")]
-        public Task RSC17_ClientIdFromOptions()
+        public void RSC17_ClientIdFromOptions()
         {
-            // NOTE: missing SDK API: the REST client (PubSubHttpClient) has no ClientId property (only PubSubRealtimeClient has one); client.Auth.ClientId exists
             // Setup
-            // client = Rest(options: ClientOptions(
-            //   key: "appId.keyId:keySecret",
-            //   clientId: "explicit-client-id"
-            // ))
+            var client = Rest(new ClientOptions
+            {
+                Key = "appId.keyId:keySecret",
+                ClientId = "explicit-client-id",
+            });
 
             // Assertions
-            // ASSERT client.clientId == "explicit-client-id"
+            // NOTE: client.clientId is asserted as client.Auth.ClientId: RSC17 requires Auth#clientId, and the IDL defines no RestClient#clientId (only RealtimeClient#clientId, RTC17); see deviations.md (UTS Spec Errors, RSC17)
+            client.Auth.ClientId.Should().Be("explicit-client-id");
+
+            // NOTE: no assertion: with no RestClient#clientId in the IDL, client.clientId and client.auth.clientId are the same member, so this line has nothing to compare; see deviations.md (UTS Spec Errors, RSC17)
             // ASSERT client.clientId == client.auth.clientId
-            return Task.CompletedTask;
         }
 
         // UTS: rest/unit/RSC17/client-id-matches-auth-1
-        [UtsFact(Skip = "Missing SDK public API: RestClient#clientId (RSC17); see deviations.md (Missing SDK Public API / Features)")]
+        [UtsFact]
         [Trait("spec", "RSC17")]
-        public Task RSC17_ClientIdMatchesAuth()
+        public void RSC17_ClientIdMatchesAuth()
         {
-            // NOTE: missing SDK API: the REST client (PubSubHttpClient) has no ClientId property (only PubSubRealtimeClient has one); client.Auth.ClientId exists
             // Setup
-            // client = Rest(options: ClientOptions(
-            //   key: "appId.keyId:keySecret",
-            //   clientId: "explicit-client-id"
-            // ))
+            var client = Rest(new ClientOptions
+            {
+                Key = "appId.keyId:keySecret",
+                ClientId = "explicit-client-id",
+            });
 
             // Assertions
-            // ASSERT client.clientId == "explicit-client-id"
+            // NOTE: client.clientId is asserted as client.Auth.ClientId: RSC17 requires Auth#clientId, and the IDL defines no RestClient#clientId (only RealtimeClient#clientId, RTC17); see deviations.md (UTS Spec Errors, RSC17)
+            client.Auth.ClientId.Should().Be("explicit-client-id");
+
+            // NOTE: no assertion: with no RestClient#clientId in the IDL, client.clientId and client.auth.clientId are the same member, so this line has nothing to compare; see deviations.md (UTS Spec Errors, RSC17)
             // ASSERT client.clientId == client.auth.clientId
-            return Task.CompletedTask;
         }
 
         // UTS: rest/unit/RSC18/tls-controls-protocol-scheme-0

@@ -133,10 +133,24 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/MOP2a/message-operation-fields-0
-        [Fact]
+        [UtsFact]
         [Trait("spec", "MOP2a")]
-        public void MOP2a_MessageOperationFields()
+        public async Task MOP2a_MessageOperationFields()
         {
+            // NOTE: the mock captures each UpdateMessageAsync request body, where the SDK sends the operation as the message version (RSL15b7)
+            var capturedRequests = new CaptureList<PendingHttpRequest>();
+            var mockHttp = new MockHttpClient(
+                onConnectionAttempt: conn => conn.RespondWithSuccess(),
+                onRequest: req =>
+                {
+                    capturedRequests.Add(req);
+                    req.RespondWith(200, new JObject { ["versionSerial"] = "vs1" });
+                });
+            InstallMock(mockHttp);
+
+            var client = Rest(new ClientOptions { Key = "appId.keyId:keySecret" });
+            var channel = client.Channels.Get("test-MOP2a-" + Guid.NewGuid().ToString("N"));
+
             // Test Steps
             var op = new MessageOperation
             {
@@ -156,11 +170,13 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             op.Metadata["tool"].Should().Be("editor");
 
             // Serialization
-            // NOTE: no assertion: MessageOperation has no toJson in this SDK (it is sent as the message version, RSL15b7) and carries no JSON property names (missing SDK API; see deviations.md)
+            // DEVIATION: MessageOperation#toJson absent; using the "version" object of the UpdateMessageAsync request body
             // json_data = op.toJson()
-            // ASSERT json_data["clientId"] == "user-1"
-            // ASSERT json_data["description"] == "edit description"
-            // ASSERT json_data["metadata"]["reason"] == "typo"
+            await channel.UpdateMessageAsync(new Message { Serial = "serial-1" }, op);
+            var jsonData = (JObject)JObject.Parse(capturedRequests[0].BodyText)["version"];
+            ((string)jsonData["clientId"]).Should().Be("user-1");
+            ((string)jsonData["description"]).Should().Be("edit description");
+            ((string)jsonData["metadata"]["reason"]).Should().Be("typo");
 
             // All-null construction
             var emptyOp = new MessageOperation();
@@ -168,11 +184,13 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             emptyOp.Description.Should().BeNull();
             emptyOp.Metadata.Should().BeNull();
 
-            // NOTE: no assertion: MessageOperation has no toJson in this SDK (missing SDK API; see deviations.md)
+            // DEVIATION: MessageOperation#toJson absent; using the "version" object of the UpdateMessageAsync request body
             // empty_json = empty_op.toJson()
-            // ASSERT "clientId" NOT IN empty_json
-            // ASSERT "description" NOT IN empty_json
-            // ASSERT "metadata" NOT IN empty_json
+            await channel.UpdateMessageAsync(new Message { Serial = "serial-2" }, emptyOp);
+            var emptyJson = (JObject)JObject.Parse(capturedRequests[1].BodyText)["version"];
+            emptyJson.ContainsKey("clientId").Should().BeFalse();
+            emptyJson.ContainsKey("description").Should().BeFalse();
+            emptyJson.ContainsKey("metadata").Should().BeFalse();
         }
 
         // UTS: rest/unit/UDR2a/update-delete-result-fields-0

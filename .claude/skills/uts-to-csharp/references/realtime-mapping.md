@@ -157,7 +157,7 @@ Every row of §6 to §9 was read in the SDK source.
 | `channel.unsubscribe(listener)` / `(name, listener)` / `()` | `channel.Unsubscribe(listener)` / `Unsubscribe(name, listener)` / `Unsubscribe()` | keep the listener in a variable to unsubscribe it |
 | `channel.publish(name:, data:)` / `(message:)` / `(messages:)` | `await channel.PublishAsync(name, data[, clientId])` / `PublishAsync(message)` / `PublishAsync(messages)` | `Result<PublishResult>` (`Value.Serials`); may throw (§4) |
 | `channel.updateMessage(…)`, `deleteMessage`, `appendMessage` | `await channel.UpdateMessageAsync(message, operation, parameters)` etc. | `Result<UpdateDeleteResult>` |
-| `channel.history(params)` | `await channel.HistoryAsync(PaginatedRequestParams)` | REST; `untilAttach` is missing (§12) |
+| `channel.history(params)` | `await channel.HistoryAsync(PaginatedRequestParams)` | REST; `untilAttach` is not a public option (§12: internal `AddUntilAttachParameter`) |
 | `channel.getMessage(…)`, `getMessageVersions(…)` | `GetMessageAsync`, `GetMessageVersionsAsync` | REST |
 
 ## 8. Presence <a id="8-presence"></a>
@@ -208,7 +208,8 @@ How each row is rendered:
 
 - **Not applicable** (the input cannot exist in this SDK): omit the whole test and leave one marker alone on its line, in the standard form `// UTS-NA: <full Test ID> — not applicable: <reason>`. These are never deviations or coverage gaps. For a row or part of a test, keep the spec line as a comment under a `// NOTE:` instead.
 - **Missing API, whole test depends on it:** a missing-API stub as in SKILL.md *Test patterns for a diagnosed failure* (skip reason `Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`), recorded under *Missing SDK Public API / Features* in `deviations.md` in evaluate mode and listed in the run summary in translate-only mode. A missing *optional* feature is not applicable (`// UTS-NA:`) instead.
-- **Missing API, one incidental line:** comment the spec line out under a `// NOTE:` and translate the rest.
+- **Missing API, only part of a test needs it:** comment out just those lines under the exact skip-reason text (`// Missing SDK public API: <Type#member or option> (<spec point>); see deviations.md (Missing SDK Public API / Features)`) and keep the rest running; stub the whole test only if nothing meaningful would remain.
+- **Adapt first** (SKILL.md *First, try to adapt the test*): when another public mechanism, or at the unit tier an existing internal member, reaches the behaviour, the test runs through it, marked `// DEVIATION: <Type#member> absent; using <equivalent>` and recorded under *Adapted Tests* noting the absent public API. Adapted Tests always takes precedence; a missing-API stub or partial test is only for when adapting fails.
 
 ### Not applicable
 
@@ -249,12 +250,12 @@ Parts of tests (translate the rest):
 | `Connection#whenState` | RTN26 | all of `realtime/unit/connection/when_state_test.md` | missing-API stub per test |
 | `RealtimeChannel#whenState` | RTL25 | all of `realtime/unit/channels/channel_when_state_test.md` | missing-API stub per test |
 | `Channels#getDerived` | RTS5 | `realtime/unit/RTS5a/creates-derived-channel-0`, `RTS5a1/filter-base64-encoded-0`, `RTS5a2/derived-with-params-0`, `RTS5/get-derived-with-options-0` | missing-API stub per test |
-| `attachOnSubscribe` channel option (`RealtimeChannelOptions`) | TB4, RTL7h | `realtime/unit/TB4/attach-on-subscribe-default-0`, `realtime/unit/RTL7h/no-attach-on-subscribe-0`, and the `attachOnSubscribe` assertions in `channel_options.md` | missing-API stub for the two tests; the assertions commented under a `// NOTE:`; see the setup rule below |
-| `subscribe(MessageFilter, …)` | RTL22 | `realtime/unit/RTL22a/filter-matching-name-0`, `…-ref-timeserial-1`, `…-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0` | missing-API stub per test |
-| `history(untilAttach:)` on a channel | RTL10b | `realtime/unit/RTL10b/adds-from-serial-0`, `realtime/unit/RTL10b/errors-when-not-attached-1` (presence history has it; the channel's `HistoryAsync` doesn't) | missing-API stub per test |
+| `attachOnSubscribe` channel option (`RealtimeChannelOptions`) | TB4, RTL7h | `realtime/unit/TB4/attach-on-subscribe-default-0`, `realtime/unit/RTL7h/no-attach-on-subscribe-0`, and the `attachOnSubscribe` assertions in `channel_options.md` | missing-API stub for the two tests; the assertions commented out under the skip-reason comment; see the setup rule below |
+| `subscribe(MessageFilter, …)` | RTL22 | `realtime/unit/RTL22a/filter-matching-ref-timeserial-1`, `…-clientid-2`, `RTL22b/filter-isref-false-0`, `RTL22c/filter-multiple-criteria-0` | missing-API stub per test. Not `RTL22a/filter-matching-name-0`: a name-only filter is reached by the public `channel.Subscribe(name, listener)`, so that test runs through it, marked `// DEVIATION: RealtimeChannel#subscribe(MessageFilter) absent; using channel.Subscribe("target-event", listener)`, and is an Adapted Test |
+| `history(untilAttach:)` on a channel | RTL10b | `realtime/unit/RTL10b/adds-from-serial-0`, `realtime/unit/RTL10b/errors-when-not-attached-1` (presence history has it; the channel's `HistoryAsync` doesn't) | adapted at the unit tier: call the internal `((RealtimeChannel)channel).AddUntilAttachParameter(query)` (adds `fromSerial`, throws when not ATTACHED) then `HistoryAsync(query)`, marked `// DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)`; Adapted Test noting the public option is absent |
 | `RealtimeClient#request` | RTC9 | not missing (default): idiomatic. The public `client.HttpClient` is the realtime client's REST client, and RTC9 asks for the wrapper "delivered in an idiomatic way" | translate through `client.HttpClient.Request(…)` |
 
-**`attachOnSubscribe` as setup.** Where `RealtimeChannelOptions(attachOnSubscribe: false)` is only setup (55 uses: the channel is attached before any `subscribe`), drop it with a `// NOTE: attachOnSubscribe (TB4) is not in this SDK; Subscribe attaches only when the channel is not ATTACHED or ATTACHING, and this test attaches first, so the outcome is unchanged`. Where the test subscribes before attaching and relies on the option, the test is a missing-API stub. When a missing member is incidental to a broader test, comment the line with a `// NOTE:` instead.
+**`attachOnSubscribe` as setup.** Where `RealtimeChannelOptions(attachOnSubscribe: false)` is only setup (55 uses: the channel is attached before any `subscribe`), drop it with a `// NOTE: attachOnSubscribe (TB4) is not in this SDK; Subscribe attaches only when the channel is not ATTACHED or ATTACHING, and this test attaches first, so the outcome is unchanged`. Where the test subscribes before attaching and relies on the option, the test is a missing-API stub. When a missing member is needed by only part of a broader test, comment out just those lines under the skip-reason comment and keep the rest of the test running.
 
 ### REST-only extras filed under `uts/realtime`
 

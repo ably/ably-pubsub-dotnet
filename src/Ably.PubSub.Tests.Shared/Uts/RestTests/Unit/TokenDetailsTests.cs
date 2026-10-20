@@ -32,7 +32,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16a/token-from-callback-0
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16a")]
         public async Task RSA16a_TokenFromCallback()
@@ -62,6 +61,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             await client.Channels.Get("test").StatusAsync();
 
             // Assertions
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             CurrentTokenDetails(client).Should().NotBeNull();
             CurrentTokenDetails(client).Token.Should().Be("callback-token-abc");
             CurrentTokenDetails(client).ClientId.Should().Be("my-client");
@@ -72,7 +72,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16a/token-from-request-token-1
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16a")]
         public async Task RSA16a_TokenFromRequestToken()
@@ -111,13 +110,13 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             await client.Auth.AuthorizeAsync();
 
             // Assertions
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             CurrentTokenDetails(client).Should().NotBeNull();
             CurrentTokenDetails(client).Token.Should().Be("requested-token-xyz");
             CurrentTokenDetails(client).ClientId.Should().Be("token-client");
         }
 
         // UTS: rest/unit/RSA16b/token-string-in-options-0
-        // DEVIATION: see deviations.md
         [Fact]
         [Trait("spec", "RSA16b")]
         public void RSA16b_TokenStringInOptions()
@@ -137,6 +136,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
             // Test Steps
             // Access tokenDetails immediately after construction
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             var tokenDetails = CurrentTokenDetails(client);
 
             // Assertions
@@ -178,6 +178,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             await client.Channels.Get("test").StatusAsync();
 
             // Assertions
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             CurrentTokenDetails(client).Should().NotBeNull();
             CurrentTokenDetails(client).Token.Should().Be("just-a-token-string");
 
@@ -188,7 +189,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16c/set-on-instantiation-0
-        // DEVIATION: see deviations.md
         [Fact]
         [Trait("spec", "RSA16c")]
         public void RSA16c_SetOnInstantiation()
@@ -205,6 +205,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
             // Test Steps
             // Access tokenDetails immediately after construction
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             var tokenDetails = CurrentTokenDetails(client);
 
             // Assertions
@@ -214,7 +215,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16c/updated-after-authorize-1
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16c")]
         public async Task RSA16c_UpdatedAfterAuthorize()
@@ -247,6 +247,8 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // Test Steps
             // First authorize
             await client.Auth.AuthorizeAsync();
+
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             var firstToken = CurrentTokenDetails(client);
 
             // Second authorize
@@ -276,7 +278,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16c/updated-after-40142-renewal-3
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16c")]
         public async Task RSA16c_UpdatedAfter40142Renewal()
@@ -331,6 +332,8 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // Test Steps
             // First get a token
             await client.Auth.AuthorizeAsync();
+
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             var firstToken = CurrentTokenDetails(client);
 
             // Make a request that will fail with 40142, triggering renewal
@@ -343,7 +346,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16d/null-with-basic-auth-0
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16d")]
         public async Task RSA16d_NullWithBasicAuth()
@@ -367,11 +369,11 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
             // Assertions
             // Should be null because we're using basic auth, not token auth
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             CurrentTokenDetails(client).Should().BeNull();
         }
 
         // UTS: rest/unit/RSA16d/null-before-token-obtained-1
-        // DEVIATION: see deviations.md
         [Fact]
         [Trait("spec", "RSA16d")]
         public void RSA16d_NullBeforeTokenObtained()
@@ -388,6 +390,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
 
             // Test Steps
             // Don't make any requests - just check tokenDetails
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             var tokenDetails = CurrentTokenDetails(client);
 
             // Assertions
@@ -441,6 +444,8 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // Test Steps
             // First authorize succeeds
             await client.Auth.AuthorizeAsync();
+
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             CurrentTokenDetails(client).Should().NotBeNull();
             CurrentTokenDetails(client).Token.Should().Be("first-token");
 
@@ -469,7 +474,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16a/preserved-across-requests-0
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16a")]
         public async Task RSA16a_PreservedAcrossRequests()
@@ -496,6 +500,8 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // Test Steps
             // Make multiple requests
             await client.Channels.Get("test").StatusAsync();
+
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             var firstCheck = CurrentTokenDetails(client);
 
             await client.Channels.Get("test").StatusAsync();
@@ -512,7 +518,6 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16a/reflects-capability-1
-        // DEVIATION: see deviations.md
         [UtsFact]
         [Trait("spec", "RSA16a")]
         public async Task RSA16a_ReflectsCapability()
@@ -540,12 +545,13 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             await client.Channels.Get("test").StatusAsync();
 
             // Assertions
+            // DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken
             CurrentTokenDetails(client).Should().NotBeNull();
             CurrentTokenDetails(client).Capability.ToJson().Should().Be("{\"channel1\":[\"publish\",\"subscribe\"],\"channel2\":[\"subscribe\"]}");
         }
 
-        // The spec's Auth#tokenDetails is not public in this SDK (rest-mapping.md section 8, Missing APIs): the internal
-        // AblyAuth.CurrentToken holds the same value (adapted, see deviations.md).
+        // Reads the spec's Auth#tokenDetails through the internal AblyAuth.CurrentToken; each caller marks its
+        // first read with the DEVIATION comment (see deviations.md, Adapted Tests, RSA16).
         private static TokenDetails CurrentTokenDetails(PubSubHttpClient client) => ((AblyAuth)client.Auth).CurrentToken;
     }
 }

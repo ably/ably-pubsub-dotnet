@@ -189,57 +189,70 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/TG4/first-returns-first-page-0
-        [UtsFact(Skip = "Missing SDK public API: PaginatedResult#first (TG4); see deviations.md (Missing SDK Public API / Features)")]
+        // DEVIATION: see deviations.md
+        [DeviationFact("TG", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
         [Trait("spec", "TG4")]
-        public Task TG4_FirstReturnsFirstPage()
+        public async Task TG4_FirstReturnsFirstPage()
         {
-            // NOTE: missing SDK API: PaginatedResult<T> exposes NextAsync, HasNext and IsLast but no FirstAsync (only the HttpPaginatedResponse returned by request() has one), so page2.first() can't be called and the whole test is a stub. Spec lines:
-            // captured_requests = []
-            // request_count = 0
-            //
-            // mock_http = MockHttpClient(
-            //   onConnectionAttempt: (conn) => conn.respond_with_success(),
-            //   onRequest: (req) => {
-            //     captured_requests.push(req)
-            //     request_count++
-            //
-            //     IF request_count == 1:
-            //       # Initial request
-            //       req.respond_with(200,
-            //         body: [{ "id": "item1" }],
-            //         headers: {
-            //           "Link": "</channels/test/messages?cursor=next>; rel=\"next\", </channels/test/messages>; rel=\"first\""
-            //         }
-            //       )
-            //     ELSE IF request_count == 2:
-            //       # Next page
-            //       req.respond_with(200,
-            //         body: [{ "id": "item2" }],
-            //         headers: {
-            //           "Link": "</channels/test/messages>; rel=\"first\""
-            //         }
-            //       )
-            //     ELSE:
-            //       # First page again
-            //       req.respond_with(200,
-            //         body: [{ "id": "item1" }],
-            //         headers: {
-            //           "Link": "</channels/test/messages?cursor=next>; rel=\"next\""
-            //         }
-            //       )
-            //   }
-            // )
-            // install_mock(mock_http)
-            //
-            // client = Rest(options: ClientOptions(key: "appId.keyId:keySecret"))
-            // channel = client.channels.get("test")
-            //
-            // page1 = AWAIT channel.history()
-            // page2 = AWAIT page1.next()
+            // Setup
+            var capturedRequests = new CaptureList<PendingHttpRequest>();
+            var requestCount = 0;
+
+            var mockHttp = new MockHttpClient(
+                onConnectionAttempt: conn => conn.RespondWithSuccess(),
+                onRequest: req =>
+                {
+                    capturedRequests.Add(req);
+                    var count = Interlocked.Increment(ref requestCount);
+
+                    if (count == 1)
+                    {
+                        // Initial request
+                        req.RespondWith(
+                            200,
+                            body: new[] { new { id = "item1" } },
+                            headers: new Dictionary<string, string>
+                            {
+                                ["Link"] = "</channels/test/messages?cursor=next>; rel=\"next\", </channels/test/messages>; rel=\"first\"",
+                            });
+                    }
+                    else if (count == 2)
+                    {
+                        // Next page
+                        req.RespondWith(
+                            200,
+                            body: new[] { new { id = "item2" } },
+                            headers: new Dictionary<string, string>
+                            {
+                                ["Link"] = "</channels/test/messages>; rel=\"first\"",
+                            });
+                    }
+                    else
+                    {
+                        // First page again
+                        req.RespondWith(
+                            200,
+                            body: new[] { new { id = "item1" } },
+                            headers: new Dictionary<string, string>
+                            {
+                                ["Link"] = "</channels/test/messages?cursor=next>; rel=\"next\"",
+                            });
+                    }
+                });
+            InstallMock(mockHttp);
+
+            var client = Rest(new ClientOptions { Key = "appId.keyId:keySecret" });
+            var channel = client.Channels.Get("test");
+
+            var page1 = await channel.HistoryAsync();
+            var page2 = await page1.NextAsync();
+
+            // DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)
             // first_page = AWAIT page2.first()
-            //
-            // ASSERT first_page.items[0].id == "item1"
-            return Task.CompletedTask;
+            var firstPage = await channel.HistoryAsync(page2.FirstQueryParams);
+
+            // Assertions
+            firstPage.Items[0].Id.Should().Be("item1");
         }
 
         // UTS: rest/unit/TG/empty-result-handling-0

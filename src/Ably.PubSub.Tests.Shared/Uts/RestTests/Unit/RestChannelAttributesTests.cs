@@ -354,11 +354,11 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             metrics.Subscribers.Should().Be(8);
 
             // CHM2g: objectPublishers
-            // NOTE: missing SDK API: ChannelMetrics has no ObjectPublishers member (CHM2g), so no assertion is emitted; see deviations.md
+            // Missing SDK public API: ChannelMetrics#objectPublishers (CHM2g); see deviations.md (Missing SDK Public API / Features)
             // ASSERT metrics.objectPublishers == 2
 
             // CHM2h: objectSubscribers
-            // NOTE: missing SDK API: ChannelMetrics has no ObjectSubscribers member (CHM2h), so no assertion is emitted; see deviations.md
+            // Missing SDK public API: ChannelMetrics#objectSubscribers (CHM2h); see deviations.md (Missing SDK Public API / Features)
             // ASSERT metrics.objectSubscribers == 5
         }
 
@@ -426,8 +426,10 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             metrics.Subscribers.Should().Be(0);
 
             // CHM2g-h: missing fields default to 0
-            // NOTE: missing SDK API: ChannelMetrics has no ObjectPublishers or ObjectSubscribers member (CHM2g, CHM2h), so no assertions are emitted; see deviations.md
+            // Missing SDK public API: ChannelMetrics#objectPublishers (CHM2g); see deviations.md (Missing SDK Public API / Features)
             // ASSERT metrics.objectPublishers == 0
+
+            // Missing SDK public API: ChannelMetrics#objectSubscribers (CHM2h); see deviations.md (Missing SDK Public API / Features)
             // ASSERT metrics.objectSubscribers == 0
         }
     }
