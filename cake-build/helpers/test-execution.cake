@@ -4,6 +4,14 @@
 
 public class TestExecutionHelper
 {
+    /// <summary>
+    /// UTS tiers. Every UTS test class carries [Trait("uts", "<tier>")]; UTS infra tests also
+    /// carry [Trait("uts-infra", "common|<tier>")]. They run from the Test.*.Uts and
+    /// Test.*.UtsInfra targets, one tier per run; the native unit and integration targets
+    /// exclude all of them, so each UTS suite has exactly one CI home.
+    /// </summary>
+    public static readonly string[] UtsTiers = { "unit", "integration", "proxy" };
+
     private readonly ICakeContext _context;
     private readonly BuildPaths _paths;
     private readonly FrameworkDetector _frameworkDetector;
@@ -20,18 +28,12 @@ public class TestExecutionHelper
     /// </summary>
     public XUnit2Settings CreateXUnitSettings(string reportName, bool isIntegration = false, bool isRetry = false)
     {
-        var settings = new XUnit2Settings
-        {
-            ToolPath = _paths.Root.CombineWithFilePath("tools/xunit/xunit.console.exe"),
-            OutputDirectory = _paths.TestResults,
-            XmlReport = true,
-            ReportName = reportName
-        };
+        var settings = NewXUnitSettings(reportName);
         
         if (isIntegration)
         {
             settings.Parallelism = ParallelismOption.Collections;
-            settings.ArgumentCustomization = args => args
+            settings.ArgumentCustomization = args => ExcludeUtsTraits(args)
                 .Append("-trait")
                 .AppendQuoted("type=integration")
                 .Append("-maxthreads")
@@ -41,7 +43,7 @@ public class TestExecutionHelper
         else if (!isRetry)
         {
             // Unit tests exclude integration trait
-            settings.ArgumentCustomization = args => args
+            settings.ArgumentCustomization = args => ExcludeUtsTraits(args)
                 .Append("-notrait")
                 .AppendQuoted("type=integration")
                 .Append("-verbose");
@@ -54,6 +56,45 @@ public class TestExecutionHelper
         }
         
         return settings;
+    }
+
+    /// <summary>
+    /// Creates XUnit2 settings for a UTS run: only tests carrying one of the given name=value
+    /// traits. xunit console 2.4 ORs repeated -trait options (and ANDs repeated -notrait).
+    /// </summary>
+    public XUnit2Settings CreateUtsXUnitSettings(string reportName, IEnumerable<string> traits)
+    {
+        var settings = NewXUnitSettings(reportName);
+        settings.ArgumentCustomization = args =>
+        {
+            foreach (var trait in traits)
+            {
+                args.Append("-trait").AppendQuoted(trait);
+            }
+            return args.Append("-verbose");
+        };
+
+        return settings;
+    }
+
+    private XUnit2Settings NewXUnitSettings(string reportName)
+    {
+        return new XUnit2Settings
+        {
+            ToolPath = _paths.Root.CombineWithFilePath("tools/xunit/xunit.console.exe"),
+            OutputDirectory = _paths.TestResults,
+            XmlReport = true,
+            ReportName = reportName
+        };
+    }
+
+    private static ProcessArgumentBuilder ExcludeUtsTraits(ProcessArgumentBuilder args)
+    {
+        foreach (var tier in UtsTiers)
+        {
+            args.Append("-notrait").AppendQuoted($"uts={tier}");
+        }
+        return args;
     }
     
     /// <summary>
@@ -245,6 +286,8 @@ public class TestExecutionHelper
         {
             filters.Add("linux!=skip");
         }
+
+        filters.Add(UtsExclusionFilter());
         
         return string.Join("&", filters);
     }
@@ -254,7 +297,91 @@ public class TestExecutionHelper
     /// </summary>
     public string CreateIntegrationTestFilter()
     {
-        return "type=integration";
+        return "type=integration&" + UtsExclusionFilter();
+    }
+
+    /// <summary>
+    /// Excludes every UTS tier. A test without a uts trait satisfies each uts!=tier condition
+    /// (VSTest NotEqual is true when the property is absent), so native tests are unaffected.
+    /// </summary>
+    private static string UtsExclusionFilter()
+    {
+        return string.Join("&", UtsTiers.Select(tier => $"uts!={tier}"));
+    }
+
+    /// <summary>
+    /// Returns the tier when it is one of UtsTiers, else throws
+    /// </summary>
+    public string ValidateUtsTier(string tier)
+    {
+        if (string.IsNullOrEmpty(tier) || !UtsTiers.Contains(tier))
+        {
+            throw new Exception($"--uts-tier must be one of: {string.Join(", ", UtsTiers)} (got '{tier}')");
+        }
+
+        return tier;
+    }
+
+    /// <summary>
+    /// Creates filter for DotNet UTS tests of one tier (generated and infra tests)
+    /// </summary>
+    public string CreateUtsTestFilter(string tier)
+    {
+        return $"uts={ValidateUtsTier(tier)}";
+    }
+
+    /// <summary>
+    /// Creates filter for DotNet UTS infra tests of one tier, plus the common infra self-tests
+    /// </summary>
+    public string CreateUtsInfraTestFilter(string tier)
+    {
+        return $"uts-infra=common|uts-infra={ValidateUtsTier(tier)}";
+    }
+
+    /// <summary>
+    /// xunit console traits for UTS tests of one tier
+    /// </summary>
+    public IEnumerable<string> UtsXUnitTraits(string tier)
+    {
+        return new[] { $"uts={ValidateUtsTier(tier)}" };
+    }
+
+    /// <summary>
+    /// xunit console traits for UTS infra tests of one tier, plus the common infra self-tests
+    /// </summary>
+    public IEnumerable<string> UtsInfraXUnitTraits(string tier)
+    {
+        return new[] { "uts-infra=common", $"uts-infra={ValidateUtsTier(tier)}" };
+    }
+
+    /// <summary>
+    /// Fails when a results file (trx or xunit v2 xml) is missing or reports zero tests. A UTS
+    /// target that selects nothing must not pass green: dotnet test exits 0 when no test matches
+    /// the filter, and so does xunit console when no test matches the traits.
+    /// </summary>
+    public void EnsureTestsRan(FilePath resultsPath)
+    {
+        if (!_context.FileExists(resultsPath))
+        {
+            throw new Exception($"No test results at {resultsPath.FullPath}; cannot confirm that any test ran.");
+        }
+
+        var xml = System.Text.RegularExpressions.Regex.Replace(
+            System.IO.File.ReadAllText(resultsPath.FullPath), @"xmlns=""[^""]+""", "");
+        var doc = System.Xml.Linq.XDocument.Parse(xml);
+
+        // trx: TestRun/ResultSummary/Counters@total; xunit v2: assemblies/assembly@total
+        var total = doc.Descendants("Counters").Concat(doc.Descendants("assembly"))
+            .Select(element => (string)element.Attribute("total"))
+            .Where(value => !string.IsNullOrEmpty(value))
+            .Sum(value => int.Parse(value));
+
+        if (total == 0)
+        {
+            throw new Exception($"{resultsPath.GetFilename()} reports zero tests; the filter selected nothing.");
+        }
+
+        _context.Information($"{resultsPath.GetFilename()}: {total} tests");
     }
 }
 

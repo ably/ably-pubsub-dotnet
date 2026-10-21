@@ -1,0 +1,29 @@
+{
+  "_description": "Maps each UTS module (ably/specification uts/<module>) to its target test directory per tier, plus the UTS infra entry, for scripts/resolve_uts.py. Update it when a module is added, its tests move, a tier's readiness changes or the UTS infra moves. Keys starting with _ are ignored by the scripts.",
+  "_comment": "No hand-maintained entries: rest and realtime are the --create default layout (Uts/<Pascal(name)>Tests/{Unit,Integration,Integration/Proxy}); objects is out of scope as a whole (no LiveObjects API in the SDK), so it keeps a module-level unready reason and no tier paths. namespaceRoot is stored because no project file declares it: the shared project declares Import_RootNamespace Ably.PubSub.Tests.Shared (Ably.PubSub.Tests.Shared.projitems), but the UTS tree uses Ably.PubSub.Tests.Uts.*; the resolver appends the PascalCase path below the shared project's directory. specRepo is validated for shape; the resolver uses it only for a read-only origin warning. The resolver derives testRoot (src/Ably.PubSub.Tests.Shared/Uts, the parent of infra.root); output files are flat: <tier dir>/<ClassName>.cs. msgpack-only tests are build-inapplicable and live in the module notes, not here (JSON-only build).",
+  "specRepo": "ably/specification",
+  "namespaceRoot": "Ably.PubSub.Tests",
+  "infra": {
+    "root": "src/Ably.PubSub.Tests.Shared/Uts/Infra",
+    "readme": "src/Ably.PubSub.Tests.Shared/Uts/Infra/README.md",
+    "testsRoot": "src/Ably.PubSub.Tests.Shared/Uts/InfraTests",
+    "testCommand": "./build.sh --target=Test.NetStandard.UtsInfra --framework=net6.0 --uts-tier={tier}"
+  },
+  "packages": {
+    "rest": {
+      "unit": "src/Ably.PubSub.Tests.Shared/Uts/RestTests/Unit",
+      "integration": "src/Ably.PubSub.Tests.Shared/Uts/RestTests/Integration",
+      "proxy": "src/Ably.PubSub.Tests.Shared/Uts/RestTests/Integration/Proxy",
+      "notes": "references/rest-mapping.md"
+    },
+    "realtime": {
+      "unit": "src/Ably.PubSub.Tests.Shared/Uts/RealtimeTests/Unit",
+      "integration": "src/Ably.PubSub.Tests.Shared/Uts/RealtimeTests/Integration",
+      "proxy": "src/Ably.PubSub.Tests.Shared/Uts/RealtimeTests/Integration/Proxy",
+      "notes": "references/realtime-mapping.md"
+    },
+    "objects": {
+      "unready": "out of scope (D-28): the SDK has no LiveObjects API"
+    }
+  }
+}

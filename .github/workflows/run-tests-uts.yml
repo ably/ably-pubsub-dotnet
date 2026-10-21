@@ -1,0 +1,117 @@
+name: "UTS Test"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'integration/**'
+
+permissions:
+  contents: read
+
+# One CI home per UTS suite: the existing unit and integration workflows exclude every
+# uts-traited test, and these jobs run them by tier. The Cake UTS targets have no .WithRetry
+# variant, so a failing test (or a run that selects zero tests) fails the job.
+jobs:
+  unit:
+    runs-on: ubuntu-22.04
+    env:
+      DOTNET_NOLOGO: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        targetframework: [ "net6.0", "net7.0" ]
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            6.0.428
+            7.0.410
+
+      - name: Download dotnet build-script tools
+        run: dotnet tool restore
+
+      - name: UTS unit tests
+        run: ./build.sh --target=Test.NetStandard.Uts --framework=${{ matrix.targetframework }} --uts-tier=unit
+
+  unit-netframework:
+    runs-on: windows-2022
+    env:
+      DOTNET_NOLOGO: true
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            7.0.410
+
+      - name: Download dotnet build-script tools
+        run: dotnet tool restore
+
+      - name: UTS unit tests (net462)
+        run: ./build.cmd --target=Test.NetFramework.Uts --uts-tier=unit
+
+  integration:
+    runs-on: ubuntu-22.04
+    env:
+      DOTNET_NOLOGO: true
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            6.0.428
+            7.0.410
+
+      - name: Download dotnet build-script tools
+        run: dotnet tool restore
+
+      - name: UTS integration tests (sandbox)
+        run: ./build.sh --target=Test.NetStandard.Uts --framework=net6.0 --uts-tier=integration
+
+  proxy:
+    runs-on: ubuntu-22.04
+    env:
+      DOTNET_NOLOGO: true
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            6.0.428
+            7.0.410
+
+      - name: Download dotnet build-script tools
+        run: dotnet tool restore
+
+      # The proxy infra downloads the pinned uts-proxy release for linux_amd64, checks its
+      # SHA-256 and starts it; a failed download or start fails the tests, so nothing is
+      # installed here.
+      - name: UTS proxy tests (sandbox through uts-proxy)
+        run: ./build.sh --target=Test.NetStandard.Uts --framework=net6.0 --uts-tier=proxy

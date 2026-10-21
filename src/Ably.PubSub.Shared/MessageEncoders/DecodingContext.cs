@@ -1,3 +1,5 @@
+using System;
+
 namespace Ably.PubSub.MessageEncoders
 {
     /// <summary>
@@ -11,6 +13,11 @@ namespace Ably.PubSub.MessageEncoders
         /// The channel options for the current channel.
         /// </summary>
         public ChannelOptions ChannelOptions { get; set; }
+
+        /// <summary>
+        /// Replaces the vcdiff codec when set: <c>(base, delta) =&gt; result</c>. Test-only, see ClientOptions.DeltaDecoder.
+        /// </summary>
+        internal Func<byte[], byte[], byte[]> DeltaDecoder { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DecodingContext"/> class.

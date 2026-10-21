@@ -314,7 +314,7 @@ namespace Ably.PubSub
                     // ordinary shape in C# - would block before there is anything to bound. It
                     // cannot cancel the callback; an abandoned one runs to completion.
                     var callbackResult = await Task.Run(() => authOptions.AuthCallback(tokenParams))
-                        .TimeoutAfter(Options.RealtimeRequestTimeout, null);
+                        .TimeoutAfter(Options.RealtimeRequestTimeout, null, Options.TimerScheduler);
 
                     if (callbackResult == null)
                     {
