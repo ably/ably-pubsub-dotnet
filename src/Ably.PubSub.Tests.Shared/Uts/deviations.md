@@ -552,15 +552,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `ChannelServerInitiatedDetachTests.RTL13a_AttachedReattachTriggered` and `ChannelServerInitiatedDetachTests.RTL13b_AttachingDetachedToSuspended`, env-gated `[DeviationFact]` with the spec-correct assertions.
 - **Status:** open bug.
 
-### RTS4e — release() of an ATTACHED channel detaches it instead of raising 90011
-
-- **Spec point:** RTS4e, RTS4b (test `realtime/unit/RTS4e/release-attached-fails-0`, `uts/realtime/unit/channels/channels_collection.md`).
-- **What the features spec says:** `(RTS4e)` "If the channel's state is anything else, `release()` must raise an `ErrorInfo` with `code` 90011 and `statusCode` 400, and take no other action."; `(RTS4b)` allows an SDK that implemented RTS4a to keep it until its next major version, "but must log a deprecation warning each time `release()` is called for a channel whose state is not `INITIALIZED`, `DETACHED` or `FAILED`".
-- **What the SDK does:** `Channels.Release(name)` on an ATTACHED channel does not throw; it detaches the channel and removes it in the detach callback (the old RTS4a behaviour) and logs no deprecation warning.
-- **Root cause:** `RealtimeChannels.Release` calls `channel.Detach(DetachedCallback)` for any state other than INITIALIZED/DETACHED/FAILED.
-- **Test impact:** `ChannelsCollectionTests.RTS4e_ReleaseAttachedFails`, env-gated `[DeviationFact("RTS4e")]`.
-- **Status:** open bug (RTS4e, or at minimum the RTS4b deprecation warning).
-
 ### RTN17g — with an empty fallback set, a failed connection attempt is retried at once against the same host
 
 - **Spec point:** RTN17g, RTN14d (test `realtime/unit/RTN17g/empty-fallback-set-error-0`).
@@ -1167,6 +1158,14 @@ Either way, the entry's draft fix says what the spec should change.
 - **What the SDK does:** the public `PaginatedResult#first` is absent (`PaginatedResult<T>` has `NextAsync`, `HasNext` and `IsLast`; only the `HttpPaginatedResponse` returned by `request()` has a `FirstAsync`). The public `FirstQueryParams` holds the first-page query, and passing it to the channel's `HistoryAsync(query)` re-runs it, which is what `first()` does.
 - **Test impact:** `PaginationTests.TG4_FirstRetrievesPage` (integration) and `PaginatedResultTests.TG4_FirstReturnsFirstPage` (unit) call `channel.HistoryAsync(page2.FirstQueryParams)`, marked `// DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)`. The integration test runs. The unit test is env-gated (`[DeviationFact("TG")]`) because its mock's query-less `first` link hits the TG link-parser crash (see that entry under Failing Tests).
 - **Status:** open: public `PaginatedResult#first` not implemented.
+
+### RSAN3b — `RestAnnotations#get` takes no arbitrary `params`: the querystring test passes `AnnotationsRequestParams { Limit }`
+
+- **Spec point:** RSAN3b (the ID-less section "RSAN3b — get passes params as querystring", `uts/rest/unit/channel/annotations.md`).
+- **What the features spec says:** `(RSAN3b)` "Any `params` are sent in the querystring"; the IDL types them `params?: Dict<String, Stringifiable>`.
+- **What the SDK does:** the public `params` dictionary the spec passes is absent: `RestAnnotations.GetAsync` takes an `AnnotationsRequestParams`, which exposes only `Limit` (`Http/AnnotationsRequestParams.cs:15`). The spec's `{ "limit": "50" }` maps onto `Limit = 50`, so the test still checks that the value reaches the querystring; any other parameter can't be sent.
+- **Test impact:** `AnnotationsTests.NoId_Rsan3bGetPassesParamsAsQuerystring` passes `new AnnotationsRequestParams { Limit = 50 }`, marked `// DEVIATION: RestAnnotations#get(params) absent; using AnnotationsRequestParams { Limit }`, and asserts `limit=50` as the spec does.
+- **Status:** open: arbitrary annotation query `params` not implemented (`AnnotationsRequestParams` supports only `Limit`).
 
 ### RTL22a — `RealtimeChannel#subscribe(MessageFilter, …)` is absent: the name-filter test subscribes by event name
 

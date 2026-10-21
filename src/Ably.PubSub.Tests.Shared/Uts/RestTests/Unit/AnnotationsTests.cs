@@ -421,6 +421,8 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var channel = client.Channels.Get(channelName);
 
             // Test Steps
+            // DEVIATION: RestAnnotations#get(params) absent; using AnnotationsRequestParams { Limit }
+            // AWAIT channel.annotations.get("msg-serial-1", params: { "limit": "50" })
             await channel.Annotations.GetAsync("msg-serial-1", new AnnotationsRequestParams { Limit = 50 });
 
             // Assertions

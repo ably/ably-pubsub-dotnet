@@ -272,8 +272,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTS4e/release-attached-fails-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTS4e", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTS4e")]
         public async Task RTS4e_ReleaseAttachedFails()
         {
