@@ -29,7 +29,7 @@ namespace Ably.PubSub.Transport
 
         public void SetException(Exception ex)
         {
-            _completionSource.TrySetException(new AblyException(ex));
+            _completionSource.TrySetException(ToAblyException(ex));
         }
 
         public static Task<Result<T>> Wrap<T>(Action<Action<T, ErrorInfo>> toWrapMethod)
@@ -76,6 +76,13 @@ namespace Ably.PubSub.Transport
 
             return wrapper.Task;
         }
+
+        /// <summary>
+        /// An <see cref="AblyException"/> already carries the <see cref="ErrorInfo"/> of the failure, such as the
+        /// refusal of an operation in the current connection or channel state (RTL6c4), so it is passed through as is.
+        /// Any other exception is unexpected and is wrapped (code 50000, the original as the inner exception).
+        /// </summary>
+        internal static AblyException ToAblyException(Exception ex) => ex as AblyException ?? new AblyException(ex);
     }
 
     internal class TaskWrapper<T>
@@ -117,7 +124,7 @@ namespace Ably.PubSub.Transport
 
         public void SetException(Exception ex)
         {
-            _completionSource.TrySetException(new AblyException(ex));
+            _completionSource.TrySetException(TaskWrapper.ToAblyException(ex));
         }
     }
 
@@ -138,7 +145,7 @@ namespace Ably.PubSub.Transport
 
         public void SetException(Exception ex)
         {
-            _completionSource.TrySetException(new AblyException(ex));
+            _completionSource.TrySetException(TaskWrapper.ToAblyException(ex));
         }
     }
 }
