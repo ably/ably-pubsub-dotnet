@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Types;
@@ -28,6 +29,12 @@ namespace Ably.PubSub.Tests.Realtime
             ((RealtimeChannel)channel).SetChannelState(ChannelState.Attached);
             return (client, channel);
         }
+
+        private List<ProtocolMessage> SentMessageFrames() =>
+            LastCreatedTransport.SentMessages
+                .Select(x => x.Original)
+                .Where(x => x.Action == ProtocolMessage.MessageAction.Message)
+                .ToList();
 
         [Fact]
         [Trait("spec", "RTL6j")]
@@ -278,6 +285,60 @@ namespace Ably.PubSub.Tests.Realtime
             calls.Should().HaveCount(1);
             calls[0].Success.Should().BeFalse();
             calls[0].Error.Should().BeSameAs(error);
+        }
+
+        [Theory]
+        [InlineData(ChannelState.Suspended)]
+        [InlineData(ChannelState.Failed)]
+        [Trait("spec", "RTL6c4")]
+        public async Task PublishAsync_InAChannelStateWhichRefusesPublishing_ShouldThrowTheRefusalErrorUnwrapped(ChannelState state)
+        {
+            var (client, channel) = await GetAttachedChannel();
+            ((RealtimeChannel)channel).SetChannelState(state);
+
+            var exception = await Assert.ThrowsAsync<AblyException>(() => channel.PublishAsync("name", "data"));
+            await client.ProcessCommands();
+
+            exception.ErrorInfo.Code.Should().Be(ErrorCodes.BadRequest);
+            exception.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            exception.ErrorInfo.Message.Should().Be($"Unable to publish in {state} state");
+            exception.InnerException.Should().BeNull();
+            SentMessageFrames().Should().BeEmpty();
+        }
+
+        [Fact]
+        [Trait("spec", "RTL6c2")]
+        [Trait("spec", "RTL6c4")]
+        public async Task PublishAsync_WhenTheConnectionCannotQueueTheMessage_ShouldThrowTheRefusalErrorUnwrapped()
+        {
+            var client = GetClientWithFakeTransport(o =>
+            {
+                o.AutoConnect = false;
+                o.QueueMessages = false;
+            });
+            var channel = client.Channels.Get(TestChannelName);
+            ((RealtimeChannel)channel).SetChannelState(ChannelState.Attached);
+
+            var exception = await Assert.ThrowsAsync<AblyException>(() => channel.PublishAsync(new Message("name", "data")));
+
+            client.Connection.State.Should().Be(ConnectionState.Initialized);
+            exception.ErrorInfo.Code.Should().Be(ErrorCodes.BadRequest);
+            exception.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            exception.ErrorInfo.Message.Should().Contain("connection is in Initialized state");
+            exception.InnerException.Should().BeNull();
+        }
+
+        [Fact]
+        [Trait("spec", "RTL6c4")]
+        public async Task PublishAsync_WhenAnUnexpectedExceptionIsThrown_ShouldStillWrapItAsAnInternalError()
+        {
+            var (_, channel) = await GetAttachedChannel();
+
+            var exception = await Assert.ThrowsAsync<AblyException>(() => channel.PublishAsync((IEnumerable<Message>)null));
+
+            exception.ErrorInfo.Code.Should().Be(ErrorCodes.InternalError);
+            exception.ErrorInfo.Message.Should().StartWith("Unexpected error :");
+            exception.InnerException.Should().BeOfType<ArgumentNullException>();
         }
     }
 }

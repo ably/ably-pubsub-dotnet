@@ -660,7 +660,7 @@ namespace Ably.PubSub.Realtime
 
             if (!Connection.CanPublishMessages)
             {
-                throw new AblyException(new ErrorInfo($"Message cannot be published. Client is not allowed to queue messages when connection is in {State} state", ErrorCodes.BadRequest, HttpStatusCode.BadRequest));
+                throw new AblyException(new ErrorInfo($"Message cannot be published. Client is not allowed to queue messages when connection is in {Connection.State} state", ErrorCodes.BadRequest, HttpStatusCode.BadRequest));
             }
         }
 
@@ -682,7 +682,7 @@ namespace Ably.PubSub.Realtime
             // RTL32b, RTL32b1, RTL32b2, RTL32c
             var edit = Message.CreateEdit(message, operation, action);
 
-            // The refusal is not wrapped, so the error code of the refusal is preserved (as for annotations).
+            // The refusal is not wrapped, so the error code of the refusal is preserved (as for publish and annotations).
             EnsureCanPublish();
 
             var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Message, Name)

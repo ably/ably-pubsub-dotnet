@@ -158,6 +158,8 @@ Publishing now reports what the service did with the messages. Typical callers o
 
 **Behaviour change:** a realtime publish whose serial falls below the range of a later `ACK` now completes as a failure (error code 50000) instead of silently succeeding. An `ACK` covers only `msgSerial` to `msgSerial + count - 1`, and the protocol treats skipped messages as not acknowledged; java and cocoa behave the same way. Entries inside the range are unaffected.
 
+**Behaviour change:** a realtime `PublishAsync` refused by the channel or connection state (the channel is SUSPENDED or FAILED, or the connection is neither CONNECTED nor allowed to queue the message) still faults the task, but the `AblyException` now carries the refusal's own error (code 40000, status 400). 1.x threw a generic 50000 "Unexpected error" with the refusal as its `InnerException`. If you read `InnerException` to find the refusal, read `ErrorInfo` directly instead.
+
 New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message updates and deletes enabled:
 
 | API | Notes |

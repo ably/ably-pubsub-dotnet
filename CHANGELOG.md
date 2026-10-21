@@ -26,6 +26,7 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 
 **Behaviour changes**
 
+- A realtime `PublishAsync` refused by the channel or connection state (RTL6c4: the channel is SUSPENDED or FAILED, or the connection is neither CONNECTED nor allowed to queue the message) now faults with an `AblyException` carrying the refusal's own `ErrorInfo` (code 40000, status 400), as `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` and `Annotations.PublishAsync` do. 1.x wrapped it in a generic 50000 "Unexpected error" and kept the original error only as the `InnerException`. Any other `AblyException` thrown inside the realtime task methods (`AttachAsync`, `DetachAsync`, `SetOptionsAsync`, the presence methods, `PingAsync`) is passed through the same way; an exception that is not an `AblyException` is still wrapped as 50000. The refusal message for a connection that can't queue now names the connection state rather than the channel state.
 - Realtime channels log through the logger of the client that owns them, whether they come from `Channels.Get(name)` or `Channels.Get(name, options)`; they previously always used the process-wide default logger. Applications configure logging with `ClientOptions.LogHandler` and `LogLevel`, which apply to that same default logger, so channel warnings such as the RTAN4e "AnnotationSubscribe mode not granted" warning reach the configured handler as before.
 
 **Notes**
