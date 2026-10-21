@@ -1150,14 +1150,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `PaginationTests.TG4_FirstRetrievesPage` (integration) and `PaginatedResultTests.TG4_FirstReturnsFirstPage` (unit) call `channel.HistoryAsync(page2.FirstQueryParams)`, marked `// DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)`. The integration test runs. The unit test is env-gated (`[DeviationFact("TG")]`) because its mock's query-less `first` link hits the TG link-parser crash (see that entry under Failing Tests).
 - **Status:** open: public `PaginatedResult#first` not implemented.
 
-### RSAN3b — `RestAnnotations#get` takes no arbitrary `params`: the querystring test passes `AnnotationsRequestParams { Limit }`
-
-- **Spec point:** RSAN3b (the ID-less section "RSAN3b — get passes params as querystring", `uts/rest/unit/channel/annotations.md`).
-- **What the features spec says:** `(RSAN3b)` "Any `params` are sent in the querystring"; the IDL types them `params?: Dict<String, Stringifiable>`.
-- **What the SDK does:** the public `params` dictionary the spec passes is absent: `RestAnnotations.GetAsync` takes an `AnnotationsRequestParams`, which exposes only `Limit` (`Http/AnnotationsRequestParams.cs:15`). The spec's `{ "limit": "50" }` maps onto `Limit = 50`, so the test still checks that the value reaches the querystring; any other parameter can't be sent.
-- **Test impact:** `AnnotationsTests.NoId_Rsan3bGetPassesParamsAsQuerystring` passes `new AnnotationsRequestParams { Limit = 50 }`, marked `// DEVIATION: RestAnnotations#get(params) absent; using AnnotationsRequestParams { Limit }`, and asserts `limit=50` as the spec does.
-- **Status:** open: arbitrary annotation query `params` not implemented (`AnnotationsRequestParams` supports only `Limit`).
-
 ### RTL22a — `RealtimeChannel#subscribe(MessageFilter, …)` is absent: the name-filter test subscribes by event name
 
 - **Spec point:** RTL22, RTL22a, MFI2d (test `realtime/unit/RTL22a/filter-matching-name-0`, `uts/realtime/unit/channels/channel_subscribe.md`).

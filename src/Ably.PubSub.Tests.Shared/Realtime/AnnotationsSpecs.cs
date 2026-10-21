@@ -380,6 +380,23 @@ namespace Ably.PubSub.Tests.Realtime
         }
 
         [Fact]
+        [Trait("spec", "RTAN3a")]
+        [Trait("spec", "RSAN3b")]
+        public async Task GetAsync_WithExtraParameters_ShouldSendThemInTheQuerystring()
+        {
+            var client = await GetConnectedClient(handleRequestFunc: _ => new AblyResponse { TextResponse = "[]" }.ToTask());
+            var query = new AnnotationsRequestParams { ExtraParameters = { ["limit"] = "50", ["custom"] = "value" } };
+
+            await client.Channels.Get(TestChannelName).Annotations.GetAsync(Serial, query);
+
+            Requests.Last().QueryParameters.Should().BeEquivalentTo(new Dictionary<string, string>
+            {
+                ["limit"] = "50",
+                ["custom"] = "value",
+            });
+        }
+
+        [Fact]
         [Trait("spec", "RTL28")]
         [Trait("spec", "RTAN3a")]
         public async Task Retrieval_OnACipherChannel_ShouldDecryptThroughTheRestRoute()

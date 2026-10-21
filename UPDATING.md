@@ -166,7 +166,7 @@ New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message u
 |-----|-------|
 | `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` | Take a `Message` with a populated `Serial`, an optional `MessageOperation` (`ClientId`, `Description`, `Metadata`) and optional params. The message you pass is never modified. `IHttpChannel` returns `Task<UpdateDeleteResult>` and throws on failure; `IRealtimeChannel` returns `Task<Result<UpdateDeleteResult>>`, like `PublishAsync`. `UpdateDeleteResult.VersionSerial` is `null` if the message was superseded by a later update. |
 | `GetMessageAsync`, `GetMessageVersionsAsync` | Retrieve the latest version, or all versions, of a message by serial. |
-| `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. |
+| `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. `GetAsync` takes an `AnnotationsRequestParams`: `Limit` (default 100) plus `ExtraParameters`, any other query parameters, all sent in the querystring. |
 | `Message.Serial`, `Message.Version`, `Message.Action`, `Message.Annotations` | Populated on messages received from the service. |
 
 **Behaviour change:** the SDK now declares wire protocol version 6 (1.x declared 2). The version is sent as the realtime `v` parameter and the REST `X-Ably-Version` header, and the service sends the newer message structure. The stats endpoint remains pinned to the v2 response format, so `StatsAsync` results are unchanged.

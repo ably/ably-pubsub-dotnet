@@ -177,7 +177,7 @@ Every row of §6 to §9 was read in the SDK source.
 |---|---|---|
 | `channel.annotations.publish(serialOrMessage, annotation)`, `.delete(…)` | `await channel.Annotations.PublishAsync(serial, annotation)`, `DeleteAsync(…)` | `Result` |
 | `channel.annotations.subscribe(cb)` / `(type:, cb)`, `.unsubscribe(…)` | `channel.Annotations.Subscribe(a => …)` / `Subscribe(type, a => …)`, `Unsubscribe(…)` (`bool`) | implicit attach; logs a warning (RTAN4e) when ANNOTATION_SUBSCRIBE wasn't granted |
-| `channel.annotations.get(…)` | `GetAsync(serial, AnnotationsRequestParams)` | REST |
+| `channel.annotations.get(…)` | `GetAsync(serial, AnnotationsRequestParams)` (`params:` → `ExtraParameters`, as REST) | REST |
 
 ## 10. Wire protocol in mocks <a id="10-wire-protocol"></a>
 
