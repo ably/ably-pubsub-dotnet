@@ -568,8 +568,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTAN4e/subscribe-warns-no-mode-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTAN4e", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTAN4e")]
         public async Task RTAN4e_SubscribeWarnsNoMode()
         {

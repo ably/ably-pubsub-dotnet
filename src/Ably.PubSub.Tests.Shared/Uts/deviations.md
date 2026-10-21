@@ -661,15 +661,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `ConnectionFailuresTests.RTN15h3_NonTokenErrorResume`, env-gated `[DeviationFact("RTN15h3")]`.
 - **Status:** open bug.
 
-### RTAN4e — no warning is logged when an annotation listener is added without ANNOTATION_SUBSCRIBE
-
-- **Spec point:** RTAN4e (test `realtime/unit/RTAN4e/subscribe-warns-no-mode-0`, `uts/realtime/unit/channels/channel_annotations.md`).
-- **What the features spec says:** "`(RTAN4e)` … once the channel is in the `attached` state, the `RTL4m` channel modes are checked for the presence of the `ANNOTATION_SUBSCRIBE` mode. … If this mode is missing, the library should log a warning indicating that the user has tried to add an annotation listener without having requested the `ANNOTATION_SUBSCRIBE` channel mode in ChannelOptions".
-- **What the SDK does:** with the channel ATTACHED and its granted modes `Publish` only (observed: `state=Attached modes=Publish`), `channel.Annotations.Subscribe(…)` logs no warning at all (nothing at Warning level in the captured log).
-- **Root cause:** not isolated. `RealtimeAnnotations.WarnIfSubscribeModeNotGranted` exists and is called from `Subscribe`, but nothing reaches the client's log sink; candidates are the channel logger (`RealtimeChannel.Logger`) not being the client's logger, or the `_handlers.IsEmpty` guard.
-- **Test impact:** `ChannelAnnotationsTests.RTAN4e_SubscribeWarnsNoMode`, env-gated `[DeviationFact("RTAN4e")]` (the test matches the SDK's spelling "AnnotationSubscribe").
-- **Status:** open bug.
-
 ### RTC8a1 — authorize() can miss the CONNECTED that answers its AUTH
 
 - **Spec point:** RTC8a, RTC8a1 (test `realtime/unit/RTC8a1/capability-downgrade-channel-failed-1`, `uts/realtime/unit/auth/realtime_authorize.md`).

@@ -126,7 +126,7 @@ namespace Ably.PubSub.Realtime
             PubSubRealtimeClient realtimeClient,
             ChannelOptions options = null,
             IMobileDevice mobileDevice = null)
-            : base(options?.Logger)
+            : base(options?.Logger ?? realtimeClient.Logger)
         {
             Name = name;
             Options = options;
