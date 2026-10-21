@@ -194,7 +194,7 @@ Every row was read in the SDK source. "Throws" means `AblyException`.
 | Pseudocode | C# | Result / failure |
 |---|---|---|
 | `channel.annotations.publish(serialOrMsg, Annotation(type:, name:, …))`, `.delete(…)` | `channel.Annotations.PublishAsync(serial, new Annotation(type, name, data, count, clientId))`, `DeleteAsync(…)` | `Task`; throws |
-| `channel.annotations.get(serial, params: { "k": "v" })` | `channel.Annotations.GetAsync(serial, new AnnotationsRequestParams { ExtraParameters = new Dictionary<string, string> { ["k"] = "v" } })` | `PaginatedResult<Annotation>`; every entry, `limit` included, goes to the querystring as given (the typed `Limit` is the idiomatic alternative) |
+| `channel.annotations.get(serial, params: { "k": "v" })` | `channel.Annotations.GetAsync(serial, new AnnotationsRequestParams { ExtraParameters = new Dictionary<string, string> { ["k"] = "v" } })` | `PaginatedResult<Annotation>`; every entry, `limit` included, goes to the querystring as given; a typed `Limit`, when set, replaces a `limit` entry (the typed `Limit` is the idiomatic alternative) |
 
 ### Auth & tokens
 

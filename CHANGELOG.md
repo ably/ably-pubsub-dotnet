@@ -21,14 +21,14 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 
 - Update, delete and append messages by serial: `UpdateMessageAsync`, `DeleteMessageAsync` and `AppendMessageAsync` on `IHttpChannel` (RSL15, returning `Task<UpdateDeleteResult>`) and on `IRealtimeChannel` (RTL32, returning `Task<Result<UpdateDeleteResult>>`), with the new `MessageOperation` and `UpdateDeleteResult` types.
 - Retrieve a message by serial and all of its versions (`GetMessageAsync`, `GetMessageVersionsAsync`), and publish, delete, retrieve and subscribe to message annotations (`Annotations`). `Message` gains `Serial`, `Version`, `Action` and `Annotations`.
-- `AnnotationsRequestParams.ExtraParameters` sends any query parameter with `Annotations.GetAsync` (RSAN3a, RSAN3b), alongside the typed `Limit`. A `Limit` outside 0 to 1000 throws an `AblyException` (code 40003) rather than an `ArgumentException`.
+- `AnnotationsRequestParams.ExtraParameters` sends any query parameter with `Annotations.GetAsync` (RSAN3a, RSAN3b), alongside the typed `Limit`.
 - Declares wire protocol version 6 (was 2): the realtime `v` transport param and the REST `X-Ably-Version` header now send `6` (CSV2). The `/stats` endpoint stays pinned to the v2 response format.
 - `Request()`/`RequestV2()` callers that send no `X-Ably-Version` header now receive protocol-6 response shapes (for example, `GET /channels` returns channel names, and a batch `POST /messages` returns a single results envelope). Pass the `X-Ably-Version` header to pin a version.
 
 **Behaviour changes**
 
 - A realtime `PublishAsync` refused by the channel or connection state (RTL6c4: the channel is SUSPENDED or FAILED, or the connection is neither CONNECTED nor allowed to queue the message) now faults with an `AblyException` carrying the refusal's own `ErrorInfo` (code 40000, status 400), as `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` and `Annotations.PublishAsync` do. 1.x wrapped it in a generic 50000 "Unexpected error" and kept the original error only as the `InnerException`. Any other `AblyException` thrown inside the realtime task methods (`AttachAsync`, `DetachAsync`, `SetOptionsAsync`, the presence methods, `PingAsync`) is passed through the same way; an exception that is not an `AblyException` is still wrapped as 50000. The refusal message for a connection that can't queue now names the connection state rather than the channel state.
-- Realtime channels log through the logger of the client that owns them, whether they come from `Channels.Get(name)` or `Channels.Get(name, options)`; they previously always used the process-wide default logger. Applications configure logging with `ClientOptions.LogHandler` and `LogLevel`, which apply to that same default logger, so channel warnings such as the RTAN4e "AnnotationSubscribe mode not granted" warning reach the configured handler as before.
+- `AnnotationsRequestParams` with a `Limit` outside 0 to 1000 now throws an `AblyException` (code 40003, status 400), like the other argument checks in `Annotations`, rather than an `ArgumentException`.
 
 **Notes**
 
