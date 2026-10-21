@@ -79,7 +79,7 @@ Options are PascalCase properties; every duration is a `TimeSpan` (spec values a
 | `defaultTokenParams` | `DefaultTokenParams = new TokenParams { … }` | `TokenParams` |
 | `clientId` | `ClientId` | `string`; the setter throws `InvalidOperationException` for `"*"` (RSA7c) |
 | `endpoint` | `Endpoint` | `string`: routing policy (`main`), `nonprod:<id>`, or a hostname (contains `.` or `::`, or is `localhost`) with no default fallbacks (REC1) |
-| `fallbackHosts` | `FallbackHosts = new[] { … }` | `string[]`, **set-only**; an empty array disables fallback. No public getter (§8) |
+| `fallbackHosts` | `FallbackHosts = new[] { … }` | `string[]`; an empty array disables fallback. Reading `options.FallbackHosts` gives the array that was set, `null` when unset (TO3k6) |
 | `port`, `tlsPort`, `tls` | `Port`, `TlsPort`, `Tls` | `int`, `int`, `bool` |
 | `httpOpenTimeout`, `httpRequestTimeout` | `HttpOpenTimeout`, `HttpRequestTimeout` | `TimeSpan` (defaults 4 s, 10 s) |
 | `httpMaxRetryCount` | `HttpMaxRetryCount` | `int` (default 3) |
@@ -332,7 +332,6 @@ The SDK replaced `environment`, `restHost`, `realtimeHost` and `fallbackHostsUse
 | `PaginatedResult#first` | TG5 (UTS label TG4) | `rest/unit/TG4/first-returns-first-page-0`, `rest/integration/TG4/first-retrieves-page-0` | adapted: `channel.HistoryAsync(page.FirstQueryParams)` re-runs the first-page query, marked `// DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)`; Adapted Test. The unit test is gated on the TG link-parser deviation |
 | `Auth#tokenDetails` (public) | RSA16 | every `client.auth.tokenDetails` read. The value exists internally (`((AblyAuth)client.Auth).CurrentToken`) | adapted: read the internal one at the unit tier, marked `// DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken` at each test's first read; Adapted Test noting the public accessor is absent |
 | `version` argument of `request()` | RSC19f, RSC19f1 | the SDK owner's idiom is a request-level `X-Ably-Version` header (`headers: {"X-Ably-Version": "3"}` takes precedence over the client default, RSC7e) | adapted wherever the spec passes `version`: add the header, marked `// DEVIATION: RestClient#request(version) absent; using a request-level X-Ably-Version header`; `rest/unit/RSC19f1/version-param-sets-header-0` is the Adapted Test entry |
-| `ClientOptions.fallbackHosts` getter | TO3k6 | `rest/unit/TO3/client-options-custom-hosts-1` | adapted at the unit tier: read the internal `options.GetFallbackHosts()` (it returns the array that was set), marked `// DEVIATION: ClientOptions#fallbackHosts absent; using internal ClientOptions.GetFallbackHosts()`; Adapted Test noting the public getter is absent. At integration or proxy tier, where internals are out of bounds, comment the line out under the skip-reason comment instead |
 
 ### Mock Infrastructure Limitations
 

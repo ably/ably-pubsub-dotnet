@@ -97,7 +97,8 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
 | `ClientOptions.Environment`, `ClientOptions.RestHost`, `ClientOptions.RealtimeHost` | `ClientOptions.Endpoint` — see [Choose the host with `Endpoint`](#choose-the-host-with-endpoint) |
-| `ClientOptions.FullRestHost()` / `ClientOptions.FullRealtimeHost()` / `ClientOptions.GetFallbackHosts()` | Nothing — `Connection.Host` reports the host the realtime connection is using |
+| `ClientOptions.FullRestHost()` / `ClientOptions.FullRealtimeHost()` | Nothing — `Connection.Host` reports the host the realtime connection is using |
+| `ClientOptions.GetFallbackHosts()` | `ClientOptions.FallbackHosts` (now readable). It returns only the hosts you set, or `null` when you set none; unlike `GetFallbackHosts()`, it does not return the default fallback hosts derived from `Endpoint` |
 
 ## Choose the host with `Endpoint`
 
@@ -122,7 +123,7 @@ How `Endpoint` resolves:
 | `nonprod:` plus a name, e.g. `nonprod:sandbox` | `sandbox.realtime.ably-nonprod.net` | `sandbox.[a-e].fallback.ably-realtime-nonprod.com` |
 | A hostname (contains `.` or `::`, or is `localhost`) | The value as given | None |
 
-An explicit `FallbackHosts` always replaces the default fallback hosts. A custom `Port` or `TlsPort` no longer disables the default fallback hosts.
+An explicit `FallbackHosts` always replaces the default fallback hosts. A custom `Port` or `TlsPort` no longer disables the default fallback hosts. Reading `FallbackHosts` gives back the hosts you set, or `null` when you set none (the defaults in the table above then apply); it never returns the computed defaults.
 
 **Before (1.x):**
 

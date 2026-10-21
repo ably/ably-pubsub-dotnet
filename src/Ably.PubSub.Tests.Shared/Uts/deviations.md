@@ -1158,14 +1158,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `ChannelSubscribeTests.RTL22a_FilterMatchingName` subscribes with `channel.Subscribe("target-event", listener)` in place of `subscribe(MessageFilter(name: "target-event"), listener)`, marked `// DEVIATION: RealtimeChannel#subscribe(MessageFilter) absent; using channel.Subscribe("target-event", listener)`; all 5 assertions are verbatim. The `attachOnSubscribe: false` setup is dropped as elsewhere (the test attaches first).
 - **Status:** open: public `RealtimeChannel#subscribe(MessageFilter, …)` not implemented.
 
-### TO3k6 — `ClientOptions#fallbackHosts` has no public getter: the test reads the internal `GetFallbackHosts()`
-
-- **Spec point:** TO3k6 (test `rest/unit/TO3/client-options-custom-hosts-1`, `uts/rest/unit/types/options_types.md`).
-- **What the features spec says:** the IDL lists `fallbackHosts` as a `ClientOptions` attribute (TO3k6), which the test reads back.
-- **What the SDK does:** the public `ClientOptions#fallbackHosts` getter is absent (`ClientOptions.FallbackHosts` is set-only). The internal `ClientOptions.GetFallbackHosts()` returns a copy of the array that was set (or the endpoint's defaults when none was), which is the value the spec asserts.
-- **Test impact:** `OptionsTypesTests.TO3_ClientOptionsCustomHosts` asserts `options.GetFallbackHosts()` equals `["fallback1.example.com", "fallback2.example.com"]`, marked `// DEVIATION: ClientOptions#fallbackHosts absent; using internal ClientOptions.GetFallbackHosts()` (unit tier only).
-- **Status:** open: public `ClientOptions#fallbackHosts` getter not implemented.
-
 ### RSL6 / TM3 — a fully decoded message has `encoding == ""`, not null
 
 - **Spec point:** RSL6a, RSL6 (tests `rest/unit/RSL6a/decode-base64-to-binary-0`, `rest/unit/RSL6a/decode-json-to-object-1`, `rest/unit/RSL6/decode-utf8-base64-data-2`, `rest/unit/RSL6/complex-chained-encoding-3`, and the `base64`, `json` cases of `rest/unit/TM3/from-encoded-decodes-encoding-1`).
