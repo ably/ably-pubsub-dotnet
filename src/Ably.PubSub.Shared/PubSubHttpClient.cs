@@ -401,11 +401,6 @@ namespace Ably.PubSub
         /// It is mainly because of the way a PaginatedResource defines its queries. For retrieving Stats with special parameters use <see cref="StatsAsync(StatsRequestParams)"/>.
         /// The stats endpoint is pinned to protocol version 2, so the response uses the v2 (typed) stats schema.
         /// </summary>
-        /// <example>
-        /// var client = new PubSubHttpClient("validkey");
-        /// var stats = client..StatsAsync();
-        /// var nextPage = client..StatsAsync(stats.NextQuery);.
-        /// </example>
         /// <param name="query"><see cref="PaginatedRequestParams"/> and <see cref="StatsRequestParams"/>.</param>
         /// <returns>returns a PaginatedResult of Stats.</returns>
         public Task<PaginatedResult<Stats>> StatsAsync(PaginatedRequestParams query)
