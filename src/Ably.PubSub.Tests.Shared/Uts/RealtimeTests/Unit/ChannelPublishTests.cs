@@ -598,8 +598,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL6c4/fails-conn-failed-2
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTL6c4")]
         public async Task RTL6c4_FailsConnFailed()
         {
@@ -1423,8 +1422,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN7e/error-represents-reason-4
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN7e")]
         public async Task RTN7e_ErrorRepresentsReason()
         {

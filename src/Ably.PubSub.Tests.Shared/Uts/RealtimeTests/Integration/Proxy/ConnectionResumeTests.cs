@@ -327,8 +327,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // UTS: realtime/proxy/RTN15h1/token-error-nonrenewable-failed-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN15h1", Timeout = TestTimeoutMs)]
+        [Fact(Timeout = TestTimeoutMs)]
         [Trait("spec", "RTN15h1")]
         public async Task RTN15h1_TokenErrorNonrenewableFailed()
         {

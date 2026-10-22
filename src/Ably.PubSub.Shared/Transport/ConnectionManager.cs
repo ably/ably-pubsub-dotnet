@@ -157,74 +157,85 @@ namespace Ably.PubSub.Transport
 
         internal async Task OnAuthUpdated(TokenDetails tokenDetails, bool wait)
         {
-            if (Connection.State != ConnectionState.Connected)
+            // The awaiter starts listening on construction, before the AUTH message is sent or the
+            // connection attempt is started, so a CONNECTED (or any other state change) that is
+            // processed immediately cannot be missed (RTC8a1, RTC8b1).
+            using (var waiter = wait ? new ConnectionChangeAwaiter(Connection, Options.TimerScheduler) : null)
             {
-                ExecuteCommand(Connect());
-                return;
-            }
-
-            try
-            {
-                var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Auth)
+                if (Connection.State != ConnectionState.Connected)
                 {
-                    Auth = new AuthDetails
-                    {
-                        AccessToken = tokenDetails.Token,
-                    },
-                };
-
-                Send(msg);
-            }
-            catch (AblyException e)
-            {
-                Logger.Warning("OnAuthUpdated: closing transport after send failure");
-                Logger.Debug(e.Message);
-                Transport?.Close();
-            }
-
-            if (wait)
-            {
-                var waiter = new ConnectionChangeAwaiter(Connection, Options.TimerScheduler);
-
-                try
+                    // RTC8b, RTC8c: initiate a connection attempt with the new token.
+                    ExecuteCommand(Connect());
+                }
+                else
                 {
-                    while (true)
+                    try
                     {
-                        // Options rather than Defaults, since TO3l11 makes realtimeRequestTimeout a
-                        // client option.
-                        var (success, newState) = await waiter.Wait(Options.RealtimeRequestTimeout);
-                        if (success == false)
+                        var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Auth)
                         {
-                            throw new AblyException(
-                                new ErrorInfo(
-                                $"Connection state didn't change after Auth updated within {Options.RealtimeRequestTimeout}",
-                                40140));
-                        }
+                            Auth = new AuthDetails
+                            {
+                                AccessToken = tokenDetails.Token,
+                            },
+                        };
 
-                        switch (newState)
-                        {
-                            case ConnectionState.Connected:
-                                Logger.Debug("onAuthUpdated: Successfully connected");
-                                return;
-                            case ConnectionState.Connecting:
-                            case ConnectionState.Disconnected:
-                                continue;
-                            default: // if it's one of the failed states
-                                Logger.Debug("onAuthUpdated: Failed to reconnect");
-                                throw new AblyException(Connection.ErrorReason);
-                        }
+                        Send(msg);
+                    }
+                    catch (AblyException e)
+                    {
+                        Logger.Warning("OnAuthUpdated: closing transport after send failure");
+                        Logger.Debug(e.Message);
+                        Transport?.Close();
                     }
                 }
-                catch (AblyException)
+
+                if (waiter != null)
                 {
-                    throw;
+                    await WaitForConnectionAfterAuthUpdate(waiter);
                 }
-                catch (Exception e)
+            }
+        }
+
+        private async Task WaitForConnectionAfterAuthUpdate(ConnectionChangeAwaiter waiter)
+        {
+            try
+            {
+                while (true)
                 {
-                    Logger.Error("Error in AuthUpdated handler", e);
-                    throw new AblyException(
-                        new ErrorInfo("Error while waiting for connection to update after updating Auth"), e);
+                    // Options rather than Defaults, since TO3l11 makes realtimeRequestTimeout a
+                    // client option.
+                    var (success, newState) = await waiter.Wait(Options.RealtimeRequestTimeout);
+                    if (success == false)
+                    {
+                        throw new AblyException(
+                            new ErrorInfo(
+                            $"Connection state didn't change after Auth updated within {Options.RealtimeRequestTimeout}",
+                            40140));
+                    }
+
+                    switch (newState)
+                    {
+                        case ConnectionState.Connected:
+                            Logger.Debug("onAuthUpdated: Successfully connected");
+                            return;
+                        case ConnectionState.Connecting:
+                        case ConnectionState.Disconnected:
+                            continue;
+                        default: // if it's one of the failed states
+                            Logger.Debug("onAuthUpdated: Failed to reconnect");
+                            throw new AblyException(Connection.ErrorReason);
+                    }
                 }
+            }
+            catch (AblyException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                Logger.Error("Error in AuthUpdated handler", e);
+                throw new AblyException(
+                    new ErrorInfo("Error while waiting for connection to update after updating Auth"), e);
             }
         }
 

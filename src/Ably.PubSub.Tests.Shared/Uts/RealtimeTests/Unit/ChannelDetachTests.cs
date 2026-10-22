@@ -2,7 +2,7 @@
 // Derived from uts/realtime/unit/channels/channel_detach.md
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: unit
-// Disclosures: fake timers enabled in RTL5l/detach-attached-when-disconnected-1 (infra-driving: keeps the connection DISCONNECTED until time is advanced); SDK operations are awaited through UtsWait.WithTimeout (10 s wall clock), so an SDK that never completes fails fast instead of hanging (infra-driving)
+// Disclosures: SDK operations are awaited through UtsWait.WithTimeout (10 s wall clock), so an SDK that never completes fails fast instead of hanging (infra-driving)
 
 using System;
 using System.Collections.Generic;
@@ -373,57 +373,15 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTL5l/detach-attached-when-disconnected-1
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN14d", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact(Skip = "UTS spec error RTL5l: the UTS spec contradicts the features spec; skipped until the spec is fixed; see deviations.md (UTS Spec Errors)")]
         [Trait("spec", "RTL5l")]
-        public async Task RTL5l_DetachAttachedWhenDisconnected()
+        public Task RTL5l_DetachAttachedWhenDisconnected()
         {
-            // Setup
-            // NOTE: fake timers keep the connection DISCONNECTED (no automatic retry) until time is advanced; see the header disclosure
-            EnableFakeTimers();
-
-            var mockWs = new MockWebSocket(onConnectionAttempt: conn => conn.RespondWithConnected());
-            InstallMock(mockWs);
-
-            var client = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
-
-            var channel = client.Channels.Get("test-channel");
-
-            // Test Steps
-            client.Connect();
-            await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Connected);
-
-            // Attach the channel
-            mockWs.OnMessageFromClient = msg =>
-            {
-                if ((int)msg.Action == ProtocolMessages.Attach)
-                {
-                    mockWs.ActiveConnection.SendToClient(ProtocolMessages.AttachedMessage(msg.Channel));
-                }
-            };
-            var attachFuture = channel.AttachAsync();
-            await UtsWait.AwaitChannelState(channel, ChannelState.Attached);
-
-            // Disconnect the transport
-            mockWs.ActiveConnection.SimulateDisconnect();
-            await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Disconnected);
-
-            // Now detach while disconnected
-            var messagesSent = new CaptureList<ProtocolMessage>();
-            mockWs.OnMessageFromClient = msg => messagesSent.Add(msg);
-
-            var detachFuture = channel.DetachAsync();
-            await UtsWait.AwaitChannelState(channel, ChannelState.Detached);
-
-            // Assertions
-            // Channel transitions directly to DETACHED
-            channel.State.Should().Be(ChannelState.Detached);
-
-            // No DETACH message was sent (transport is unavailable)
-            var detachMessages = messagesSent.Snapshot().Where(m => (int)m.Action == ProtocolMessages.Detach).ToList();
-            detachMessages.Should().HaveCount(0);
-            await UtsWait.WithTimeout(attachFuture, TimeSpan.FromSeconds(10), "attachFuture");
-            await UtsWait.WithTimeout(detachFuture, TimeSpan.FromSeconds(10), "detachFuture");
+            // SPEC ERROR RTL5l: the mock accepts every connection attempt, so after simulate_disconnect() the client reconnects at once (RTN15a, RTN15h3)
+            // and RTL3d moves the ATTACHED channel to ATTACHING; when detach() runs after that reconnect, the connection is CONNECTED and RTL5d (and RTL5i)
+            // require a DETACH, contradicting "no DETACH message sent". Fix the UTS spec first - see deviations.md (UTS Spec Errors).
+            UtsAssert.Fail("UTS spec error RTL5l - fix the spec first; see deviations.md");
+            return Task.CompletedTask;
         }
 
         // UTS: realtime/unit/RTL5d/normal-detach-flow-0

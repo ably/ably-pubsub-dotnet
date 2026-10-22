@@ -30,8 +30,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC8a/authorize-connected-sends-auth-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTC8a1", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTC8a")]
         public async Task RTC8a_AuthorizeConnectedSendsAuth()
         {
@@ -170,8 +169,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC8a1/capability-downgrade-channel-failed-1
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTC8a1", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTC8a1")]
         public async Task RTC8a1_CapabilityDowngradeChannelFailed()
         {
@@ -312,8 +310,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC8a3/authorize-completes-after-response-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTC8a1", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTC8a3")]
         public async Task RTC8a3_AuthorizeCompletesAfterResponse()
         {
@@ -488,8 +485,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC8c/authorize-disconnected-initiates-connection-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTC8b1", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTC8c")]
         public async Task RTC8c_AuthorizeDisconnectedInitiatesConnection()
         {
@@ -610,8 +606,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTC8c/authorize-closed-initiates-connection-2
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTC8b1", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTC8c")]
         public async Task RTC8c_AuthorizeClosedInitiatesConnection()
         {

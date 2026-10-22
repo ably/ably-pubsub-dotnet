@@ -45,8 +45,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN14a/invalid-key-failed-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN14a")]
         public async Task RTN14a_InvalidKeyFailed()
         {
@@ -150,8 +149,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RSA4a/token-error-no-renewal-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RSA4a2", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RSA4a")]
         public async Task RSA4a_TokenErrorNoRenewal()
         {

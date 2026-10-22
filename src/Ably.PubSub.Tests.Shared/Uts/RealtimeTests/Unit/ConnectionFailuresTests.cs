@@ -82,8 +82,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN15h2/token-error-renew-fails-1
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN15h2", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN15h2")]
         public async Task RTN15h2_TokenErrorRenewFails()
         {
@@ -149,8 +148,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN15h3/non-token-error-resume-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN15h3", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN15h3")]
         public async Task RTN15h3_NonTokenErrorResume()
         {
@@ -218,8 +216,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN15j/error-empty-channel-failed-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN15j", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN15j")]
         public async Task RTN15j_ErrorEmptyChannelFailed()
         {
