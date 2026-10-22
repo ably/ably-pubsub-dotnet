@@ -128,12 +128,17 @@ namespace Ably.PubSub.Tests.Uts.InfraTests
             await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Connected);
             var channel = client.Channels.Get(name);
 
-            var attaching = UtsWait.AwaitChannelState(channel, ChannelState.Attaching);
+            var attaching = UtsWait.AwaitChannelState(channel, ChannelState.Attaching, TimeSpan.FromSeconds(5));
             var result = await channel.AttachAsync();
 
             result.IsSuccess.Should().BeTrue();
             channel.State.Should().Be(ChannelState.Attached, "ATTACHING was only transient");
-            attaching.IsCompleted.Should().BeTrue("the wait latched ATTACHING although the channel had left it");
+
+            // The channel will not enter ATTACHING again, so this completes only if the wait latched
+            // the transient ATTACHING; otherwise it fails with its timeout. Not checked through
+            // IsCompleted: the wait's task completes after a thread-pool hop (its completion source
+            // runs continuations asynchronously), which a starved runner can schedule after this
+            // continuation.
             await attaching;
         }
 
