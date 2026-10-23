@@ -328,6 +328,12 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Unit
             InstallMock(fakeMock);
             var faked = Realtime(new ClientOptions { Key = ValidKey, FallbackHosts = new string[0], RealtimeRequestTimeout = SdkTimeout });
             await fakeMock.AwaitConnectionAttempt();
+
+            // The faked client puts two timers on the fake clock: the connecting-state timer, and the first delay of
+            // the RTN23a heartbeat monitor loop, which RealtimeWorkflow.Start registers from a Task.Run on a pool
+            // thread (README F2), so it can land after the connection attempt is signalled. Wait for both before the
+            // snapshot, else a late heartbeat delay is mistaken for the second client's timer.
+            await UtsWait.PollUntil(() => Clock.PendingCount >= 2, description: "the connecting timer and the heartbeat monitor delay to be scheduled");
             var pendingWithOneClient = Clock.PendingCount;
 
             // Built afterwards straight from the core constructor, without the unit factory and its hook.
