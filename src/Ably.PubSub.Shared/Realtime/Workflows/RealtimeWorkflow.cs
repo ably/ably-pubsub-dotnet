@@ -581,6 +581,22 @@ namespace Ably.PubSub.Realtime.Workflow
                     // If it's an error or has been closed we want to do something about it
                     if (cmd.TransportState == TransportState.Closed || cmd.Exception != null)
                     {
+                        // A server that sends ERROR, DISCONNECTED or CONNECTED and then closes the
+                        // transport puts the message and the close in the queue back to back. The
+                        // state handles the message by queueing a command, which lands behind the
+                        // close, so the close would be handled in the state the message was meant
+                        // to leave: a fatal ERROR would first cause a disconnect and an instant
+                        // reconnect, and then FAILED would be followed by CONNECTING (RTN14g,
+                        // RTN15h3, RTN27h). One hop behind the commands queued so far restores the
+                        // order in which the transport delivered them. ably-java gets the same order by
+                        // deciding the ERROR's target state inline, on the transport thread, so its
+                        // FAILED request is queued ahead of anything the close produces.
+                        if (cmd.Deferred == false)
+                        {
+                            QueueCommand(cmd.Defer().TriggeredBy(cmd));
+                            return EmptyCommand.Instance;
+                        }
+
                         switch (State.Connection.State)
                         {
                             case ConnectionState.Closing:
@@ -940,9 +956,14 @@ namespace Ably.PubSub.Realtime.Workflow
                         {
                             if (cmd.Error.IsTokenError && Auth.TokenRenewable == false)
                             {
-                                var newError = ErrorInfo.NonRenewableToken;
-                                newError.Message += $" Original: {cmd.Error.Message} ({cmd.Error.Code})";
-                                return newError;
+                                // A copy: NonRenewableToken is process wide, so appending to it
+                                // would leak this connection's message into every later client.
+                                var nonRenewable = ErrorInfo.NonRenewableToken;
+                                return new ErrorInfo(
+                                    nonRenewable.Message + $" Original: {cmd.Error.Message} ({cmd.Error.Code})",
+                                    nonRenewable.Code,
+                                    nonRenewable.StatusCode,
+                                    nonRenewable.Href);
                             }
 
                             return cmd.Error;

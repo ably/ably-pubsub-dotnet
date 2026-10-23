@@ -24,6 +24,10 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 - Declares wire protocol version 6 (was 2): the realtime `v` transport param and the REST `X-Ably-Version` header now send `6` (CSV2). The `/stats` endpoint stays pinned to the v2 response format.
 - `Request()`/`RequestV2()` callers that send no `X-Ably-Version` header now receive protocol-6 response shapes (for example, `GET /channels` returns channel names, and a batch `POST /messages` returns a single results envelope). Pass the `X-Ably-Version` header to pin a version.
 
+**Behaviour changes**
+
+- `Auth.AuthorizeAsync` on a realtime client now completes only once the connection reaches `CONNECTED` (RTC8b1), whatever state it was in. Called while `INITIALIZED`, `CLOSED` or `DISCONNECTED` it starts a connection attempt (RTC8c) and waits for it, where it previously returned as soon as the token was obtained; it throws if the connection fails instead. It also no longer misses a `CONNECTED` that answers the `AUTH` message before it starts waiting, which made it wait for the whole `realtimeRequestTimeout`. A REST request that the client retries with a new token after a token error (RSA4b) does not wait for the realtime connection, whatever its state; it previously waited for the `AUTH` exchange while `CONNECTED`.
+
 **Notes**
 
 - Device push-receive (push activation on Android/iOS) is not part of the 2.0 packages; a `net8.0-android`/`net8.0-ios` port on `Ably.PubSub.Device` is a possible future follow-up (currently **parked** — no committed milestone). Push administration (from a backend) is unaffected. See [PushNotifications.md](PushNotifications.md).
@@ -43,6 +47,7 @@ Implements RTN23 dead-transport detection and the connection-recovery spec point
 - `connectionId` no longer changes after a long disconnection, since the client always attempts a resume now. Use `ChannelStateChange.Resumed` to detect a fresh connection.
 - `Connection.CreateRecoveryKey()` returns a key while `SUSPENDED`, where it previously returned empty.
 - Some `ErrorInfo` messages and codes changed.
+- A server that sends a fatal `ERROR` (or `DISCONNECTED`) and then closes the socket no longer leaves the connection `CONNECTING` after `FAILED`: the transport close is handled after the command the message queued, as it was delivered. A connection that fails with a non-renewable token error also no longer appends its message to the shared `40171` error that later connections report.
 
 **Merged pull requests:**
 

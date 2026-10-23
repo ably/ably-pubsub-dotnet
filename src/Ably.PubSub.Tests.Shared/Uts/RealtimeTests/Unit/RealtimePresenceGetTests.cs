@@ -154,8 +154,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTP11c1/get-no-wait-returns-immediately-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTP11c1", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTP11c1")]
         public async Task RTP11c1_GetNoWaitReturnsImmediately()
         {
@@ -187,6 +186,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Connected);
             var attachResult = await UtsWait.WithTimeout(channel.AttachAsync(), TimeSpan.FromSeconds(10), "AttachAsync");
             attachResult.IsSuccess.Should().BeTrue("AWAIT channel.attach() succeeds ({0})", attachResult.Error?.Message);
+
+            // NOTE: RTP11c1 only promises the members known so far, and the SYNC follows the ATTACHED in the queue, so it is drained here (process_pending_events) to make "known" mean alice
+            await ProcessPendingEvents();
 
             // Sync is in progress but we don't wait
             var members = (await UtsWait.WithTimeout(channel.Presence.GetAsync(new Presence.GetParams { WaitForSync = false }), TimeSpan.FromSeconds(10), "GetAsync")).ToList();

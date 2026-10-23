@@ -63,8 +63,8 @@ namespace Ably.PubSub.Tests.Uts.InfraTests
         [Fact]
         public async Task ConnectionStateWaitFailsFastWhenTheConnectionEntersFailed()
         {
-            // thenClose: false, so the SDK race in ConnectionStaysFailedWhenTheServerClosesAfterAFatalError can't
-            // move the connection out of FAILED under this helper test.
+            // thenClose: false, so this helper test does not depend on the close ordering that
+            // ConnectionStaysFailedWhenTheServerClosesAfterAFatalError checks.
             var mock = new MockWebSocket(attempt => attempt.RespondWithError(ProtocolMessages.ErrorMessage(40000, "fatal for the test"), thenClose: false));
             InstallMock(mock);
             var client = Realtime(new ClientOptions { Key = ValidKey, AutoConnect = false });
@@ -91,12 +91,13 @@ namespace Ably.PubSub.Tests.Uts.InfraTests
         /// <summary>
         /// Not a helper contract: an SDK finding made by the test above. RTN14g/RTN15i say a connection-level
         /// ERROR moves the connection to FAILED, which only an explicit <c>connect()</c> leaves. When the server
-        /// closes the socket after the ERROR (as <c>mock_websocket.md</c> says it does), the SDK can handle the
-        /// close first (DISCONNECTED, with an RTN15a/RTN17j instant retry queued), then the ERROR (FAILED),
-        /// and then the queued retry takes the connection from FAILED back to CONNECTING, looping. A race:
-        /// it shows in some runs only (more often under the parallel infra run), so this checks 20 clients.
+        /// closes the socket after the ERROR (as <c>mock_websocket.md</c> says it does), the SDK used to handle
+        /// the close first (DISCONNECTED, with an RTN15a/RTN17j instant retry queued), then the ERROR (FAILED),
+        /// and then the queued retry took the connection from FAILED back to CONNECTING. Fixed in
+        /// <c>RealtimeWorkflow</c> (<c>HandleTransportEventCommand</c> defers a close once, behind the commands
+        /// the earlier messages queued). It was a race, so this checks 20 clients.
         /// </summary>
-        [DeviationFact("FAILED left by a queued instant retry after ERROR + server close (unit-build SDK finding)")]
+        [Fact]
         public async Task ConnectionStaysFailedWhenTheServerClosesAfterAFatalError()
         {
             var mock = new MockWebSocket(attempt => attempt.RespondWithError(ProtocolMessages.ErrorMessage(40000, "fatal for the test")));
@@ -127,12 +128,17 @@ namespace Ably.PubSub.Tests.Uts.InfraTests
             await UtsWait.AwaitConnectionState(client.Connection, ConnectionState.Connected);
             var channel = client.Channels.Get(name);
 
-            var attaching = UtsWait.AwaitChannelState(channel, ChannelState.Attaching);
+            var attaching = UtsWait.AwaitChannelState(channel, ChannelState.Attaching, TimeSpan.FromSeconds(5));
             var result = await channel.AttachAsync();
 
             result.IsSuccess.Should().BeTrue();
             channel.State.Should().Be(ChannelState.Attached, "ATTACHING was only transient");
-            attaching.IsCompleted.Should().BeTrue("the wait latched ATTACHING although the channel had left it");
+
+            // The channel will not enter ATTACHING again, so this completes only if the wait latched
+            // the transient ATTACHING; otherwise it fails with its timeout. Not checked through
+            // IsCompleted: the wait's task completes after a thread-pool hop (its completion source
+            // runs continuations asynchronously), which a starved runner can schedule after this
+            // continuation.
             await attaching;
         }
 

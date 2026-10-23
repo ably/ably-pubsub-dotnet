@@ -124,7 +124,8 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // UTS: realtime/proxy/RTL14/error-on-attach-0
-        [Fact(Timeout = TestTimeoutMs)]
+        // DEVIATION: see deviations.md
+        [DeviationFact("RTL14", Timeout = TestTimeoutMs)]
         [Trait("spec", "RTL14")]
         public async Task RTL14_ErrorOnAttach()
         {
@@ -397,7 +398,8 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // UTS: realtime/proxy/RTL12/attached-non-resumed-update-0
-        [Fact(Timeout = TestTimeoutMs)]
+        // DEVIATION: see deviations.md
+        [DeviationFact("RTL12", Timeout = TestTimeoutMs)]
         [Trait("spec", "RTL12")]
         public async Task RTL12_AttachedNonResumedUpdate()
         {

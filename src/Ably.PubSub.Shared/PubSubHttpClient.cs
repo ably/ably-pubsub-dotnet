@@ -226,7 +226,8 @@ namespace Ably.PubSub
 
                     try
                     {
-                        await AblyAuth.AuthorizeAsync();
+                        // RSA4b - only the new token is needed, so no wait for the realtime connection.
+                        await AblyAuth.AuthorizeAsync(null, null, waitForConnection: false);
                         await AblyAuth.AddAuthHeader(request);
                         return await ExecuteHttpRequest(request);
                     }

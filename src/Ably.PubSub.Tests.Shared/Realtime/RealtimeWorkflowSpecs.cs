@@ -101,6 +101,82 @@ namespace Ably.PubSub.Tests.NETFramework.Realtime
                 await client.WaitForState(ConnectionState.Failed);
             }
 
+            [Theory]
+            [InlineData(0)]
+            [InlineData(1)]
+            [InlineData(2)]
+            [InlineData(3)]
+            [InlineData(4)]
+            [InlineData(5)]
+            [InlineData(6)]
+            [InlineData(7)]
+            [Trait("spec", "RTN14g")]
+            [Trait("spec", "RTN27h")]
+            public async Task WithInboundErrorMessageFollowedByTransportClose_ShouldStayFailed(int attempt)
+            {
+                // A server that sends a fatal ERROR and then closes the socket puts the two in the
+                // queue back to back. The close must not be handled before the command the ERROR
+                // queued, or the connection would disconnect, retry at once, and end up CONNECTING
+                // after FAILED. The test thread queues both without waiting, so the order in which
+                // the workflow thread sees them varies run to run; attempt only repeats it.
+                FakeTransportFactory.InitialiseFakeTransport =
+                    transport => transport.OnConnectChangeStateToConnected = false;
+
+                var client = GetClientWithFakeTransport(opts =>
+                {
+                    opts.Endpoint = "non-default.ably.io";
+                    opts.RealtimeRequestTimeout = TimeSpan.FromMinutes(1);
+                });
+
+                await client.WaitForState(ConnectionState.Connecting);
+
+                var states = new List<ConnectionState>();
+                client.Connection.On(args => { lock (states) { states.Add(args.Current); } });
+
+                // WaitForState returns on the state change, which comes before the transport exists.
+                while (LastCreatedTransport == null)
+                {
+                    await Task.Delay(5);
+                }
+
+                var transportId = LastCreatedTransport.Id;
+                client.ExecuteCommand(ProcessMessageCommand.Create(
+                    new ProtocolMessage(ProtocolMessage.MessageAction.Error) { Error = new ErrorInfo("Invalid API key", 40005, HttpStatusCode.BadRequest) }));
+                client.ExecuteCommand(HandleTransportEventCommand.Create(transportId, TransportState.Closed, null));
+
+                await client.WaitForState(ConnectionState.Failed);
+                await client.ProcessCommands();
+                await client.ProcessCommands();
+
+                client.Connection.State.Should().Be(ConnectionState.Failed, "attempt {0}", attempt);
+                lock (states)
+                {
+                    states.Should().Equal(new[] { ConnectionState.Failed }, "attempt {0}", attempt);
+                }
+
+                client.Connection.ErrorReason.Code.Should().Be(40005);
+            }
+
+            [Fact]
+            [Trait("spec", "RSA4a2")]
+            public async Task SetFailedState_WithNonRenewableTokenError_ShouldNotChangeTheSharedNonRenewableTokenError()
+            {
+                var messageBefore = ErrorInfo.NonRenewableToken.Message;
+                var client = GetClientWithFakeTransport(opts =>
+                {
+                    opts.Key = null;
+                    opts.Token = "expired-token";
+                    opts.AutoConnect = false;
+                });
+
+                client.ExecuteCommand(SetFailedStateCommand.Create(new ErrorInfo("Token expired", 40142, HttpStatusCode.Unauthorized)));
+                await client.ProcessCommands();
+
+                client.Connection.ErrorReason.Code.Should().Be(40171);
+                client.Connection.ErrorReason.Message.Should().EndWith("Original: Token expired (40142)");
+                ErrorInfo.NonRenewableToken.Message.Should().Be(messageBefore);
+            }
+
             public ConnectingStateSpecs(ITestOutputHelper output)
                 : base(output)
             {

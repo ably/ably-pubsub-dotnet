@@ -30,8 +30,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN25/error-reason-on-failed-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN25")]
         public async Task RTN25_ErrorReasonOnFailed()
         {
@@ -110,8 +109,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN25/error-reason-token-error-3
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN25")]
         public async Task RTN25_ErrorReasonTokenError()
         {
@@ -245,8 +243,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN25/error-reason-in-state-change-6
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN25")]
         public async Task RTN25_ErrorReasonInStateChange()
         {

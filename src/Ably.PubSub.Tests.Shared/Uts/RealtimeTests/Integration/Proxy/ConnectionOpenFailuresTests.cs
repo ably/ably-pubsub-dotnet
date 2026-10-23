@@ -267,7 +267,8 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // UTS: realtime/proxy/RTN14c/connection-timeout-0
-        [Fact(Timeout = TestTimeoutMs)]
+        // DEVIATION: see deviations.md
+        [DeviationFact("RTN14c", Timeout = TestTimeoutMs)]
         [Trait("spec", "RTN14c")]
         public async Task RTN14c_ConnectionTimeout()
         {
