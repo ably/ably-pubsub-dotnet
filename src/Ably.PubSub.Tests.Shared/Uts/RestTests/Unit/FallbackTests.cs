@@ -1033,7 +1033,9 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
                 200,
                 "yes");
 
-            var clientCase1 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret" });
+            // NOTE: autoConnect: false (TO3e); the spec's auto-connecting client fails its connection attempt and its RTN17j
+            // fallback connectivity check consumes the single queued check response first - see deviations.md (UTS Spec Errors, REC3)
+            var clientCase1 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
             var resultCase1 = await clientCase1.HttpClient.CanConnectToAbly();
 
             resultCase1.Should().BeTrue();
@@ -1050,7 +1052,9 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
                 200,
                 "no");
 
-            var clientCase2 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret" });
+            // NOTE: autoConnect: false (TO3e); the spec's auto-connecting client fails its connection attempt and its RTN17j
+            // fallback connectivity check consumes the single queued check response first - see deviations.md (UTS Spec Errors, REC3)
+            var clientCase2 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
             var resultCase2 = await clientCase2.HttpClient.CanConnectToAbly();
 
             resultCase2.Should().BeFalse();
@@ -1068,7 +1072,9 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
                 200,
                 string.Empty);
 
-            var clientCase3 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret" });
+            // NOTE: autoConnect: false (TO3e); the spec's auto-connecting client fails its connection attempt and its RTN17j
+            // fallback connectivity check consumes the single queued check response first - see deviations.md (UTS Spec Errors, REC3)
+            var clientCase3 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
             var resultCase3 = await clientCase3.HttpClient.CanConnectToAbly();
 
             resultCase3.Should().BeFalse();
@@ -1085,7 +1091,9 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
                 404,
                 "Not Found");
 
-            var clientCase4 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret" });
+            // NOTE: autoConnect: false (TO3e); the spec's auto-connecting client fails its connection attempt and its RTN17j
+            // fallback connectivity check consumes the single queued check response first - see deviations.md (UTS Spec Errors, REC3)
+            var clientCase4 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
             var resultCase4 = await clientCase4.HttpClient.CanConnectToAbly();
 
             resultCase4.Should().BeFalse();
@@ -1100,7 +1108,9 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             // NOTE: the spec omits install_mock(mock_http) here; the mock is installed so the client uses it
             InstallMock(mockHttpCase5);
 
-            var clientCase5 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret" });
+            // NOTE: autoConnect: false (TO3e); the spec's auto-connecting client fails its connection attempt and its RTN17j
+            // fallback connectivity check consumes the single queued check response first - see deviations.md (UTS Spec Errors, REC3)
+            var clientCase5 = Realtime(new ClientOptions { Key = "appId.keyId:keySecret", AutoConnect = false });
             var resultCase5 = await clientCase5.HttpClient.CanConnectToAbly();
 
             resultCase5.Should().BeFalse();

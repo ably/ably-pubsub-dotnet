@@ -378,8 +378,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         public Task RTL5l_DetachAttachedWhenDisconnected()
         {
             // SPEC ERROR RTL5l: the mock accepts every connection attempt, so after simulate_disconnect() the client reconnects at once (RTN15a, RTN15h3)
-            // and RTL3d moves the ATTACHED channel to ATTACHING; when detach() runs after that reconnect, the connection is CONNECTED and RTL5d (and RTL5i)
-            // require a DETACH, contradicting "no DETACH message sent". Fix the UTS spec first - see deviations.md (UTS Spec Errors).
+            // and the connection is not held DISCONNECTED. If detach() runs after that reconnect, RTL3d has put the channel in ATTACHING on a CONNECTED
+            // connection and RTL5i defers the detach to an ATTACH the test never answers, so the wait for DETACHED times out. The spec does not refuse
+            // the reconnection (channel_connection_state.md:514-516). Fix the UTS spec first - see deviations.md (UTS Spec Errors).
             UtsAssert.Fail("UTS spec error RTL5l - fix the spec first; see deviations.md");
             return Task.CompletedTask;
         }
