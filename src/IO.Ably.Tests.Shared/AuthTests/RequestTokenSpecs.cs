@@ -50,20 +50,21 @@ namespace IO.Ably.Tests.AuthTests
             var client = GetRestClient(
                 null,
                 options => options.DefaultTokenParams = new TokenParams
-                                                            {
-                                                                ClientId = "123", Ttl = TimeSpan.FromHours(2)
-                                                            });
+                {
+                    ClientId = "123",
+                    Ttl = TimeSpan.FromHours(2)
+                });
 
             var capability = new Capability();
             capability.AddResource("a").AllowAll();
             var methodParams = new TokenParams
-                                   {
-                                       Capability = capability,
-                                       ClientId = "999",
-                                       Ttl = TimeSpan.FromMinutes(1),
-                                       Nonce = "123",
-                                       Timestamp = Now.AddHours(1)
-                                   };
+            {
+                Capability = capability,
+                ClientId = "999",
+                Ttl = TimeSpan.FromMinutes(1),
+                Nonce = "123",
+                Timestamp = Now.AddHours(1)
+            };
 
             await client.Auth.RequestTokenAsync(methodParams);
 
@@ -162,11 +163,11 @@ namespace IO.Ably.Tests.AuthTests
                     return DummyTokenResponse.ToTask();
                 };
             var tokenParams = new TokenParams
-                                  {
-                                      Capability = new Capability(),
-                                      ClientId = "ClientId",
-                                      Ttl = TimeSpan.FromMinutes(10)
-                                  };
+            {
+                Capability = new Capability(),
+                ClientId = "ClientId",
+                Ttl = TimeSpan.FromMinutes(10)
+            };
 
             // Act
             await rest.Auth.RequestTokenAsync(
@@ -185,11 +186,11 @@ namespace IO.Ably.Tests.AuthTests
                 };
 
             var tokenParams = new TokenParams
-                                  {
-                                      Capability = new Capability(),
-                                      ClientId = "ClientId",
-                                      Ttl = TimeSpan.FromMinutes(10)
-                                  };
+            {
+                Capability = new Capability(),
+                ClientId = "ClientId",
+                Ttl = TimeSpan.FromMinutes(10)
+            };
 
             // Act
             await rest.Auth.RequestTokenAsync(
@@ -207,13 +208,13 @@ namespace IO.Ably.Tests.AuthTests
             var authCallbackCalled = false;
             var token = new TokenDetails();
             var options = new AuthOptions
-                              {
-                                  AuthCallback = (x) =>
-                                      {
-                                          authCallbackCalled = true;
-                                          return Task.FromResult<object>(token);
-                                      }
-                              };
+            {
+                AuthCallback = (x) =>
+                    {
+                        authCallbackCalled = true;
+                        return Task.FromResult<object>(token);
+                    }
+            };
             var result = await rest.Auth.RequestTokenAsync(tokenRequest, options);
 
             authCallbackCalled.Should().BeTrue();
@@ -349,11 +350,11 @@ namespace IO.Ably.Tests.AuthTests
                     });
 
             var options = new AuthOptions
-                              {
-                                  AuthUrl = new Uri("http://authUrl"),
-                                  AuthHeaders = new Dictionary<string, string> { { "Test", "Test" } },
-                                  AuthParams = new Dictionary<string, string> { { "Test", "Test" } },
-                              };
+            {
+                AuthUrl = new Uri("http://authUrl"),
+                AuthHeaders = new Dictionary<string, string> { { "Test", "Test" } },
+                AuthParams = new Dictionary<string, string> { { "Test", "Test" } },
+            };
 
             // Act
             await rest.Auth.RequestTokenAsync(null, options);
@@ -507,11 +508,11 @@ namespace IO.Ably.Tests.AuthTests
         {
             var rest = GetRestClient();
             var tokenParams = new TokenParams
-                                  {
-                                      Capability = new Capability(),
-                                      ClientId = "ClientId",
-                                      Ttl = TimeSpan.FromMinutes(10)
-                                  };
+            {
+                Capability = new Capability(),
+                ClientId = "ClientId",
+                Ttl = TimeSpan.FromMinutes(10)
+            };
 
             // Act
             await rest.Auth.RequestTokenAsync(tokenParams);

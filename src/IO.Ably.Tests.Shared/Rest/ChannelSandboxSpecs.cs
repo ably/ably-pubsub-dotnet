@@ -214,7 +214,7 @@ namespace IO.Ably.Tests.Rest
         [Theory]
         [ProtocolData]
         [Trait("spec", "RSL1k4")]
-        public async Task IdempotentPublishing_SimulateErrorAndRetry(Protocol protocol)
+        public async Task IdempotentPublishing_SimulateErrorAndRetry_Flaky(Protocol protocol)
         {
             const int numberOfRetries = 2;
             var client = await GetRestClient(protocol, opts =>
@@ -348,7 +348,7 @@ namespace IO.Ably.Tests.Rest
         [Trait("spec", "RSL6a")]
 
         // Uses the to publish the examples inside crypto-data-128.json to publish and then retrieve the messages
-        public async Task CanPublishAMessageAndRetrieveIt128(Protocol protocol)
+        public async Task CanPublishAMessageAndRetrieveIt128_Flaky(Protocol protocol)
         {
             var items = (JArray)_examples["items"];
 

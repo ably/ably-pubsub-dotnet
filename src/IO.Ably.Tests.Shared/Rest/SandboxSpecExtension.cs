@@ -35,7 +35,7 @@ namespace IO.Ably.Tests
             Result<bool> result = await channelAwaiter.WaitAsync(timespan);
             if (result.IsFailure)
             {
-                 throw new Exception($"Channel '{channel.Name}' did not reach '{awaitedState}' in {timespan.TotalSeconds} seconds. Current state {channel.State}");
+                throw new Exception($"Channel '{channel.Name}' did not reach '{awaitedState}' in {timespan.TotalSeconds} seconds. Current state {channel.State}");
             }
         }
 
