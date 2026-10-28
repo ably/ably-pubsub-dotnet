@@ -24,7 +24,7 @@ namespace Ably.PubSub.Http
         private readonly string _basePath;
         private ChannelOptions _options;
         private readonly PushChannel _pushChannel;
-        private readonly RestAnnotations _annotations;
+        private readonly HttpAnnotations _annotations;
 
         internal HttpChannel(PubSubHttpClient ablyRest, string name, ChannelOptions options, IMobileDevice mobileDevice = null)
         {
@@ -32,7 +32,7 @@ namespace Ably.PubSub.Http
             _ablyRest = ablyRest;
             _options = options;
             _basePath = $"/channels/{name.EncodeUriPart()}";
-            _annotations = new RestAnnotations(ablyRest, this, _basePath);
+            _annotations = new HttpAnnotations(ablyRest, this, _basePath);
 
             if (mobileDevice != null)
             {
@@ -71,7 +71,7 @@ namespace Ably.PubSub.Http
         public IPresence Presence => this;
 
         /// <inheritdoc/>
-        public RestAnnotations Annotations => _annotations;
+        public HttpAnnotations Annotations => _annotations;
 
         /// <inheritdoc/>
         public Task<PublishResult> PublishAsync(string name, object data, string clientId = null)

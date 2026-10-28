@@ -25,7 +25,7 @@ namespace Ably.PubSub.Realtime
 
         /// <summary>
         /// Publishes an annotation to the message with the given serial (RTAN1). The arguments are validated,
-        /// and the annotation completed and its data encoded, as for <see cref="RestAnnotations.PublishAsync(string, Annotation)"/> (RTAN1a).
+        /// and the annotation completed and its data encoded, as for <see cref="HttpAnnotations.PublishAsync(string, Annotation)"/> (RTAN1a).
         /// The connection and channel state conditions are those of publishing a message (RTAN1b).
         /// </summary>
         /// <param name="messageSerial">the serial of the message to annotate.</param>
@@ -73,7 +73,7 @@ namespace Ably.PubSub.Realtime
 
         /// <summary>
         /// Retrieves the annotations of the message with the given serial. Identical to
-        /// <see cref="RestAnnotations.GetAsync(string, AnnotationsRequestParams)"/> (RTAN3a).
+        /// <see cref="HttpAnnotations.GetAsync(string, AnnotationsRequestParams)"/> (RTAN3a).
         /// </summary>
         /// <param name="messageSerial">the serial of the annotated message.</param>
         /// <param name="query">optional query parameters.</param>
@@ -214,7 +214,7 @@ namespace Ably.PubSub.Realtime
         private async Task<Result> SendAsync(string messageSerial, Annotation annotation, AnnotationAction action)
         {
             // RTAN1a: argument validation, field setting and data encoding as in RSAN1.
-            var outbound = RestAnnotations.CreateOutboundAnnotation(messageSerial, annotation, action);
+            var outbound = HttpAnnotations.CreateOutboundAnnotation(messageSerial, annotation, action);
 
             // RTAN1b: a state which refuses publishing throws, as it does when publishing a message.
             // The exception is not wrapped, so the error code of the refusal is preserved.
