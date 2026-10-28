@@ -7,7 +7,7 @@ namespace Ably.PubSub.Push
     /// like subscribing and unsubscribing to push notification,
     /// narrowed to a specific channel.
     /// </summary>
-    public class PushChannel
+    internal class PushChannel
     {
         private readonly PubSubHttpClient _rest;
         private readonly ILogger _logger;

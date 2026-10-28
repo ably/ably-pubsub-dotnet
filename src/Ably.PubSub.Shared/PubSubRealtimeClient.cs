@@ -135,8 +135,9 @@ namespace Ably.PubSub
 
         /// <summary>
         /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
+        /// Internal: device push-receive is not available in 2.0.
         /// </summary>
-        public LocalDevice Device => HttpClient.Device;
+        internal LocalDevice Device => HttpClient.Device;
 
         /// <inheritdoc/>
         public Task<PaginatedResult<Stats>> StatsAsync()

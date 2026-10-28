@@ -8,7 +8,7 @@ namespace Ably.PubSub.Push
     /// <summary>
     /// LocalDevice represents the current state of the device in respect of it being a target for push notifications.
     /// </summary>
-    public class LocalDevice : DeviceDetails
+    internal class LocalDevice : DeviceDetails
     {
         private const string JsonTokenTypeParameterName = "transportType";
         private const string JsonAndroidTokenParameterName = "registrationToken";
@@ -109,7 +109,7 @@ namespace Ably.PubSub.Push
         /// <param name="clientId">Optional clientId which is set on the device.</param>
         /// <param name="mobileDevice">If a mobile device is present it we will use the DevicePlatform and FormFactor from there.</param>
         /// <returns>Instance of LocalDevice.</returns>
-        public static LocalDevice Create(string clientId = null, IMobileDevice mobileDevice = null)
+        internal static LocalDevice Create(string clientId = null, IMobileDevice mobileDevice = null)
         {
             return new LocalDevice
             {

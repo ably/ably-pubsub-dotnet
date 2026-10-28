@@ -5,7 +5,7 @@ using Ably.PubSub.Push;
 
 namespace Ably.PubSub.Tests.Push
 {
-    public class FakeMobileDevice : IMobileDevice
+    internal class FakeMobileDevice : IMobileDevice
     {
         public Dictionary<string, string> Settings { get; } = new Dictionary<string, string>();
 

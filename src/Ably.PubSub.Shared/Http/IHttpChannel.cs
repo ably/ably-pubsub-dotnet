@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using Ably.PubSub.Push;
 
 namespace Ably.PubSub.Http
 {
@@ -140,12 +139,6 @@ namespace Ably.PubSub.Http
         /// Experimental: the annotations API may change.
         /// </summary>
         HttpAnnotations Annotations { get; }
-
-        /// <summary>
-        /// A convenient set of methods that help with managing subscriptions to a push channel.
-        /// <see cref="PushChannel"/>.
-        /// </summary>
-        PushChannel Push { get; }
 
         /// <summary>
         /// Sync version of <see cref="PublishAsync(string, object, string)"/>.

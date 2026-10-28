@@ -105,14 +105,16 @@ namespace Ably.PubSub.Realtime
 
         public RealtimeAnnotations Annotations { get; }
 
-        /// <inheritdoc />
-        public PushChannel Push
+        /// <summary>
+        /// Device push channel subscriptions. Internal: device push-receive is not available in 2.0.
+        /// </summary>
+        internal PushChannel Push
         {
             get
             {
                 if (_pushChannel is null)
                 {
-                    Logger.Warning("The current device is does not support or is not configured for Push notifications.");
+                    Logger.Warning("The current device does not support or is not configured for push notifications.");
                     return null;
                 }
 

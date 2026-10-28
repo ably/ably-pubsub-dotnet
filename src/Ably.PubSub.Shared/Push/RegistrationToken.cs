@@ -3,7 +3,7 @@
     /// <summary>
     /// Class used to hold registration tokens.
     /// </summary>
-    public class RegistrationToken
+    internal class RegistrationToken
     {
         /// <summary>
         /// Constructs a new registration token instance.

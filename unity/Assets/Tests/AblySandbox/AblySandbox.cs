@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Ably.PubSub;
-using Ably.PubSub.Push;
 using Ably.PubSub.Realtime;
 using UnityEngine.TestTools;
 
@@ -73,7 +72,7 @@ namespace Assets.Tests.AblySandbox
             return new PubSubHttpClient(defaultOptions);
         }
 
-        public async Task<PubSubRealtimeClient> GetRealtimeClient(Protocol protocol, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null, Func<ClientOptions, IMobileDevice, PubSubHttpClient> createRestFunc = null)
+        public async Task<PubSubRealtimeClient> GetRealtimeClient(Protocol protocol, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null)
         {
             var settings = await Fixture.GetSettings();
             var defaultOptions = settings.CreateDefaultOptions();
@@ -81,7 +80,7 @@ namespace Assets.Tests.AblySandbox
             defaultOptions.TransportFactory = new TestTransportFactory();
 
             optionsAction?.Invoke(defaultOptions, settings);
-            var client = new PubSubRealtimeClient(defaultOptions, createRestFunc);
+            var client = new PubSubRealtimeClient(defaultOptions, mobileDevice: null);
 
             _realtimeClients.Add(client);
             return client;

@@ -246,7 +246,7 @@ namespace Ably.PubSub.Tests.Push
 
             public PubSubHttpClient HttpClient { get; }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             private ActivationStateMachine GetStateMachine(PubSubHttpClient restClient = null)
             {
@@ -544,7 +544,7 @@ namespace Ably.PubSub.Tests.Push
 
             public PubSubHttpClient HttpClient { get; }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public void Dispose()
             {
@@ -727,7 +727,7 @@ namespace Ably.PubSub.Tests.Push
                 return (new ActivationStateMachine.WaitingForPushDeviceDetails(stateMachine), stateMachine);
             }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public PubSubHttpClient HttpClient { get; set; }
 
@@ -856,7 +856,7 @@ namespace Ably.PubSub.Tests.Push
                 return (new ActivationStateMachine.WaitingForDeviceRegistration(stateMachine), stateMachine);
             }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public PubSubHttpClient HttpClient { get; set; }
 
@@ -1043,7 +1043,7 @@ namespace Ably.PubSub.Tests.Push
                 return (new ActivationStateMachine.WaitingForNewPushDeviceDetails(stateMachine), stateMachine);
             }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public PubSubHttpClient HttpClient { get; set; }
 
@@ -1213,7 +1213,7 @@ namespace Ably.PubSub.Tests.Push
                 return new ActivationStateMachine.WaitingForRegistrationSync(stateMachine, fromEvent);
             }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public PubSubHttpClient HttpClient { get; set; }
 
@@ -1320,7 +1320,7 @@ namespace Ably.PubSub.Tests.Push
                 return (new ActivationStateMachine.AfterRegistrationSyncFailed(stateMachine), stateMachine);
             }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public PubSubHttpClient HttpClient { get; set; }
 
@@ -1461,7 +1461,7 @@ namespace Ably.PubSub.Tests.Push
                 return (new ActivationStateMachine.WaitingForDeregistration(stateMachine, getPreviousState(stateMachine)), stateMachine);
             }
 
-            public FakeMobileDevice MobileDevice { get; set; }
+            internal FakeMobileDevice MobileDevice { get; set; }
 
             public PubSubHttpClient HttpClient { get; }
 
