@@ -1791,6 +1791,90 @@ namespace Ably.PubSub.Tests.Realtime
             }
         }
 
+        [Trait("spec", "RTL10b")]
+        public class HistoryUntilAttachSpecs : ChannelSpecs
+        {
+            private const string AttachSerial = "attach-serial-1";
+
+            [Fact]
+            public async Task HistoryAsync_WithUntilAttach_ShouldSendTheAttachSerialAsFromSerial()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+
+                await channel.HistoryAsync(true);
+
+                LastRequest.Url.Should().Be("/channels/test/messages");
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+            }
+
+            [Fact]
+            public async Task HistoryAsync_WithQueryAndUntilAttach_ShouldSendTheAttachSerialAndKeepTheQuery()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+
+                await channel.HistoryAsync(new PaginatedRequestParams { Limit = 10 }, true);
+
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+                LastRequest.AssertContainsParameter("limit", "10");
+            }
+
+            [Fact]
+            public async Task HistoryAsync_WithUntilAttachOnAChannelThatIsNotAttached_ShouldThrow()
+            {
+                var (_, channel) = await GetClientAndChannel();
+                channel.State.Should().Be(ChannelState.Initialized);
+
+                await Assert.ThrowsAsync<AblyException>(() => channel.HistoryAsync(true));
+                await Assert.ThrowsAsync<AblyException>(() => channel.HistoryAsync(new PaginatedRequestParams(), true));
+            }
+
+            [Fact]
+            public async Task HistoryAsync_WithoutUntilAttach_ShouldNotSendFromSerialEvenWhenNotAttached()
+            {
+                var (_, channel) = await GetClientAndChannel();
+
+                await channel.HistoryAsync(false);
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+
+                await channel.HistoryAsync(new PaginatedRequestParams { Limit = 5 }, false);
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+                LastRequest.AssertContainsParameter("limit", "5");
+
+                await channel.HistoryAsync();
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+            }
+
+            [Fact]
+            public async Task PresenceHistoryAsync_WithoutUntilAttach_ShouldNotSendFromSerial()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+
+                await channel.Presence.HistoryAsync();
+
+                LastRequest.Url.Should().Be("/channels/test/presence/history");
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+            }
+
+            private async Task<(PubSubRealtimeClient, IRealtimeChannel)> GetAttachedClientAndChannel()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = AttachSerial,
+                });
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Attached);
+                return (client, channel);
+            }
+
+            public HistoryUntilAttachSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
         protected void SetState(
             IRealtimeChannel channel,
             ChannelState state,

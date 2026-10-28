@@ -595,9 +595,31 @@ namespace Ably.PubSub.Realtime
             return HttpChannel.HistoryAsync(query);
         }
 
+        public Task<PaginatedResult<Message>> HistoryAsync(bool untilAttach)
+        {
+            var query = new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                AddUntilAttachParameter(query); // RTL10b
+            }
+
+            return HttpChannel.HistoryAsync(query);
+        }
+
         public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query)
         {
             query = query ?? new PaginatedRequestParams();
+            return HttpChannel.HistoryAsync(query);
+        }
+
+        public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query, bool untilAttach)
+        {
+            query = query ?? new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                AddUntilAttachParameter(query); // RTL10b
+            }
+
             return HttpChannel.HistoryAsync(query);
         }
 
