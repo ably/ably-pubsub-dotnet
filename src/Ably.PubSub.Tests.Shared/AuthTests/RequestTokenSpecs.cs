@@ -220,6 +220,87 @@ namespace Ably.PubSub.Tests.AuthTests
             Assert.Same(token, result);
         }
 
+        [Theory]
+        [Trait("spec", "RSA8d")]
+        [Trait("spec", "RSA4f")]
+        [InlineData("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ4IjoxfQ.c2lnbmF0dXJl")]
+        [InlineData("xVLyHw.A-pwh7wicf3afTfgiw4k2Ku33kcnSA7z6y8FjuYpe3QaNRTEo4")]
+        public async Task RequestToken_WithAuthCallbackReturningTokenString_ReturnsTokenDetailsWithoutHttpRequest(string tokenString)
+        {
+            var rest = GetRestClient();
+            var options = new AuthOptions { AuthCallback = _ => Task.FromResult<object>(tokenString) };
+
+            var result = await rest.Auth.RequestTokenAsync(new TokenParams(), options);
+
+            result.Token.Should().Be(tokenString);
+            Requests.Should().BeEmpty();
+        }
+
+        [Fact]
+        [Trait("spec", "RSA8d")]
+        [Trait("spec", "RSA4f")]
+        public async Task RequestToken_WithAuthCallbackReturningSerializedTokenRequest_PostsToRequestToken()
+        {
+            var rest = GetRestClient();
+            var serializedRequest = await rest.Auth.CreateTokenRequestAsync(new TokenParams { ClientId = "123" }, null);
+
+            var tokenDetails = new TokenDetails("requested-token")
+            {
+                Expires = DateTimeOffset.UtcNow.AddHours(1),
+                Issued = DateTimeOffset.UtcNow,
+            };
+            rest.ExecuteHttpRequest = request =>
+            {
+                Requests.Add(request);
+                return JsonHelper.Serialize(tokenDetails).ToAblyJsonResponse();
+            };
+
+            var options = new AuthOptions { AuthCallback = _ => Task.FromResult<object>(serializedRequest) };
+            var result = await rest.Auth.RequestTokenAsync(new TokenParams(), options);
+
+            Requests.Should().HaveCount(1);
+            Requests[0].Url.Should().Be($"/keys/{KeyId}/requestToken");
+            ((TokenRequest)Requests[0].PostData).ClientId.Should().Be("123");
+            result.Token.Should().Be("requested-token");
+        }
+
+        [Fact]
+        [Trait("spec", "RSA8d")]
+        [Trait("spec", "RSA4f")]
+        public async Task RequestToken_WithAuthCallbackReturningSerializedTokenDetails_ReturnsTokenDetailsWithoutHttpRequest()
+        {
+            var rest = GetRestClient();
+            var tokenDetails = new TokenDetails("abc.def")
+            {
+                Expires = DateTimeOffset.UtcNow.AddHours(1),
+                Issued = DateTimeOffset.UtcNow,
+            };
+            var serialized = JsonHelper.Serialize(tokenDetails);
+            var options = new AuthOptions { AuthCallback = _ => Task.FromResult<object>(serialized) };
+
+            var result = await rest.Auth.RequestTokenAsync(new TokenParams(), options);
+
+            result.Token.Should().Be("abc.def");
+            Requests.Should().BeEmpty();
+        }
+
+        [Theory]
+        [Trait("spec", "RSA8d")]
+        [Trait("spec", "RSA4c1")]
+        [InlineData("")]
+        [InlineData("   ")]
+        public async Task RequestToken_WithAuthCallbackReturningEmptyString_ThrowsClientAuthProviderRequestFailed(string callbackResult)
+        {
+            var rest = GetRestClient();
+            var options = new AuthOptions { AuthCallback = _ => Task.FromResult<object>(callbackResult) };
+
+            var ex = await Assert.ThrowsAsync<AblyException>(() => rest.Auth.RequestTokenAsync(new TokenParams(), options));
+
+            ex.ErrorInfo.Code.Should().Be(ErrorCodes.ClientAuthProviderRequestFailed);
+            ex.ErrorInfo.Cause.Message.Should().Contain("empty string");
+            Requests.Should().BeEmpty();
+        }
+
         [Fact]
         [Trait("spec", "RSA8e")]
         public async Task RequestToken_TokenParamsAndAuthOptionsReplaceConfiguredDefaults()

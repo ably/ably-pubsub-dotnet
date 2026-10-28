@@ -369,11 +369,11 @@ namespace Ably.PubSub.Tests
                 options.AuthCallback = (tokenParams) => throw new Exception("AuthCallback force error");
             }
 
-            // invalid token returned
+            // invalid token request returned (a non-JSON string is a valid token string per RSA8d, so use malformed JSON)
             static void InvalidTokenOptions(ClientOptions options, TestEnvironmentSettings settings)
             {
                 options.AutoConnect = false;
-                options.AuthCallback = (tokenParams) => Task.FromResult<object>("invalid:token");
+                options.AuthCallback = (tokenParams) => Task.FromResult<object>("{invalid:token");
             }
 
             await TestConnectingBecomesDisconnected("With invalid AuthUrl connection becomes Disconnected", AuthUrlOptions);
