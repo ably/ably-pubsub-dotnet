@@ -1,6 +1,6 @@
 # Upgrading from ably.io 1.x to Ably Pub/Sub 2.0
 
-Ably Pub/Sub 2.0 splits the single `ably.io` package into device-side and server-side packages. This lets Ably classify every client as device-side or server-side, which the platform's behaviour and monthly-active-user (MAU) billing depend on. The API shape is unchanged, but three things are renamed for 2.0: the root namespace moves from `IO.Ably` to **`Ably.PubSub`** (see [New root namespace](#new-root-namespace)), the client classes are renamed — `AblyRealtime` is now `PubSubRealtimeClient` and `AblyRest` is now `PubSubHttpClient` (see [Renamed types](#renamed-types)) — and both the package you install and the way you construct the client change.
+Ably Pub/Sub 2.0 splits the single `ably.io` package into device-side and server-side packages. This lets Ably classify every client as device-side or server-side, which the platform's behaviour and monthly-active-user (MAU) billing depend on. The API is largely unchanged. The breaking changes are: the package you install changes; the root namespace moves from `IO.Ably` to **`Ably.PubSub`** (see [New root namespace](#new-root-namespace)); the client classes are renamed — `AblyRealtime` is now `PubSubRealtimeClient` and `AblyRest` is now `PubSubHttpClient` (see [Renamed types](#renamed-types)); clients are created through door factories and can no longer be subclassed; deprecated 1.x members are removed; `Endpoint` replaces `Environment`/`RestHost`/`RealtimeHost`; publish methods return a `PublishResult`; releasing a channel that isn't detached now throws; and the device push-receive API, which cannot work in 2.0, is no longer public. Each is covered below.
 
 ## Package coordinates
 
@@ -44,7 +44,19 @@ using Ably.PubSub.Server;
 PubSubHttpClient rest = PubSubServer.CreateHttpClient("your-ably-api-key");
 ```
 
+Device REST (was `new AblyRest(...)` in a device app). There is deliberately no device HTTP factory; create a device client without connecting and use its HTTP client:
+
+```csharp
+using Ably.PubSub;
+using Ably.PubSub.Device;
+
+var realtime = PubSubDevice.CreateClient(o => { o.Key = "your-ably-api-key"; o.AutoConnect = false; });
+PubSubHttpClient rest = realtime.HttpClient;
+```
+
 Every factory accepts an API key string, an Ably token string, a `ClientOptions`, or an `Action<ClientOptions>`.
+
+`PubSubRealtimeClient` is `sealed` in 2.0 (as `PubSubHttpClient`, formerly `AblyRest`, already was), and its `protected virtual Dispose(bool)` is now private. Code that subclassed `AblyRealtime` must wrap a client instead; call `Dispose()` to release a client.
 
 ## New root namespace
 
@@ -58,9 +70,9 @@ using IO.Ably.Push;             using Ably.PubSub.Push;
 using IO.Ably.Rest;             using Ably.PubSub.Http;
 ```
 
-Sub-namespaces map one-to-one, with two deliberate exceptions: `IO.Ably.Rest` becomes `Ably.PubSub.Http` (matching the [type renames](#renamed-types)), and the door namespaces simplify to their package names — `IO.Ably.PubSub.Device`/`IO.Ably.PubSub.Server` become `Ably.PubSub.Device`/`Ably.PubSub.Server`.
+Sub-namespaces map one-to-one, with one deliberate exception: `IO.Ably.Rest` becomes `Ably.PubSub.Http` (matching the [type renames](#renamed-types)). The door factories are new in 2.0 and live in `Ably.PubSub.Device` and `Ably.PubSub.Server`.
 
-Because v1 keeps `IO.Ably.*` and v2 lives under `Ably.PubSub.*`, the two no longer share any type names — see [Do not mix 1.x and 2.0](#do-not-mix-1x-and-20-in-one-project) for what that does and does not buy you.
+Because v1 keeps `IO.Ably.*` and v2 lives under `Ably.PubSub.*`, the two no longer share any type names (except the internal delta-decoding helper `IO.Ably.DeltaCodec.dll`, which keeps its namespace and is unified as one assembly) — see [Do not mix 1.x and 2.0](#do-not-mix-1x-and-20-in-one-project) for what that does and does not buy you.
 
 ## Renamed types
 
@@ -78,23 +90,30 @@ Because v1 keeps `IO.Ably.*` and v2 lives under `Ably.PubSub.*`, the two no long
 | `AblyRealtime.RestClient` (property) | `PubSubRealtimeClient.HttpClient` |
 | `PushRest` (the `AblyRest.Push` type) | `PushHttp` (the `PubSubHttpClient.Push` type) |
 
-Names that refer to Ably's REST API service or wire options are unchanged (`ClientOptions.IdempotentRestPublishing`, and so on).
+Names that refer to Ably's REST API service or wire options are unchanged (`ClientOptions.IdempotentRestPublishing`, and so on). The annotations API, new in 2.0, follows the same rule: `IHttpChannel.Annotations` is of type `HttpAnnotations` (the specification's `RestAnnotations`).
 
 ## Deprecated API removed
 
-2.0 drops every member 1.x had marked `[Obsolete]`. Separately, it hides the client constructors behind the `PubSubDevice` / `PubSubServer` door factories; those constructors were never marked `[Obsolete]` in 1.x, but they are listed here because they are no longer part of the public API.
+2.0 drops the members 1.x had marked `[Obsolete]`, with two exceptions that stay and are no longer marked `[Obsolete]`:
+
+- `Presence.IsSyncInProgress` is a supported property. It has no public replacement, so it was never removed.
+- `IRealtimeChannel.HistoryAsync(bool untilAttach)` and `HistoryAsync(PaginatedRequestParams, bool untilAttach)` are supported (RTL10b): with `untilAttach: true` they pass the channel's attach serial as `fromSerial`, and throw if the channel is not attached. Their 1.x deprecation was meant for presence history, which has no `untilAttach` in the specification (RTP12).
+
+Instead, `Presence.HistoryAsync(bool untilAttach)` and `Presence.HistoryAsync(PaginatedRequestParams, bool untilAttach)` are now `[Obsolete]`, and 2.0 adds `Presence.HistoryAsync()` and `Presence.HistoryAsync(PaginatedRequestParams)`, which existing calls without `untilAttach` now bind to. The deprecated overloads still work.
+
+Separately, 2.0 hides the client constructors behind the `PubSubDevice` / `PubSubServer` door factories; those constructors were never marked `[Obsolete]` in 1.x, but they are listed here because they are no longer part of the public API.
 
 | Removed | Use instead |
 |---------|-------------|
-| `new AblyRealtime(...)` / `new AblyRest(...)` (now internal) | `PubSubDevice.CreateClient(...)`, `PubSubServer.CreateRealtimeClient(...)`, `PubSubServer.CreateHttpClient(...)` |
+| `new AblyRealtime(...)` / `new AblyRest(...)` (now internal) | `PubSubDevice.CreateClient(...)`, `PubSubServer.CreateRealtimeClient(...)`, `PubSubServer.CreateHttpClient(...)` (device apps that used `AblyRest`: `PubSubDevice.CreateClient(...).HttpClient`) |
+| `AblyRealtime.Dispose(bool)` (`protected virtual`, now private) | `Dispose()`; `PubSubRealtimeClient` is sealed |
 | `Auth.Authorise(...)` / `Auth.AuthoriseAsync(...)` | `Auth.Authorize(...)` / `Auth.AuthorizeAsync(...)` |
-| `Auth.CreateTokenRequestObject(...)` / `Auth.CreateTokenRequestObjectAsync(...)` | `Auth.CreateTokenRequest(...)` / `Auth.CreateTokenRequestAsync(...)` (return the serialized token request) |
+| `Auth.CreateTokenRequestObject(...)` / `Auth.CreateTokenRequestObjectAsync(...)` | `Auth.CreateTokenRequest(...)` / `Auth.CreateTokenRequestAsync(...)` (return the serialized token request, which an `AuthCallback` can return as is) |
 | `Connection.RecoveryKey` | `Connection.CreateRecoveryKey()` |
-| `ClientOptions.FallbackHostsUseDefault` | Nothing — the default fallback hosts apply automatically; set `ClientOptions.FallbackHosts` only to supply custom hosts |
+| `ClientOptions.FallbackHostsUseDefault` | Nothing — the default fallback hosts apply automatically unless `Endpoint` is a hostname (see [Choose the host with `Endpoint`](#choose-the-host-with-endpoint)); set `ClientOptions.FallbackHosts` only to supply custom hosts |
 | `ClientOptions.CaptureCurrentSynchronizationContext` | `ClientOptions.CustomContext` (pass the `SynchronizationContext` explicitly) |
 | `AblyRest.Request(string method, ..., JToken body, ...)` | `PubSubHttpClient.RequestV2(...)` (string body) or `PubSubHttpClient.Request(HttpMethod, ...)` |
 | `HistoryRequestParams` | `PaginatedRequestParams` |
-| `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
 | `ClientOptions.Environment`, `ClientOptions.RestHost`, `ClientOptions.RealtimeHost` | `ClientOptions.Endpoint` — see [Choose the host with `Endpoint`](#choose-the-host-with-endpoint) |
 | `ClientOptions.FullRestHost()` / `ClientOptions.FullRealtimeHost()` / `ClientOptions.GetFallbackHosts()` | Nothing — `Connection.Host` reports the host the realtime connection is using |
@@ -167,13 +186,15 @@ New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message u
 | `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. |
 | `Message.Serial`, `Message.Version`, `Message.Action`, `Message.Annotations` | Populated on messages received from the service. |
 
+`IHttpChannel` and `IRealtimeChannel` gain the members above, so code that implements these interfaces (for example, test fakes) must add them. `IHttpChannel.Annotations` is of type `HttpAnnotations`; the annotations API is experimental.
+
 **Behaviour change:** the SDK now declares wire protocol version 6 (1.x declared 2). The version is sent as the realtime `v` parameter and the REST `X-Ably-Version` header, and the service sends the newer message structure. The stats endpoint remains pinned to the v2 response format, so `StatsAsync` results are unchanged.
 
 **Behaviour change:** `Request()`/`RequestV2()` callers that send no `X-Ably-Version` header now receive protocol-6 response shapes (for example, `GET /channels` returns channel names, and a batch `POST /messages` returns a single results envelope). Pass the `X-Ably-Version` header to pin a version.
 
 ## Release a realtime channel only once it is detached
 
-In 1.x, `Channels.Release(name)` and `Channels.ReleaseAll()` on a realtime channel that was not in the `Initialized`, `Detached` or `Failed` state detached it and removed it once the detach completed. 1.x logs a deprecation warning when this happens. In 2.0 they instead throw an `AblyException` with error code 90011 and status code 400, and leave the channel as it was. `ReleaseAll()` checks every channel first, and releases none of them if any one is in another state. Detach the channel and wait for the detach to complete before releasing it:
+In 1.x, `Channels.Release(name)` and `Channels.ReleaseAll()` on a realtime channel that was not in the `Initialized`, `Detached` or `Failed` state detached it and removed it once the detach completed. 1.x releases after 1.2.19 also log a deprecation warning when this happens. In 2.0 they instead throw an `AblyException` with error code 90011 and status code 400, and leave the channel as it was. `ReleaseAll()` checks every channel first, and releases none of them if any one is in another state. Detach the channel and wait for the detach to complete before releasing it:
 
 ```csharp
 // 1.x
@@ -187,7 +208,7 @@ realtime.Channels.Release("my-channel");
 
 ## Do not mix 1.x and 2.0 in one project
 
-With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.
+With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`, apart from the shared delta-decoding helper `IO.Ably.DeltaCodec.dll`) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.
 
 Do not settle into a mixed graph, though. Two SDKs in one process means two independent realtime connections and two token flows, and v1 clients carry no device/server classification, so they receive the 1.x billing treatment. A library's v1 types (`IO.Ably.Message`, …) are also distinct from your v2 types (`Ably.PubSub.Message`, …) — values crossing that boundary must be converted explicitly. Migrate the remaining `ably.io` consumers when you can; use `dotnet nuget why <project> ably.io` to find them.
 
@@ -199,9 +220,24 @@ Do not settle into a mixed graph, though. Two SDKs in one process means two inde
 
 Once MAU-based pricing is live, a client that is not classified as device- or server-side is rejected. The 2.0 core makes such a client impossible to construct from application code — the `PubSubRealtimeClient`/`PubSubHttpClient` constructors are internal, so the door factories are the only way in, and each factory stamps its side's classification. Always go through the factories, and use a fresh or door-appropriate `ClientOptions` per client.
 
+## Push notifications
+
+**Device push-receive is not available in 2.0.** The 1.x Xamarin satellite packages `ably.io.push.android` and `ably.io.push.ios`, with their `AndroidMobileDevice.Initialise(...)` / `AppleMobileDevice.Initialise(...)` entry points and `OnNewRegistrationToken(...)` callbacks, were not carried over, and nothing in 2.0 replaces them. Without them a device cannot be activated, so 2.0 makes the device push-receive API internal instead of shipping it in a state that always fails:
+
+| 1.x | 2.0 |
+|-----|-----|
+| `realtime.Push.Activate()` / `realtime.Push.Deactivate()` | Internal |
+| `AblyRealtime.Device` / `AblyRest.Device` (`LocalDevice`), and `IRealtimeClient.Device` / `IRestClient.Device` | Internal; removed from `IPubSubRealtimeClient` / `IPubSubHttpClient` |
+| `channel.Push` (`PushChannel`: `SubscribeDevice()`, `SubscribeClient()`, ...) on realtime and REST channels | Internal; removed from `IRealtimeChannel` / `IHttpChannel` |
+| `IMobileDevice`, `PushCallbacks`, `RegistrationToken`, `LocalDevice` (including `LocalDevice.Create(...)`) | Internal |
+
+If your app registers to *receive* push notifications on the device, stay on `ably.io` 1.x. A device push-receive port on `Ably.PubSub.Device` is a possible future follow-up, currently **parked** with no committed milestone; see https://github.com/ably/ably-pubsub-dotnet/issues/1360 and [PushNotifications.md](PushNotifications.md).
+
+**Push administration is unchanged.** `client.Push.Admin` (`PushAdmin`, with `DeviceRegistrations` and `ChannelSubscriptions`) and its types (`DeviceDetails`, `PushChannelSubscription`, `ListDeviceDetailsRequest`, `ListSubscriptionsRequest`, `DeviceFormFactor`) stay public on clients from both doors. Push administration is intended for server-side use: it needs the `push-admin` capability, which Ably enforces server-side, so use it from a backend built on `Ably.PubSub.Server`.
+
 ## Xamarin and older device apps
 
-Xamarin-era apps consume `Ably.PubSub.Device` through its `netstandard2.0` asset, the same way they consumed `ably.io`. **One gap:** device push-receive (push activation on Android/iOS) is not in the 2.0 packages yet — the two platform satellites were not carried over. If your app only publishes/subscribes, reads message history or presence, or requests tokens, it is unaffected. If it registers to *receive* push notifications on the device, stay on `ably.io` 1.x; a device push-receive port on `Ably.PubSub.Device` is a possible future follow-up, currently **parked** with no committed milestone. Push administration (sending pushes and managing devices from a backend) is unaffected and available through `Ably.PubSub.Server`.
+Xamarin-era apps consume `Ably.PubSub.Device` through its `netstandard2.0` asset, the same way they consumed `ably.io`. **One gap:** device push-receive (push activation on Android/iOS) is not in the 2.0 packages — see [Push notifications](#push-notifications). If your app only publishes/subscribes, reads message history or presence, or requests tokens, it is unaffected.
 
 ## Unity
 
