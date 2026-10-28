@@ -45,9 +45,10 @@ namespace Ably.PubSub.Realtime
         public bool SyncComplete => MembersMap.SyncCompleted && !SyncInProgress; // RTP13
 
         /// <summary>
-        /// Indicates whether there is currently a sync in progress.
+        /// Indicates whether a presence sync is currently in progress. This is true from the start of a
+        /// SYNC until it completes (see also <see cref="SyncComplete"/>, RTP13). While it is true,
+        /// <see cref="GetAsync(bool)"/> with waitForSync set to true waits for the sync to finish before returning.
         /// </summary>
-        [Obsolete("This property is internal, will be removed in the future")]
         public bool IsSyncInProgress => SyncInProgress;
 
         /// <summary>
@@ -806,6 +807,30 @@ namespace Ably.PubSub.Realtime
         }
 
         /// <summary>
+        /// Obtain recent history for this channel using the REST API (RTP12).
+        /// The history provided relates to all clients of this application,
+        /// not just this instance.
+        /// </summary>
+        /// <returns>Paginated list of Presence messages.</returns>
+        public Task<PaginatedResult<PresenceMessage>> HistoryAsync()
+        {
+            return _channel.HttpChannel.Presence.HistoryAsync(new PaginatedRequestParams());
+        }
+
+        /// <summary>
+        /// Obtain recent history for this channel using the REST API (RTP12).
+        /// The history provided relates to all clients of this application,
+        /// not just this instance.
+        /// </summary>
+        /// <param name="query">the request params. See the Ably REST API documentation for more details.</param>
+        /// <returns>Paginated list of Presence messages.</returns>
+        public Task<PaginatedResult<PresenceMessage>> HistoryAsync(PaginatedRequestParams query)
+        {
+            query = query ?? new PaginatedRequestParams();
+            return _channel.HttpChannel.Presence.HistoryAsync(query);
+        }
+
+        /// <summary>
         /// Obtain recent history for this channel using the REST API.
         /// The history provided relates to all clients of this application,
         /// not just this instance.
@@ -813,7 +838,8 @@ namespace Ably.PubSub.Realtime
         /// <param name="untilAttach">optionally can add until attached parameter.</param>
         /// <exception cref="AblyException">can throw if untilAttached=true and the current channel is not attached.</exception>
         /// <returns>Paginated list of Presence messages.</returns>
-        public Task<PaginatedResult<PresenceMessage>> HistoryAsync(bool untilAttach = false)
+        [Obsolete("The untilAttach parameter is not part of the presence history API (RTP12) and will be removed in a future major version. Use HistoryAsync() instead.")]
+        public Task<PaginatedResult<PresenceMessage>> HistoryAsync(bool untilAttach)
         {
             var query = new PaginatedRequestParams();
             if (untilAttach)
@@ -833,7 +859,8 @@ namespace Ably.PubSub.Realtime
         /// <param name="untilAttach">add until attached parameter.</param>
         /// <exception cref="AblyException">can throw if untilAttached=true and the current channel is not attached.</exception>
         /// <returns>Paginated list of Presence messages.</returns>
-        public Task<PaginatedResult<PresenceMessage>> HistoryAsync(PaginatedRequestParams query, bool untilAttach = false)
+        [Obsolete("The untilAttach parameter is not part of the presence history API (RTP12) and will be removed in a future major version. Use HistoryAsync(PaginatedRequestParams) instead.")]
+        public Task<PaginatedResult<PresenceMessage>> HistoryAsync(PaginatedRequestParams query, bool untilAttach)
         {
             query = query ?? new PaginatedRequestParams();
             if (untilAttach)

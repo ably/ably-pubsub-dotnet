@@ -64,6 +64,10 @@ namespace Ably.PubSub.Realtime
         /// A convenient set of methods that help with managing subscriptions to a push channel.
         /// <see cref="PushChannel"/>.
         /// </summary>
+        /// <remarks>
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>; it is reserved for a future release.
+        /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+        /// </remarks>
         PushChannel Push { get; }
 
         /// <summary>
@@ -236,11 +240,28 @@ namespace Ably.PubSub.Realtime
         Task<PaginatedResult<Message>> HistoryAsync();
 
         /// <summary>
+        /// Returns past messages of this channel (RTL10b).
+        /// </summary>
+        /// <param name="untilAttach">When true, passes the attach serial as the 'fromSerial' parameter so that only messages published before the channel was attached are returned. This allows history to be used to fill the gap since attaching.</param>
+        /// <returns><see cref="PaginatedResult{T}"/> of past Messages.</returns>
+        /// <exception cref="AblyException">Throws an error if untilAttach is true and the channel is not currently attached.</exception>
+        Task<PaginatedResult<Message>> HistoryAsync(bool untilAttach);
+
+        /// <summary>
         /// Returns past message of this channel.
         /// </summary>
         /// <param name="query"><see cref="PaginatedRequestParams"/> query.</param>
         /// <returns><see cref="PaginatedResult{T}"/> of past Messages.</returns>
         Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query);
+
+        /// <summary>
+        /// Returns past messages of this channel (RTL10b).
+        /// </summary>
+        /// <param name="query"><see cref="PaginatedRequestParams"/> query.</param>
+        /// <param name="untilAttach">When true, passes the attach serial as the 'fromSerial' parameter so that only messages published before the channel was attached are returned. This allows history to be used to fill the gap since attaching.</param>
+        /// <returns><see cref="PaginatedResult{T}"/> of past Messages.</returns>
+        /// <exception cref="AblyException">Throws an error if untilAttach is true and the channel is not currently attached.</exception>
+        Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query, bool untilAttach);
 
         /// <summary>
         /// Retrieves the latest version of the message with the given serial. Identical to

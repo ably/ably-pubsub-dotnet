@@ -333,7 +333,43 @@ namespace Ably.PubSub
                         return callbackResult as TokenDetails;
                     }
 
-                    if (callbackResult is TokenRequest || callbackResult is string)
+                    if (callbackResult is string callbackString)
+                    {
+                        // RSA8d / RSA4f: the callback may return a token string (an Ably token or a JWT),
+                        // a JSON-serialized TokenDetails or a JSON-serialized TokenRequest.
+                        var trimmed = callbackString.Trim();
+                        if (trimmed.Length == 0)
+                        {
+                            throw new AblyException(
+                                "AuthCallback returned an empty string. Expected a token string, a TokenDetails, a TokenRequest or a JSON-serialized TokenRequest/TokenDetails",
+                                ErrorCodes.ClientCallbackError);
+                        }
+
+                        if (!trimmed.StartsWith("{", StringComparison.Ordinal))
+                        {
+                            // Same as RSC8c for AuthUrl: a non-JSON string is assumed to be a token string.
+                            return new TokenDetails(trimmed);
+                        }
+
+                        JObject callbackJson;
+                        try
+                        {
+                            callbackJson = JObject.Parse(trimmed);
+                        }
+                        catch (JsonReaderException e)
+                        {
+                            throw new AblyException(new ErrorInfo($"AuthCallback returned a string which can't be converted to TokenRequest. ({callbackString})."), e);
+                        }
+
+                        if (TokenDetails.IsToken(callbackJson))
+                        {
+                            return JsonHelper.DeserializeObject<TokenDetails>(callbackJson);
+                        }
+
+                        postData = GetTokenRequest(trimmed);
+                        request.Url = $"/keys/{postData.KeyName}/requestToken";
+                    }
+                    else if (callbackResult is TokenRequest)
                     {
                         postData = GetTokenRequest(callbackResult);
                         request.Url = $"/keys/{postData.KeyName}/requestToken";
@@ -342,7 +378,7 @@ namespace Ably.PubSub
                     {
                         shouldCatch = false;
                         throw new AblyException(
-                            $"AuthCallback returned an unsupported type ({callbackResult.GetType()}. Expected either TokenDetails or TokenRequest",
+                            $"AuthCallback returned an unsupported type ({callbackResult.GetType()}). Expected a TokenDetails, a TokenRequest or a token string",
                             ErrorCodes.ClientAuthProviderRequestFailed,
                             HttpStatusCode.BadRequest);
                     }

@@ -262,7 +262,7 @@ namespace Ably.PubSub.Tests.Http
         [Trait("spec", "RSL10")]
         public void Annotations_ShouldBeExposedOnTheChannel()
         {
-            GetRestClient().Channels.Get("test").Annotations.Should().BeOfType<RestAnnotations>();
+            GetRestClient().Channels.Get("test").Annotations.Should().BeOfType<HttpAnnotations>();
         }
     }
 }

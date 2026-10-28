@@ -200,7 +200,7 @@ namespace Ably.PubSub.Tests.Samples
             Console.WriteLine($"There are {presence.Count()} members on this channel");
             Console.WriteLine($"The first member has client ID: {presence.First().ClientId}");
 
-            PaginatedResult<PresenceMessage> resultPage = await channel.Presence.HistoryAsync(true);
+            PaginatedResult<PresenceMessage> resultPage = await channel.Presence.HistoryAsync();
             Console.WriteLine(resultPage.Items.Count + " presence events received in first page");
             if (resultPage.HasNext)
             {

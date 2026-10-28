@@ -112,7 +112,7 @@ namespace Ably.PubSub.Realtime
             {
                 if (_pushChannel is null)
                 {
-                    Logger.Warning("The current device is does not support or is not configured for Push notifications.");
+                    Logger.Warning($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
                     return null;
                 }
 
@@ -593,9 +593,31 @@ namespace Ably.PubSub.Realtime
             return HttpChannel.HistoryAsync(query);
         }
 
+        public Task<PaginatedResult<Message>> HistoryAsync(bool untilAttach)
+        {
+            var query = new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                AddUntilAttachParameter(query); // RTL10b
+            }
+
+            return HttpChannel.HistoryAsync(query);
+        }
+
         public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query)
         {
             query = query ?? new PaginatedRequestParams();
+            return HttpChannel.HistoryAsync(query);
+        }
+
+        public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query, bool untilAttach)
+        {
+            query = query ?? new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                AddUntilAttachParameter(query); // RTL10b
+            }
+
             return HttpChannel.HistoryAsync(query);
         }
 
