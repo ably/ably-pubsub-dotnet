@@ -103,9 +103,8 @@ namespace Ably.PubSub
 
         /// <summary>
         /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
-        /// Internal: device push-receive is not available in 2.0.
         /// </summary>
-        internal LocalDevice Device
+        public LocalDevice Device
         {
             get
             {
@@ -124,7 +123,7 @@ namespace Ably.PubSub
 
                 return null;
             }
-            set => _device = value; // The setting is only for testing purposes
+            internal set => _device = value; // The setting is only for testing purposes
         }
 
         internal Protocol Protocol => Options.UseBinaryProtocol == false ? Protocol.Json : Defaults.Protocol;

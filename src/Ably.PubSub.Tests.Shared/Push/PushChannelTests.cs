@@ -20,8 +20,8 @@ namespace Ably.PubSub.Tests.Push
             public void RealtimeChannel_ShouldInitialisePushChannel()
             {
                 var channel = GetRealtimeClient().Channels.Get("test");
-                channel.PushChannel().Should().NotBeNull();
-                channel.PushChannel().ChannelName.Should().Be(channel.Name);
+                channel.Push.Should().NotBeNull();
+                channel.Push.ChannelName.Should().Be(channel.Name);
             }
 
             [Fact]
@@ -29,16 +29,16 @@ namespace Ably.PubSub.Tests.Push
             {
                 var restClient = GetRealtimeClient().HttpClient;
                 var channel = restClient.Channels.Get("test");
-                channel.PushChannel().Should().NotBeNull();
-                channel.PushChannel().ChannelName.Should().Be(channel.Name);
+                channel.Push.Should().NotBeNull();
+                channel.Push.ChannelName.Should().Be(channel.Name);
             }
 
             [Fact]
             public void RestChannel_WhenRestClientInitialisedDirectly_ShouldInitialisePushChannel()
             {
                 var channel = GetRestClient().Channels.Get("test");
-                channel.PushChannel().Should().NotBeNull();
-                channel.PushChannel().ChannelName.Should().Be(channel.Name);
+                channel.Push.Should().NotBeNull();
+                channel.Push.ChannelName.Should().Be(channel.Name);
             }
 
             private PubSubRealtimeClient GetRealtimeClient()
@@ -64,7 +64,7 @@ namespace Ably.PubSub.Tests.Push
             public void RealtimeChannel_ShouldReturnNull()
             {
                 var channel = GetRealtimeClient().Channels.Get("test");
-                channel.PushChannel().Should().BeNull();
+                channel.Push.Should().BeNull();
             }
 
             private PubSubRealtimeClient GetRealtimeClient()
@@ -87,7 +87,7 @@ namespace Ably.PubSub.Tests.Push
             {
                 var client = GetRestClient(mobileDevice: new FakeMobileDevice());
                 client.Device = new LocalDevice();
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 Func<Task> subscribeFunc = () => pushChannel.SubscribeDevice();
 
@@ -124,7 +124,7 @@ namespace Ably.PubSub.Tests.Push
                     Id = deviceId,
                     DeviceIdentityToken = "identityToken"
                 };
-                var pushChannel = client.Channels.Get(channelName).PushChannel();
+                var pushChannel = client.Channels.Get(channelName).Push;
 
                 await pushChannel.SubscribeDevice();
 
@@ -157,7 +157,7 @@ namespace Ably.PubSub.Tests.Push
                     DeviceIdentityToken = deviceIdentityToken
                 };
 
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 await pushChannel.SubscribeDevice();
 
@@ -171,7 +171,7 @@ namespace Ably.PubSub.Tests.Push
             {
                 var client = GetRestClient(mobileDevice: new FakeMobileDevice());
                 client.Device = new LocalDevice();
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 Func<Task> subscribeFunc = () => pushChannel.SubscribeClient();
 
@@ -185,7 +185,7 @@ namespace Ably.PubSub.Tests.Push
             {
                 var client = GetRestClient(mobileDevice: new FakeMobileDevice());
                 client.Device = new LocalDevice() { DeviceIdentityToken = "token" };
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 Func<Task> subscribeFunc = () => pushChannel.SubscribeClient();
 
@@ -223,7 +223,7 @@ namespace Ably.PubSub.Tests.Push
                     ClientId = clientId,
                     DeviceIdentityToken = "identityToken"
                 };
-                var pushChannel = client.Channels.Get(channelName).PushChannel();
+                var pushChannel = client.Channels.Get(channelName).Push;
 
                 await pushChannel.SubscribeClient();
 
@@ -237,7 +237,7 @@ namespace Ably.PubSub.Tests.Push
             {
                 var client = GetRestClient(mobileDevice: new FakeMobileDevice());
                 client.Device = new LocalDevice();
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 Func<Task> subscribeFunc = () => pushChannel.UnsubscribeDevice();
 
@@ -281,7 +281,7 @@ namespace Ably.PubSub.Tests.Push
                     Id = deviceId,
                     DeviceIdentityToken = deviceIdentityToken
                 };
-                var pushChannel = client.Channels.Get(channelName).PushChannel();
+                var pushChannel = client.Channels.Get(channelName).Push;
 
                 await pushChannel.UnsubscribeDevice();
 
@@ -295,7 +295,7 @@ namespace Ably.PubSub.Tests.Push
             {
                 var client = GetRestClient(mobileDevice: new FakeMobileDevice());
                 client.Device = new LocalDevice();
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 Func<Task> subscribeFunc = () => pushChannel.UnsubscribeClient();
 
@@ -309,7 +309,7 @@ namespace Ably.PubSub.Tests.Push
             {
                 var client = GetRestClient(mobileDevice: new FakeMobileDevice());
                 client.Device = new LocalDevice() { DeviceIdentityToken = "token" };
-                var pushChannel = client.Channels.Get("test").PushChannel();
+                var pushChannel = client.Channels.Get("test").Push;
 
                 Func<Task> subscribeFunc = () => pushChannel.UnsubscribeClient();
 
@@ -348,7 +348,7 @@ namespace Ably.PubSub.Tests.Push
                     ClientId = clientId
                 };
 
-                var pushChannel = client.Channels.Get(channelName).PushChannel();
+                var pushChannel = client.Channels.Get(channelName).Push;
 
                 await pushChannel.UnsubscribeClient();
 
@@ -389,7 +389,7 @@ namespace Ably.PubSub.Tests.Push
                     Id = deviceid
                 };
 
-                var pushChannel = client.Channels.Get(channelName).PushChannel();
+                var pushChannel = client.Channels.Get(channelName).Push;
 
                 var subscriptions = await pushChannel.ListSubscriptions();
                 subscriptions.Should().NotBeNull();

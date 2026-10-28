@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Ably.PubSub.Push;
 using Ably.PubSub.Http;
 
 namespace Ably.PubSub
@@ -29,6 +30,11 @@ namespace Ably.PubSub
         /// </summary>
         /// <returns>DateTimeOffset of the server time.</returns>
         DateTimeOffset Time();
+
+        /// <summary>
+        /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
+        /// </summary>
+        LocalDevice Device { get; }
     }
 
     /// <summary>

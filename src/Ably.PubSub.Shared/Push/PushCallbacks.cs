@@ -6,7 +6,7 @@ namespace Ably.PubSub.Push
     /// <summary>
     /// Class used to setup Push state change callbacks.
     /// </summary>
-    internal class PushCallbacks
+    public class PushCallbacks
     {
         /// <summary>
         /// Action called when the device has been deactivated for push notifications.

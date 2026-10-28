@@ -52,10 +52,8 @@ namespace Ably.PubSub.Http
             set => _options = value ?? new ChannelOptions();
         }
 
-        /// <summary>
-        /// Device push channel subscriptions. Internal: device push-receive is not available in 2.0.
-        /// </summary>
-        internal PushChannel Push
+        /// <inheritdoc />
+        public PushChannel Push
         {
             get
             {

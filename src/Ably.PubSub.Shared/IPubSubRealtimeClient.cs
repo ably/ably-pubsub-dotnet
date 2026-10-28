@@ -43,6 +43,11 @@ namespace Ably.PubSub
         RealtimeChannels Channels { get; }
 
         /// <summary>
+        /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
+        /// </summary>
+        LocalDevice Device { get; }
+
+        /// <summary>
         /// Retrieves the ably service time.
         /// </summary>
         /// <returns>returns current server time as DateTimeOffset.</returns>

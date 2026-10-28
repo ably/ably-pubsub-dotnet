@@ -5,7 +5,7 @@ namespace Ably.PubSub.Push
     /// <summary>
     /// Interface for communicating with a mobile device supporting pushing notifications.
     /// </summary>
-    internal interface IMobileDevice
+    public interface IMobileDevice
     {
         /// <summary>
         /// Persist a preferences on the mobile device. TODO: Add info specific to Android and iOS.

@@ -4,8 +4,7 @@ using System.Threading.Tasks;
 namespace Ably.PubSub.Push
 {
     /// <summary>
-    /// Push APIs for realtime clients. Only <see cref="Admin"/> is public: device push-receive
-    /// (activating this device for push notifications) is not available in 2.0.
+    /// Push Apis for Realtime clients.
     /// </summary>
     public sealed class PushRealtime : IDisposable
     {
@@ -61,14 +60,12 @@ namespace Ably.PubSub.Push
 
         /// <summary>
         /// Start the push notification device registration process.
-        /// Internal: device push-receive is not available in 2.0, as there is no platform implementation of
-        /// <see cref="IMobileDevice"/> to activate.
         /// </summary>
-        internal void Activate()
+        public void Activate()
         {
             if (StateMachine is null)
             {
-                throw new AblyException("Device push-receive is not available in Ably Pub/Sub 2.0, so `Activate` cannot be used. See PushNotifications.md.");
+                throw new AblyException("Realtime push is not enabled. Please initialise Ably by calling (AblyAndroidMobileDevice / AblyAppleMobileDevice).Initialize() before calling `Activate`");
             }
 
             _ = StateMachine.HandleEvent(new ActivationStateMachine.CalledActivate());
@@ -76,13 +73,12 @@ namespace Ably.PubSub.Push
 
         /// <summary>
         /// Starts the push notification device de-registration process.
-        /// Internal: device push-receive is not available in 2.0.
         /// </summary>
-        internal void Deactivate()
+        public void Deactivate()
         {
             if (StateMachine is null)
             {
-                throw new AblyException("Device push-receive is not available in Ably Pub/Sub 2.0, so `Deactivate` cannot be used. See PushNotifications.md.");
+                throw new AblyException("Realtime push is not enabled. Please initialise Ably by calling (AblyAndroidMobileDevice / AblyAppleMobileDevice).Initialize() before calling `Deactivate`");
             }
 
             _ = StateMachine.HandleEvent(new ActivationStateMachine.CalledDeactivate());

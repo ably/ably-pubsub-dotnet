@@ -96,7 +96,7 @@ namespace Ably.PubSub.Tests
             return await GetRealtimeClient(protocol, optionsAction, null);
         }
 
-        internal async Task<PubSubRealtimeClient> GetRealtimeClient(
+        protected async Task<PubSubRealtimeClient> GetRealtimeClient(
             Protocol protocol,
             Action<ClientOptions, TestEnvironmentSettings> optionsAction,
             Func<ClientOptions, IMobileDevice, PubSubHttpClient> createRestFunc)
