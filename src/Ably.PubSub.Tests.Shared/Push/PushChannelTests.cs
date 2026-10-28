@@ -67,6 +67,31 @@ namespace Ably.PubSub.Tests.Push
                 channel.Push.Should().BeNull();
             }
 
+            [Fact]
+            public void RestChannelAndDevice_ShouldReturnNull()
+            {
+                var client = GetRealtimeClient();
+                client.HttpClient.Channels.Get("test").Push.Should().BeNull();
+                client.Device.Should().BeNull();
+                client.HttpClient.Device.Should().BeNull();
+            }
+
+            [Fact]
+            public void PushActivate_ShouldThrowPointingToTheFeatureRequest()
+            {
+                var ex = Assert.Throws<AblyException>(() => GetRealtimeClient().Push.Activate());
+                ex.ErrorInfo.Message.Should().Contain("not available in Ably Pub/Sub 2.0");
+                ex.ErrorInfo.Message.Should().Contain("https://github.com/ably/ably-pubsub-dotnet/issues/1360");
+            }
+
+            [Fact]
+            public void PushDeactivate_ShouldThrowPointingToTheFeatureRequest()
+            {
+                var ex = Assert.Throws<AblyException>(() => GetRealtimeClient().Push.Deactivate());
+                ex.ErrorInfo.Message.Should().Contain("not available in Ably Pub/Sub 2.0");
+                ex.ErrorInfo.Message.Should().Contain("https://github.com/ably/ably-pubsub-dotnet/issues/1360");
+            }
+
             private PubSubRealtimeClient GetRealtimeClient()
             {
                 return new PubSubRealtimeClient(new ClientOptions(ValidKey) { AutoConnect = false });

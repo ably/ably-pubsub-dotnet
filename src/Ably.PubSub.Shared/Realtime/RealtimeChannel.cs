@@ -112,7 +112,7 @@ namespace Ably.PubSub.Realtime
             {
                 if (_pushChannel is null)
                 {
-                    Logger.Warning("The current device is does not support or is not configured for Push notifications.");
+                    Logger.Warning($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
                     return null;
                 }
 

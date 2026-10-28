@@ -64,6 +64,10 @@ namespace Ably.PubSub.Realtime
         /// A convenient set of methods that help with managing subscriptions to a push channel.
         /// <see cref="PushChannel"/>.
         /// </summary>
+        /// <remarks>
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>; it is reserved for a future release.
+        /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+        /// </remarks>
         PushChannel Push { get; }
 
         /// <summary>

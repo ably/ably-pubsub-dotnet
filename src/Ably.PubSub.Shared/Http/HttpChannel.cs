@@ -59,7 +59,7 @@ namespace Ably.PubSub.Http
             {
                 if (_pushChannel is null)
                 {
-                    _ablyRest.Logger.Debug("The current device is not configured for push notifications.");
+                    _ablyRest.Logger.Debug($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
                     return null;
                 }
 
