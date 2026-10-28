@@ -1,6 +1,6 @@
 # Upgrading from ably.io 1.x to Ably Pub/Sub 2.0
 
-Ably Pub/Sub 2.0 splits the single `ably.io` package into device-side and server-side packages. This lets Ably classify every client as device-side or server-side, which the platform's behaviour and monthly-active-user (MAU) billing depend on. The API is largely unchanged. The breaking changes are: the package you install changes; the root namespace moves from `IO.Ably` to **`Ably.PubSub`** (see [New root namespace](#new-root-namespace)); the client classes are renamed — `AblyRealtime` is now `PubSubRealtimeClient` and `AblyRest` is now `PubSubHttpClient` (see [Renamed types](#renamed-types)); clients are created through door factories and can no longer be subclassed; deprecated 1.x members are removed; `Endpoint` replaces `Environment`/`RestHost`/`RealtimeHost`; publish methods return a `PublishResult`; releasing a channel that isn't detached now throws; and the device push-receive API, which cannot work in 2.0, is no longer public. Each is covered below.
+Ably Pub/Sub 2.0 splits the single `ably.io` package into device-side and server-side packages. This lets Ably classify every client as device-side or server-side, which the platform's behaviour and monthly-active-user (MAU) billing depend on. The API is largely unchanged. The breaking changes are: the package you install changes; the root namespace moves from `IO.Ably` to **`Ably.PubSub`** (see [New root namespace](#new-root-namespace)); the client classes are renamed — `AblyRealtime` is now `PubSubRealtimeClient` and `AblyRest` is now `PubSubHttpClient` (see [Renamed types](#renamed-types)); clients are created through door factories and can no longer be subclassed; deprecated 1.x members are removed; `Endpoint` replaces `Environment`/`RestHost`/`RealtimeHost`; publish methods return a `PublishResult`; releasing a channel that isn't detached now throws; and device push-receive is not available, so its API, which stays public, throws or returns `null`. Each is covered below.
 
 ## Package coordinates
 
@@ -222,16 +222,16 @@ Once MAU-based pricing is live, a client that is not classified as device- or se
 
 ## Push notifications
 
-**Device push-receive is not available in 2.0.** The 1.x Xamarin satellite packages `ably.io.push.android` and `ably.io.push.ios`, with their `AndroidMobileDevice.Initialise(...)` / `AppleMobileDevice.Initialise(...)` entry points and `OnNewRegistrationToken(...)` callbacks, were not carried over, and nothing in 2.0 replaces them. Without them a device cannot be activated, so 2.0 makes the device push-receive API internal instead of shipping it in a state that always fails:
+**Device push-receive is not available in 2.0.** The 1.x Xamarin satellite packages `ably.io.push.android` and `ably.io.push.ios`, with their `AndroidMobileDevice.Initialise(...)` / `AppleMobileDevice.Initialise(...)` entry points and `OnNewRegistrationToken(...)` callbacks, were not carried over, and nothing in 2.0 replaces them. Without them a device cannot be activated. The device push-receive API stays public, reserved for a future release, but it does not work in 2.0:
 
-| 1.x | 2.0 |
-|-----|-----|
-| `realtime.Push.Activate()` / `realtime.Push.Deactivate()` | Internal |
-| `AblyRealtime.Device` / `AblyRest.Device` (`LocalDevice`), and `IRealtimeClient.Device` / `IRestClient.Device` | Internal; removed from `IPubSubRealtimeClient` / `IPubSubHttpClient` |
-| `channel.Push` (`PushChannel`: `SubscribeDevice()`, `SubscribeClient()`, ...) on realtime and REST channels | Internal; removed from `IRealtimeChannel` / `IHttpChannel` |
-| `IMobileDevice`, `PushCallbacks`, `RegistrationToken`, `LocalDevice` (including `LocalDevice.Create(...)`) | Internal |
+| API | 2.0 behaviour |
+|-----|---------------|
+| `realtime.Push.Activate()` / `realtime.Push.Deactivate()` | Throw an `AblyException` that says device push is not available and links the feature request |
+| `client.Device` (`LocalDevice`) on `PubSubRealtimeClient` / `PubSubHttpClient` | Returns `null` |
+| `channel.Push` (`PushChannel`) on realtime and HTTP channels | Returns `null`, and logs why |
+| `IMobileDevice`, `PushCallbacks`, `RegistrationToken`, `LocalDevice` | Public, but there is no way to supply a device |
 
-If your app registers to *receive* push notifications on the device, stay on `ably.io` 1.x. A device push-receive port on `Ably.PubSub.Device` is a possible future follow-up, currently **parked** with no committed milestone; see https://github.com/ably/ably-pubsub-dotnet/issues/1360 and [PushNotifications.md](PushNotifications.md).
+If your app registers to *receive* push notifications on the device, stay on `ably.io` 1.x. A device push-receive port on `Ably.PubSub.Device` is a possible future follow-up, currently **parked** with no committed milestone. To request it, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360; see also [PushNotifications.md](PushNotifications.md).
 
 **Push administration is unchanged.** `client.Push.Admin` (`PushAdmin`, with `DeviceRegistrations` and `ChannelSubscriptions`) and its types (`DeviceDetails`, `PushChannelSubscription`, `ListDeviceDetailsRequest`, `ListSubscriptionsRequest`, `DeviceFormFactor`) stay public on clients from both doors. Push administration is intended for server-side use: it needs the `push-admin` capability, which Ably enforces server-side, so use it from a backend built on `Ably.PubSub.Server`.
 

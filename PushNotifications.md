@@ -6,7 +6,7 @@
 > `ably.io.push.android` and `ably.io.push.ios` are Xamarin-era projects. They depend on `ably.io` 1.x, stay supported from the 1.x maintenance branch, and have been removed from this branch along with the `DotnetPush` and `AndroidSample` examples. A modern `Ably.PubSub.Push.Android` / `Ably.PubSub.Push.iOS` port on `net8.0-android` / `net8.0-ios`, built on `Ably.PubSub.Device`, is a possible future follow-up (currently **parked** — no committed milestone); until it lands, a device application cannot combine the 2.0 SDK with Ably push receive.
 >
 >
-> In 2.0 the device push-receive API in the core is **internal**: `Push.Activate()` / `Push.Deactivate()`, the client `Device` property, channel `Push` (`PushChannel`), `IMobileDevice`, `PushCallbacks`, `RegistrationToken` and `LocalDevice`. With no platform package to supply a device, they could only fail. The examples below that use them apply to `ably.io` 1.x only. See [UPDATING.md](UPDATING.md#push-notifications) and https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+> In 2.0 the device push-receive API in the core stays public but **does not work**, because no platform package supplies a device: `Push.Activate()` / `Push.Deactivate()` throw an `AblyException`, and the client `Device` property and channel `Push` return `null`. The examples below that use them apply to `ably.io` 1.x only. To request device push for 2.x, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See also [UPDATING.md](UPDATING.md#push-notifications).
 >
 > Push **administration** (`client.Push.Admin`) is unaffected: it lives in `Ably.PubSub.Core` and remains available from both packages. It is intended for server-side use and needs the `push-admin` capability, which Ably enforces server-side.
 
