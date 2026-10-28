@@ -45,9 +45,10 @@ namespace Ably.PubSub.Realtime
         public bool SyncComplete => MembersMap.SyncCompleted && !SyncInProgress; // RTP13
 
         /// <summary>
-        /// Indicates whether there is currently a sync in progress.
+        /// Indicates whether a presence sync is currently in progress. This is true from the start of a
+        /// SYNC until it completes (see also <see cref="SyncComplete"/>, RTP13). While it is true,
+        /// <see cref="GetAsync(bool)"/> with waitForSync set to true waits for the sync to finish before returning.
         /// </summary>
-        [Obsolete("This property is internal, will be removed in the future")]
         public bool IsSyncInProgress => SyncInProgress;
 
         /// <summary>
