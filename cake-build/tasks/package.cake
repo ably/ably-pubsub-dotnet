@@ -23,8 +23,38 @@ Task("_Package_Build_All")
     
     settings = buildConfig.ApplyPackageSettings(settings);
     settings = settings.WithTarget("Build");
-    
+
     MSBuild(paths.PackageSolution, settings);
+
+    // On macOS/Linux the MSBuild above is Mono's, and under Mono the SDK-style heads build only
+    // netstandard2.0 (their csproj narrows TargetFrameworks when MSBuildRuntimeType is Mono). Build
+    // their remaining target frameworks with the .NET SDK, with the same Package properties, so a
+    // Unix pack carries every lib/<tfm> the nuspecs declare. The door projects build the core
+    // through their project references. Windows MSBuild already builds every target framework.
+    if (!IsRunningOnWindows())
+    {
+        var sdkPackageHeads = new[]
+        {
+            paths.Src.CombineWithFilePath("Ably.PubSub.Device/Ably.PubSub.Device.csproj"),
+            paths.Src.CombineWithFilePath("Ably.PubSub.Server/Ably.PubSub.Server.csproj")
+        };
+
+        foreach (var project in sdkPackageHeads)
+        {
+            Information($"Building every target framework of {project.GetFilename()} with the .NET SDK...");
+            DotNetBuild(project.FullPath, new DotNetBuildSettings
+            {
+                Configuration = "Release",
+                NoRestore = true,
+                MSBuildSettings = new DotNetMSBuildSettings()
+                    .WithProperty("StyleCopEnabled", "true")
+                    .WithProperty("Package", "true")
+                    .WithProperty("DefineConstants", "PACKAGE")
+                    .WithProperty("Deterministic", "true")
+                    .WithProperty("GenerateDocumentationFile", "true")
+            });
+        }
+    }
 });
 
 Task("_Package_Create_NuGet")
