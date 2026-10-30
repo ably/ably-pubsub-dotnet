@@ -159,7 +159,7 @@ Once you have subscribed to recieve push notifications for a channel, other devi
 
 Shows a notification to the user immediately when it is received by their device.
 
-**Android**: This is known as a [notification message](https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type). A notification message cannot be customised or handled (e.g. run logic when a user taps the notification) - therefore, if you need to handle user taps or customize a notification, send a data message and [create a local notification](https://developer.android.com/guide/topics/ui/notifiers/notifications).
+**Android**: This is known as a [notification message](https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type). A notification message cannot be customised or handled (e.g. run logic when a user taps the notification) - therefore, if you need to handle user taps or customise a notification, send a data message and [create a local notification](https://developer.android.com/guide/topics/ui/notifiers/notifications).
 
 **iOS**: This is known as an [alert push notification](https://developer.apple.com/documentation/usernotifications/). An alert notification can be [customised](https://developer.apple.com/documentation/usernotificationsui/customizing_the_appearance_of_notifications).
 
