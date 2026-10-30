@@ -51,6 +51,7 @@ Task("_Package_Build_All")
                     .WithProperty("Package", "true")
                     .WithProperty("DefineConstants", "PACKAGE")
                     .WithProperty("Deterministic", "true")
+                    .WithProperty("ContinuousIntegrationBuild", BuildSystem.IsLocalBuild ? "false" : "true")
                     .WithProperty("GenerateDocumentationFile", "true")
             });
         }

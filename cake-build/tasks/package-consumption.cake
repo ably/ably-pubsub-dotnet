@@ -312,7 +312,7 @@ Task("_Test_PackageConsumption")
             }
             else
             {
-                tool = Context.Tools.Resolve("dotnet") ?? new FilePath("dotnet");
+                tool = Context.Tools.Resolve(IsRunningOnWindows() ? "dotnet.exe" : "dotnet") ?? new FilePath("dotnet");
                 arguments = $"\"{output.CombineWithFilePath($"{app.Key}.dll").FullPath}\"";
                 runtime = ".NET";
             }
