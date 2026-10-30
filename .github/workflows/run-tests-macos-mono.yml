@@ -38,5 +38,13 @@ jobs:
       - name: Run Unit tests using mono
         run: ./build.sh --target=Test.NetFramework.Unit.WithRetry
 
+      # Packs all three packages (Mono builds the net46 heads) and runs the package-consumption
+      # apps against them, with the .NET Framework apps on Mono. Offline: no credentials.
+      - name: Package-consumption test using mono
+        run: |
+          version=$(sed -n 's/.*AssemblyInformationalVersion("\([^"]*\)").*/\1/p' src/CommonAssemblyInfo.cs)
+          echo "Version under test: $version"
+          ./build.sh -- --target=Test.PackageConsumption --version="$version" --packageOutput=consumption-packages
+
       - name: Run Integration tests using mono
         run: ./build.sh --target=Test.NetFramework.Integration.WithRetry

@@ -172,6 +172,53 @@ The `release-dry-run` GitHub workflow runs the pre-flight, a full `Package` and
 this target on every pull request. `publish.yml` runs the same three and then
 pushes.
 
+## Package-Consumption Test
+
+### Test.PackageConsumption
+
+```bash
+./build.sh -- --target=Test.PackageConsumption --version=2.0.0 --packageOutput=<dir>
+```
+
+Installs the packed packages into small apps the way a customer does, so problems
+that exist only in the shipped `.nupkg` files fail here rather than in a customer's
+app. The unit tests can't catch these, because they use project references, which
+skip NuGet's per-framework asset selection and the Package-only signing. For example,
+a .NET Framework app gets the Device `netstandard2.0` asset paired with the Core
+`net46` asset.
+
+The target runs `Package`, then:
+
+1. copies the apps in `tests/PackageConsumption` (`DeviceApp`, `ServerApp`) to
+   `test-results/package-consumption`;
+2. restores them through a generated `nuget.config` that takes `Ably.PubSub.*` only
+   from the packed `.nupkg` files (package source mapping) and everything else from
+   nuget.org, into a private global packages folder;
+3. builds each app for every target framework in the matrix (`net462`, `net48`,
+   `net6.0`, `net7.0`);
+4. asserts from `obj/project.assets.json` which `lib/<tfm>` asset of each Ably
+   package NuGet selected, and that the packages came from the local folder;
+5. runs each app. The .NET Framework apps run on the .NET Framework CLR on Windows
+   and on Mono elsewhere. Each app creates clients through its door and calls into
+   the core: a channel lookup, a REST request and a realtime connection attempt.
+   It also checks the side flag in the `Ably-Agent` header.
+
+The checks run offline: no credentials, REST requests go to a stub handler and the
+realtime connection targets a closed localhost port.
+
+The expected asset pair for each app and framework is set in one place, the matrix
+at the top of `cake-build/tasks/package-consumption.cake`. If the package layout
+changes, update that matrix. A row naming a `lib/<tfm>` that the nuspec doesn't
+declare fails the run.
+
+`Test.PackageConsumption.NoPack` runs the same steps against packages that are
+already in `--packageOutput`, without packing. The `release-dry-run` workflow uses
+it on Windows, after its `Package` step. The macOS Mono workflow runs the full
+`Test.PackageConsumption`.
+
+On macOS/Linux, `Package` needs Mono: it builds the `net46` heads with Mono MSBuild
+and the other target frameworks with the .NET SDK.
+
 ## Advanced Options
 
 ### Build with specific configuration

@@ -79,6 +79,14 @@ jobs:
       - name: Assert the packed packages
         run: ./build.cmd -- --target=Release.VerifyPackages --version=${{ steps.version.outputs.version }} --packageOutput=dry-run-packages
 
+      # Installs the packed packages into small .NET Framework (net462, net48) and .NET
+      # (net6.0, net7.0) apps the way a customer would, asserts which lib/<tfm> asset of each
+      # package NuGet selected, and runs the apps (on the .NET Framework CLR here) to prove each
+      # door can create clients against the core it is paired with. Offline: no credentials.
+      # The matrix lives in cake-build/tasks/package-consumption.cake.
+      - name: Consume the packed packages
+        run: ./build.cmd -- --target=Test.PackageConsumption.NoPack --version=${{ steps.version.outputs.version }} --packageOutput=dry-run-packages
+
       - name: List what a release would push
         run: |
           Get-ChildItem dry-run-packages/*.nupkg | ForEach-Object { "{0}  {1:N0} bytes" -f $_.Name, $_.Length }
