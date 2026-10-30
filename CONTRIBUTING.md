@@ -61,7 +61,7 @@ _More detail to follow around this._
 
 #### Debugging Tip: Enable break on exception throw
 
-A technique that has proved extremely successful when it comes to tracking down sporadic communication failures is to enable ‘break on throw’ in your debugger. The fact is that the exception handling logic in the Ably .NET SDK exhibits overly generous catch clauses which tend to catch too broad a set of exception types. These then tend to be processed as ‘something went wrong’ (i.e. we lose valuable and actionable recovery context) or are swallowed and ignored, on the basis that retry logic will, eventually, make everything good. If the retries subsequently fail to reestablish the invariants then you will commonly see `NullReferenceExceptions` as the code higher up makes assumptions about what state the object graph is in. In general if you see a `NullReferenceException` it is worth hunting down its source and precipitating conditions since it’s likely being used now as some kind of flow-of-control signal that triggers retry logic.
+To track down sporadic communication problems, enable ‘break on throw’ in your debugger. The SDK catches and retries many exceptions internally, so they don't reach the caller; breaking when they are thrown shows where they start. If you see a `NullReferenceException`, trace it back to its source and the conditions that led to it.
 
 #### Debugging Tip: Debug and Release execution traces can differ
 
@@ -125,20 +125,20 @@ For each release:
 3. Run `./unity-plugins-updater.sh 2.0.1` (linux/mac) / `.\unity-plugins-updater.cmd 2.0.1` (windows) at root and commit the generated `.dll` and `.pdb` files. (Needs Mono or Windows.)
 4. Optionally check the release locally before pushing: `./build.sh -- --target=Release.Preflight --version=2.0.1`. Note the `--`: Cake reserves `--version` for itself, so arguments for the build script go after it. A full local pack (`./package.cmd 2.0.1`) needs Windows or Mono, because the core and server packages carry a `lib/net46` asset.
 5. Run [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator) to automate the update of the [CHANGELOG](./CHANGELOG.md). This may require some manual intervention, both in terms of how the command is run and how the change log file is modified. Your mileage may vary:
-  - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-pubsub-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate a token in [GitHub personal access token settings](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
-  - The `## [2.0.0]` section of the CHANGELOG is hand-written. If the generator produces its own 2.0.0 entry, merge that generated entry into the existing hand-written one rather than letting the two duplicate.
-  - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
-  - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
-  - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
+    - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-pubsub-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate a token in [GitHub personal access token settings](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
+    - The `## [2.0.0]` section of the CHANGELOG is hand-written. If the generator produces its own 2.0.0 entry, merge that generated entry into the existing hand-written one rather than letting the two duplicate.
+    - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
+    - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
+    - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
 6. Commit this change: `git add CHANGELOG.md && git commit -m "Update change log."`.
 7. Push the branch and create a release PR (ensure you include an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers) and gain approvals for it, then merge it to the release branch. The `release-dry-run` check on that PR is the packaging gate: it packs all three packages from your commit and asserts them. Until the 2.0 integration branch merges to `main`, the release branch is `integration/v2`; after that it is `main`.
 8. **Dry run.** Dispatch the [Publish](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/publish.yml) workflow with `version` = the new version, `dry_run` = **true**, against the ref you just merged to:
 
-    ```
+    ```shell
     gh workflow run publish.yml --ref <release-branch> -f version=2.0.1 -f dry_run=true
     ```
 
-    `<release-branch>` is `integration/v2` until 2.0 merges to `main`, then `main`.
+    `<release-branch>` is the release branch from step 7.
 
     (Or use `Run workflow` in the Actions tab. `workflow_dispatch` needs the workflow file to exist on the default branch, and the run uses the workflow file and code from the ref you choose.) This builds, packs, asserts and prints exactly what it would push, and pushes nothing. Read the output.
 9. **Publish.** Dispatch the same workflow again with `dry_run` = **false**. It publishes core → device → server, waiting for the core version to be listed on nuget.org before the doors that pin it go out, skipping any version already published, and then creates the `2.0.1` tag and GitHub release with the three `.nupkg` files and the `.unitypackage` attached. No API key is involved: the workflow authenticates with nuget.org Trusted Publishing over GitHub OIDC.
