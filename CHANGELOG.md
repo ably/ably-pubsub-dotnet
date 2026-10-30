@@ -29,6 +29,7 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 
 - A realtime `PublishAsync` refused by the channel or connection state (RTL6c4: the channel is SUSPENDED or FAILED, or the connection is neither CONNECTED nor allowed to queue the message) now faults with an `AblyException` carrying the refusal's own `ErrorInfo` (code 40000, status 400), as `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` and `Annotations.PublishAsync` do. 1.x wrapped it in a generic 50000 "Unexpected error" and kept the original error only as the `InnerException`. Any other `AblyException` thrown inside the realtime task methods (`AttachAsync`, `DetachAsync`, `SetOptionsAsync`, the presence methods, `PingAsync`) is passed through the same way; an exception that is not an `AblyException` is still wrapped as 50000. The refusal message for a connection that can't queue now names the connection state rather than the channel state.
 - `AnnotationsRequestParams` with a `Limit` outside 0 to 1000 now throws an `AblyException` (code 40003, status 400), like the other argument checks in `Annotations`, rather than an `ArgumentException`.
+- `Auth.AuthorizeAsync` on a realtime client now completes only once the connection reaches `CONNECTED` (RTC8b1), whatever state it was in. Called while `INITIALIZED`, `CLOSED` or `DISCONNECTED` it starts a connection attempt (RTC8c) and waits for it, where it previously returned as soon as the token was obtained; it throws if the connection fails instead. It also no longer misses a `CONNECTED` that answers the `AUTH` message before it starts waiting, which made it wait for the whole `realtimeRequestTimeout`. A REST request that the client retries with a new token after a token error (RSA4b) does not wait for the realtime connection, whatever its state; it previously waited for the `AUTH` exchange while `CONNECTED`.
 
 **Notes**
 
@@ -49,6 +50,7 @@ Implements RTN23 dead-transport detection and the connection-recovery spec point
 - `connectionId` no longer changes after a long disconnection, since the client always attempts a resume now. Use `ChannelStateChange.Resumed` to detect a fresh connection.
 - `Connection.CreateRecoveryKey()` returns a key while `SUSPENDED`, where it previously returned empty.
 - Some `ErrorInfo` messages and codes changed.
+- A server that sends a fatal `ERROR` (or `DISCONNECTED`) and then closes the socket no longer leaves the connection `CONNECTING` after `FAILED`: the transport close is handled after the command the message queued, as it was delivered. A connection that fails with a non-renewable token error also no longer appends its message to the shared `40171` error that later connections report.
 
 **Merged pull requests:**
 

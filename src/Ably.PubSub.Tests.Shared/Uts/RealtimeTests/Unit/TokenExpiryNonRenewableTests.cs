@@ -73,8 +73,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RSA4a2/token-error-non-renewable-failed-0
-        // DEVIATION: see deviations.md
-        [DeviationFact("RSA4a2", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RSA4a2")]
         public async Task RSA4a2_TokenErrorNonRenewableFailed()
         {
@@ -120,8 +119,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RSA4a2/token-error-non-renewable-no-retry-1
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RSA4a2")]
         public async Task RSA4a2_TokenErrorNonRenewableNoRetry()
         {

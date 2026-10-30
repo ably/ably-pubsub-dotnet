@@ -551,7 +551,17 @@ namespace Ably.PubSub
         /// <param name="authOptions"><see cref="AuthOptions"/> custom options.</param>
         /// <returns>Returns a valid token.</returns>
         /// <exception cref="AblyException">Throws an ably exception representing the server response.</exception>
-        public async Task<TokenDetails> AuthorizeAsync(TokenParams tokenParams = null, AuthOptions authOptions = null)
+        public Task<TokenDetails> AuthorizeAsync(TokenParams tokenParams = null, AuthOptions authOptions = null)
+            => AuthorizeAsync(tokenParams, authOptions, waitForConnection: true);
+
+        /// <summary>
+        /// <see cref="AuthorizeAsync(TokenParams, AuthOptions)"/>, with the realtime connection wait
+        /// optional. Only authorize() itself waits for CONNECTED (RTC8a3, RTC8b1). A REST request
+        /// retried after a token error (RSA4b) needs only the new token, as in ably-java, where the
+        /// retry renews the token without waiting; waiting would hold the request on the realtime
+        /// connection and fail it with the connection's error.
+        /// </summary>
+        internal async Task<TokenDetails> AuthorizeAsync(TokenParams tokenParams, AuthOptions authOptions, bool waitForConnection)
         {
             // RSA10j - TokenParams and AuthOptions supersede any previously client library configured TokenParams and AuthOptions
             authOptions = authOptions ?? CurrentAuthOptions ?? Options;
@@ -574,7 +584,7 @@ namespace Ably.PubSub
             AuthMethod = AuthMethod.Token;
 
             // RTC8a3 - wait for reconnect if it's the Realtime client
-            await OnAuthUpdated(CurrentToken, true);
+            await OnAuthUpdated(CurrentToken, waitForConnection);
             return CurrentToken;
         }
 

@@ -454,12 +454,26 @@ namespace Ably.PubSub.Realtime.Workflow
 
         public Exception Exception { get; }
 
+        /// <summary>
+        /// True once the workflow has put this event behind the commands already queued by the messages
+        /// received before it. See <see cref="Defer"/>.
+        /// </summary>
+        public bool Deferred { get; private set; }
+
         private HandleTransportEventCommand(Guid transportId, TransportState transportState, Exception ex)
         {
             TransportId = transportId;
             TransportState = transportState;
             Exception = ex;
         }
+
+        /// <summary>
+        /// The same event, marked as deferred. A state handles a protocol message by queueing a command, so
+        /// a transport event that arrived behind that message would otherwise be handled before the
+        /// command the message produced. Re-queueing the event once restores the order the transport saw.
+        /// </summary>
+        public HandleTransportEventCommand Defer() =>
+            new HandleTransportEventCommand(TransportId, TransportState, Exception) { Deferred = true };
 
         public static HandleTransportEventCommand Create(Guid transportId, TransportState state, Exception ex) =>
             new HandleTransportEventCommand(transportId, state, ex);

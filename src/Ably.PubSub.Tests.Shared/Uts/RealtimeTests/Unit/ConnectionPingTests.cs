@@ -502,8 +502,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
         }
 
         // UTS: realtime/unit/RTN13b/deferred-ping-error-failed-4
-        // DEVIATION: see deviations.md
-        [DeviationFact("RTN27h", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RTN13b")]
         public async Task RTN13b_DeferredPingErrorFailed()
         {
