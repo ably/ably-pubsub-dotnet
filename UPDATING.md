@@ -26,6 +26,8 @@ PubSubRealtimeClient realtime = PubSubDevice.CreateClient("xxxxxx.yyyyyy:zzzzzzz
 // also: CreateClient(ClientOptions), CreateClient(o => o.ClientId = "...")
 ```
 
+The device examples here use an API key to show the mapping from 1.x. In an app that runs on an end-user device, authenticate with tokens through `AuthUrl` or `AuthCallback` instead; see the device quick start in the [README](https://github.com/ably/ably-pubsub-dotnet/blob/main/README.md).
+
 Server realtime (was `new AblyRealtime(options)` in a backend):
 
 ```csharp
@@ -60,7 +62,7 @@ Every factory accepts an API key string, an Ably token string, a `ClientOptions`
 
 ## Server clients and token authentication
 
-Clients created with `PubSubServer` declare themselves as servers. Authenticate them with an API key. Token authentication is accepted only for a token that carries the signed `x-ably-clientType=server` claim, which today means a JWT. With any other token (for example one from `Auth.RequestTokenAsync`), Ably rejects the realtime connection or the HTTP request with error 40167. Clients created with `PubSubDevice` are not affected and are normally authenticated with tokens.
+Clients created with `PubSubServer` declare themselves as servers. Authenticate them with an API key. Token authentication is accepted only for a token that carries the signed `x-ably-clientType=server` claim (a JWT). With any other token (for example one from `Auth.RequestTokenAsync`), Ably rejects the realtime connection or the HTTP request with error 40167. Clients created with `PubSubDevice` are not affected and are normally authenticated with tokens.
 
 This applies only to how a server client authenticates itself. A server client authenticated with an API key can still issue tokens and token requests for devices, with `Auth.CreateTokenRequestAsync` or `Auth.RequestTokenAsync`.
 

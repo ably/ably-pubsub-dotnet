@@ -174,8 +174,8 @@ See [token authentication](https://ably.com/docs/auth/token) for how devices use
 
 > **Important:** clients from `PubSubServer` declare themselves as servers. Authenticate them with
 > an API key. Token authentication works only with a token that carries the signed
-> `x-ably-clientType=server` claim, which today means a JWT; with any other token, Ably rejects the
-> connection or request with error 40167. Clients from `PubSubDevice` are not affected. See
+> `x-ably-clientType=server` claim (a JWT); with any other token, Ably rejects the connection or
+> request with error 40167. Clients from `PubSubDevice` are not affected. See
 > [Server clients and token authentication](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#server-clients-and-token-authentication).
 
 ### Device
@@ -272,10 +272,11 @@ for how each value resolves.
 
 ### Proxy
 
-The SDK uses your runtime's default proxy settings
-([`HttpClient.DefaultProxy`](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.defaultproxy)),
-which come from the `HTTPS_PROXY` and `HTTP_PROXY` environment variables or from the system proxy
-settings. Both HTTP requests and the realtime connection go through that proxy.
+The SDK uses your runtime's default proxy settings, for both HTTP requests and the realtime
+connection. On .NET, these are
+[`HttpClient.DefaultProxy`](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.defaultproxy),
+which comes from the `HTTPS_PROXY` and `HTTP_PROXY` environment variables or from the system proxy
+settings. On .NET Framework, they come from the system proxy settings and your app's configuration.
 
 To set a proxy in code, pass your own `HttpClient`. It applies to HTTP requests only; the
 realtime connection still uses the default proxy settings.
