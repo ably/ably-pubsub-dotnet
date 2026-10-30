@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Ably.PubSub.Encryption;
@@ -225,6 +226,91 @@ namespace Ably.PubSub.Tests.Http
             LastRequest.Url.Should().Be($"/channels/test/messages/{EncodedSerial}/annotations");
             LastRequest.QueryParameters["limit"].Should().Be("7");
             LastRequest.QueryParameters.Should().NotContainKey("direction");
+        }
+
+        [Fact]
+        [Trait("spec", "RSAN3a")]
+        [Trait("spec", "RSAN3b")]
+        public async Task GetAsync_WithExtraParameters_ShouldSendThemInTheQuerystring()
+        {
+            var client = GetRestClient(_ => new AblyResponse { TextResponse = "[]" }.ToTask());
+            var query = new AnnotationsRequestParams
+            {
+                ExtraParameters = new Dictionary<string, string> { ["type"] = "reaction:distinct.v1", ["custom"] = "value" },
+            };
+
+            await client.Channels.Get("test").Annotations.GetAsync(Serial, query);
+
+            LastRequest.Url.Should().Be($"/channels/test/messages/{EncodedSerial}/annotations");
+            LastRequest.QueryParameters.Should().BeEquivalentTo(new Dictionary<string, string>
+            {
+                ["limit"] = "100",
+                ["type"] = "reaction:distinct.v1",
+                ["custom"] = "value",
+            });
+        }
+
+        [Fact]
+        [Trait("spec", "RSAN3a")]
+        [Trait("spec", "RSAN3b")]
+        public async Task GetAsync_WithALimitInExtraParameters_ShouldSendItInsteadOfTheDefault()
+        {
+            var client = GetRestClient(_ => new AblyResponse { TextResponse = "[]" }.ToTask());
+
+            await client.Channels.Get("test").Annotations.GetAsync(Serial, new AnnotationsRequestParams { ExtraParameters = { ["limit"] = "50" } });
+
+            LastRequest.QueryParameters.Should().BeEquivalentTo(new Dictionary<string, string> { ["limit"] = "50" });
+        }
+
+        [Fact]
+        [Trait("spec", "RSAN3a")]
+        public async Task GetAsync_WithLimitAndALimitInExtraParameters_ShouldSendLimitOnce()
+        {
+            var client = GetRestClient(_ => new AblyResponse { TextResponse = "[]" }.ToTask());
+            var query = new AnnotationsRequestParams { Limit = 7, ExtraParameters = { ["limit"] = "50", ["other"] = "x" } };
+
+            await client.Channels.Get("test").Annotations.GetAsync(Serial, query);
+
+            LastRequest.QueryParameters.Should().BeEquivalentTo(new Dictionary<string, string> { ["limit"] = "7", ["other"] = "x" });
+        }
+
+        [Fact]
+        [Trait("spec", "RSAN3a")]
+        public async Task GetAsync_WithNullExtraParameters_ShouldSendTheDefaultLimit()
+        {
+            var client = GetRestClient(_ => new AblyResponse { TextResponse = "[]" }.ToTask());
+
+            await client.Channels.Get("test").Annotations.GetAsync(Serial, new AnnotationsRequestParams { ExtraParameters = null });
+
+            LastRequest.QueryParameters.Should().BeEquivalentTo(new Dictionary<string, string> { ["limit"] = "100" });
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(1001)]
+        [Trait("spec", "RSAN3a")]
+        public async Task GetAsync_WithALimitOutOfRange_ShouldThrowWithCode40003AndSendNoRequest(int limit)
+        {
+            var annotations = GetRestClient().Channels.Get("test").Annotations;
+
+            var exception = await Assert.ThrowsAsync<AblyException>(() => annotations.GetAsync(Serial, new AnnotationsRequestParams { Limit = limit }));
+
+            exception.ErrorInfo.Code.Should().Be(40003);
+            exception.ErrorInfo.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            Requests.Should().BeEmpty();
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1000)]
+        [Trait("spec", "RSAN3a")]
+        public async Task GetAsync_WithALimitAtTheBounds_ShouldSendIt(int limit)
+        {
+            var client = GetRestClient(_ => new AblyResponse { TextResponse = "[]" }.ToTask());
+
+            await client.Channels.Get("test").Annotations.GetAsync(Serial, new AnnotationsRequestParams { Limit = limit });
+
+            LastRequest.QueryParameters["limit"].Should().Be(limit.ToString());
         }
 
         [Fact]

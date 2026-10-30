@@ -626,15 +626,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `RealtimePresenceEnterTests.RTP8j_EnterNullClientidErrors`, env-gated.
 - **Status:** open bug.
 
-### RTAN4e — no warning is logged when an annotation listener is added without ANNOTATION_SUBSCRIBE
-
-- **Spec point:** RTAN4e (test `realtime/unit/RTAN4e/subscribe-warns-no-mode-0`, `uts/realtime/unit/channels/channel_annotations.md`).
-- **What the features spec says:** "`(RTAN4e)` … once the channel is in the `attached` state, the `RTL4m` channel modes are checked for the presence of the `ANNOTATION_SUBSCRIBE` mode. … If this mode is missing, the library should log a warning indicating that the user has tried to add an annotation listener without having requested the `ANNOTATION_SUBSCRIBE` channel mode in ChannelOptions".
-- **What the SDK does:** with the channel ATTACHED and its granted modes `Publish` only (observed: `state=Attached modes=Publish`), `channel.Annotations.Subscribe(…)` logs no warning at all (nothing at Warning level in the captured log).
-- **Root cause:** not isolated. `RealtimeAnnotations.WarnIfSubscribeModeNotGranted` exists and is called from `Subscribe`, but nothing reaches the client's log sink; candidates are the channel logger (`RealtimeChannel.Logger`) not being the client's logger, or the `_handlers.IsEmpty` guard.
-- **Test impact:** `ChannelAnnotationsTests.RTAN4e_SubscribeWarnsNoMode`, env-gated `[DeviationFact("RTAN4e")]` (the test matches the SDK's spelling "AnnotationSubscribe").
-- **Status:** open bug.
-
 ### RTN14d — DISCONNECTED is left at once and errorReason is cleared by the next CONNECTING
 
 - **Spec point:** RTN14d, RTN25, RTB1, RSA4c2 (tests `realtime/unit/RTN25/error-reason-disconnected-1`, `realtime/unit/RTN25/error-reason-cleared-on-connect-4`, `realtime/unit/RTN14c/connection-timeout-0`, `realtime/unit/RSA4c2/callback-timeout-connecting-disconnected-1`).
@@ -1115,14 +1106,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `PaginationTests.TG4_FirstRetrievesPage` (integration) and `PaginatedResultTests.TG4_FirstReturnsFirstPage` (unit) call `channel.HistoryAsync(page2.FirstQueryParams)`, marked `// DEVIATION: PaginatedResult#first absent; using channel.HistoryAsync(page2.FirstQueryParams)`. The integration test runs. The unit test is env-gated (`[DeviationFact("TG")]`) because its mock's query-less `first` link hits the TG link-parser crash (see that entry under Failing Tests).
 - **Status:** open: public `PaginatedResult#first` not implemented.
 
-### RSAN3b — `RestAnnotations#get` takes no arbitrary `params`: the querystring test passes `AnnotationsRequestParams { Limit }`
-
-- **Spec point:** RSAN3b (the ID-less section "RSAN3b — get passes params as querystring", `uts/rest/unit/channel/annotations.md`).
-- **What the features spec says:** `(RSAN3b)` "Any `params` are sent in the querystring"; the IDL types them `params?: Dict<String, Stringifiable>`.
-- **What the SDK does:** the public `params` dictionary the spec passes is absent: `RestAnnotations.GetAsync` takes an `AnnotationsRequestParams`, which exposes only `Limit` (`Http/AnnotationsRequestParams.cs:15`). The spec's `{ "limit": "50" }` maps onto `Limit = 50`, so the test still checks that the value reaches the querystring; any other parameter can't be sent.
-- **Test impact:** `AnnotationsTests.NoId_Rsan3bGetPassesParamsAsQuerystring` passes `new AnnotationsRequestParams { Limit = 50 }`, marked `// DEVIATION: RestAnnotations#get(params) absent; using AnnotationsRequestParams { Limit }`, and asserts `limit=50` as the spec does.
-- **Status:** open: arbitrary annotation query `params` not implemented (`AnnotationsRequestParams` supports only `Limit`).
-
 ### RTL22a — `RealtimeChannel#subscribe(MessageFilter, …)` is absent: the name-filter test subscribes by event name
 
 - **Spec point:** RTL22, RTL22a, MFI2d (test `realtime/unit/RTL22a/filter-matching-name-0`, `uts/realtime/unit/channels/channel_subscribe.md`).
@@ -1130,14 +1113,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **What the SDK does:** the public `RealtimeChannel#subscribe(MessageFilter, …)` is absent (see the RTL22 entry under Missing SDK Public API / Features). For a filter on `name` alone, the public event-name subscribe `IRealtimeChannel.Subscribe(string eventName, Action<Message>)` (RTL7b) delivers exactly the messages whose name matches, and none without a name, which is what the test observes.
 - **Test impact:** `ChannelSubscribeTests.RTL22a_FilterMatchingName` subscribes with `channel.Subscribe("target-event", listener)` in place of `subscribe(MessageFilter(name: "target-event"), listener)`, marked `// DEVIATION: RealtimeChannel#subscribe(MessageFilter) absent; using channel.Subscribe("target-event", listener)`; all 5 assertions are verbatim. The `attachOnSubscribe: false` setup is dropped as elsewhere (the test attaches first).
 - **Status:** open: public `RealtimeChannel#subscribe(MessageFilter, …)` not implemented.
-
-### TO3k6 — `ClientOptions#fallbackHosts` has no public getter: the test reads the internal `GetFallbackHosts()`
-
-- **Spec point:** TO3k6 (test `rest/unit/TO3/client-options-custom-hosts-1`, `uts/rest/unit/types/options_types.md`).
-- **What the features spec says:** the IDL lists `fallbackHosts` as a `ClientOptions` attribute (TO3k6), which the test reads back.
-- **What the SDK does:** the public `ClientOptions#fallbackHosts` getter is absent (`ClientOptions.FallbackHosts` is set-only). The internal `ClientOptions.GetFallbackHosts()` returns a copy of the array that was set (or the endpoint's defaults when none was), which is the value the spec asserts.
-- **Test impact:** `OptionsTypesTests.TO3_ClientOptionsCustomHosts` asserts `options.GetFallbackHosts()` equals `["fallback1.example.com", "fallback2.example.com"]`, marked `// DEVIATION: ClientOptions#fallbackHosts absent; using internal ClientOptions.GetFallbackHosts()` (unit tier only).
-- **Status:** open: public `ClientOptions#fallbackHosts` getter not implemented.
 
 ### RSL6 / TM3 — a fully decoded message has `encoding == ""`, not null
 

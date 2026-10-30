@@ -97,7 +97,8 @@ Names that refer to Ably's REST API service or wire options are unchanged (`Clie
 | `IRealtimeChannel.HistoryAsync(bool untilAttach)` / `HistoryAsync(PaginatedRequestParams, bool untilAttach)` | `HistoryAsync()` / `HistoryAsync(PaginatedRequestParams)` |
 | `Presence.IsSyncComplete` | `Presence.SyncComplete` |
 | `ClientOptions.Environment`, `ClientOptions.RestHost`, `ClientOptions.RealtimeHost` | `ClientOptions.Endpoint` — see [Choose the host with `Endpoint`](#choose-the-host-with-endpoint) |
-| `ClientOptions.FullRestHost()` / `ClientOptions.FullRealtimeHost()` / `ClientOptions.GetFallbackHosts()` | Nothing — `Connection.Host` reports the host the realtime connection is using |
+| `ClientOptions.FullRestHost()` / `ClientOptions.FullRealtimeHost()` | Nothing — `Connection.Host` reports the host the realtime connection is using |
+| `ClientOptions.GetFallbackHosts()` | `ClientOptions.FallbackHosts` (now readable). It returns only the hosts you set, or `null` when you set none; unlike `GetFallbackHosts()`, it does not return the default fallback hosts derived from `Endpoint` |
 
 ## Choose the host with `Endpoint`
 
@@ -122,7 +123,7 @@ How `Endpoint` resolves:
 | `nonprod:` plus a name, e.g. `nonprod:sandbox` | `sandbox.realtime.ably-nonprod.net` | `sandbox.[a-e].fallback.ably-realtime-nonprod.com` |
 | A hostname (contains `.` or `::`, or is `localhost`) | The value as given | None |
 
-An explicit `FallbackHosts` always replaces the default fallback hosts. A custom `Port` or `TlsPort` no longer disables the default fallback hosts.
+An explicit `FallbackHosts` always replaces the default fallback hosts. A custom `Port` or `TlsPort` no longer disables the default fallback hosts. Reading `FallbackHosts` gives back the hosts you set, or `null` when you set none (the defaults in the table above then apply); it never returns the computed defaults.
 
 **Before (1.x):**
 
@@ -158,13 +159,15 @@ Publishing now reports what the service did with the messages. Typical callers o
 
 **Behaviour change:** a realtime publish whose serial falls below the range of a later `ACK` now completes as a failure (error code 50000) instead of silently succeeding. An `ACK` covers only `msgSerial` to `msgSerial + count - 1`, and the protocol treats skipped messages as not acknowledged; java and cocoa behave the same way. Entries inside the range are unaffected.
 
+**Behaviour change:** a realtime `PublishAsync` refused by the channel or connection state (the channel is SUSPENDED or FAILED, or the connection is neither CONNECTED nor allowed to queue the message) still faults the task, but the `AblyException` now carries the refusal's own error (code 40000, status 400). 1.x threw a generic 50000 "Unexpected error" with the refusal as its `InnerException`. If you read `InnerException` to find the refusal, read `ErrorInfo` directly instead. The same applies to any other `AblyException` raised inside `AttachAsync`, `DetachAsync`, `SetOptionsAsync` and the presence `EnterAsync`/`UpdateAsync`/`LeaveAsync` methods: for example, with `QueueMessages = false` and the connection not CONNECTED, these methods now fault with the "Not queuing messages …" error itself (code 50000, status 400) rather than a wrapping "Unexpected error" whose `InnerException` held it.
+
 New in 2.0 on `IHttpChannel` and `IRealtimeChannel`, for channels with message updates and deletes enabled:
 
 | API | Notes |
 |-----|-------|
 | `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync` | Take a `Message` with a populated `Serial`, an optional `MessageOperation` (`ClientId`, `Description`, `Metadata`) and optional params. The message you pass is never modified. `IHttpChannel` returns `Task<UpdateDeleteResult>` and throws on failure; `IRealtimeChannel` returns `Task<Result<UpdateDeleteResult>>`, like `PublishAsync`. `UpdateDeleteResult.VersionSerial` is `null` if the message was superseded by a later update. |
 | `GetMessageAsync`, `GetMessageVersionsAsync` | Retrieve the latest version, or all versions, of a message by serial. |
-| `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. |
+| `Annotations` | Publish, delete, retrieve and (on realtime channels) subscribe to annotations of a message. Experimental. `GetAsync` takes an `AnnotationsRequestParams`: `Limit` (default 100) plus `ExtraParameters`, any other query parameters, all sent in the querystring. |
 | `Message.Serial`, `Message.Version`, `Message.Action`, `Message.Annotations` | Populated on messages received from the service. |
 
 **Behaviour change:** the SDK now declares wire protocol version 6 (1.x declared 2). The version is sent as the realtime `v` parameter and the REST `X-Ably-Version` header, and the service sends the newer message structure. The stats endpoint remains pinned to the v2 response format, so `StatsAsync` results are unchanged.

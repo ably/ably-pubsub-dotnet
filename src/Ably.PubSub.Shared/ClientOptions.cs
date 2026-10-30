@@ -18,7 +18,6 @@ namespace Ably.PubSub
 #if MSGPACK
         private bool _useBinaryProtocol;
 #endif
-        private string[] _fallbackHosts;
 
         /// <summary>
         /// If false, suppresses the automatic initiation of a connection when the library is instanced.
@@ -128,12 +127,12 @@ namespace Ably.PubSub
         /// If you have been provided a set of custom fallback hosts by Ably, please specify them here.
         /// When set, these replace the default fallback hosts derived from <see cref="Endpoint"/>;
         /// an empty array disables fallback.
+        /// Reading it returns the hosts that were set, or <c>null</c> when none were (the default fallback
+        /// hosts derived from <see cref="Endpoint"/> then apply).
+        /// Default: null.
         /// Spec: REC2a2, RSC15a, TO3k6.
         /// </summary>
-        public string[] FallbackHosts
-        {
-            set => _fallbackHosts = value;
-        }
+        public string[] FallbackHosts { get; set; }
 
         /// <summary>
         /// The fallback hosts to use: an explicit <see cref="FallbackHosts"/> always replaces the defaults (REC2a2);
@@ -141,7 +140,7 @@ namespace Ably.PubSub
         /// </summary>
         /// <returns>A copy of the fallback hosts; empty when fallback is disabled or the endpoint is a hostname.</returns>
         internal string[] GetFallbackHosts() =>
-            _fallbackHosts != null ? (string[])_fallbackHosts.Clone() : Defaults.GetEndpointFallbackHosts(Endpoint);
+            FallbackHosts != null ? (string[])FallbackHosts.Clone() : Defaults.GetEndpointFallbackHosts(Endpoint);
 
         /// <summary>
         /// For development environments only; allows a non-default Ably port to be specified.
@@ -437,15 +436,15 @@ namespace Ably.PubSub
         /// the mutable dictionary members (<see cref="Agents"/>, <see cref="AuthOptions.AuthHeaders"/>,
         /// <see cref="AuthOptions.AuthParams"/> and <see cref="TransportParams"/>) are copied into new
         /// dictionaries so the copy can be mutated without affecting the original; every other
-        /// reference-typed member (delegates, <see cref="AuthOptions.TokenDetails"/>,
+        /// reference-typed member (delegates, <see cref="FallbackHosts"/>, <see cref="AuthOptions.TokenDetails"/>,
         /// <see cref="LogHandler"/>, <see cref="HttpClient"/>, <see cref="TransportFactory"/>,
         /// <see cref="CustomContext"/>, <see cref="DefaultTokenParams"/> and <see cref="ChannelDefaults"/>)
         /// is shared by reference, matching how the core's own constructors retain them.
         /// <para>
         /// This is the copy the door packages (Ably.PubSub.Device / Ably.PubSub.Server) stamp their
         /// side agent onto, so that stamping a client never mutates the caller's own options instance.
-        /// It lives here rather than in the door helper because <see cref="FallbackHosts"/> is
-        /// write-only from outside the class and can only be carried across from inside it.
+        /// It lives here rather than in the door helper because some of the internal state the core
+        /// reads can only be carried across from inside the class.
         /// </para>
         /// </summary>
         /// <returns>A copy of these options.</returns>
@@ -475,6 +474,7 @@ namespace Ably.PubSub
                 LogLevel = LogLevel,
                 LogHandler = LogHandler,
                 Endpoint = Endpoint,
+                FallbackHosts = FallbackHosts,
                 Port = Port,
                 Tls = Tls,
                 TlsPort = TlsPort,
@@ -507,8 +507,7 @@ namespace Ably.PubSub
                 DeltaDecoder = DeltaDecoder,
             };
 
-            // Write-only / private-field members, only reachable from inside the class.
-            copy._fallbackHosts = _fallbackHosts;
+            // Private-field members, only reachable from inside the class.
             copy._nowFunc = _nowFunc;
 
             return copy;
