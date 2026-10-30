@@ -145,10 +145,13 @@ namespace Ably.PubSub.Realtime
         /// <param name="data">The payload of the message.</param>
         /// <param name="clientId">optional, id of the client.</param>
         /// <returns>
-        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
-        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
-        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
-        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// A task of <see cref="Result{T}"/>. A NACK or the confirmation timing out is reported as a failed result rather than
+        /// thrown (RTL6i). A publish refused by the channel or connection state (RTL6c4: the channel is SUSPENDED or FAILED, or
+        /// the connection is neither CONNECTED nor allowed to queue the message) is not sent, and the task faults with an
+        /// <see cref="AblyException"/> carrying the refusal's <see cref="ErrorInfo"/> (code 40000). On success <c>Value</c> holds
+        /// the serials of the published messages (RTL6j), where an individual serial is null if the message was discarded due to a
+        /// configured conflation rule (PBR2a); <c>Value</c> itself is null when the server's acknowledgement carried no result (a
+        /// connection using a protocol version older than 5).
         /// </returns>
         Task<Result<PublishResult>> PublishAsync(string eventName, object data, string clientId = null);
 
@@ -166,10 +169,13 @@ namespace Ably.PubSub.Realtime
         /// </summary>
         /// <param name="message">Message to be published.</param>
         /// <returns>
-        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
-        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
-        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
-        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// A task of <see cref="Result{T}"/>. A NACK or the confirmation timing out is reported as a failed result rather than
+        /// thrown (RTL6i). A publish refused by the channel or connection state (RTL6c4: the channel is SUSPENDED or FAILED, or
+        /// the connection is neither CONNECTED nor allowed to queue the message) is not sent, and the task faults with an
+        /// <see cref="AblyException"/> carrying the refusal's <see cref="ErrorInfo"/> (code 40000). On success <c>Value</c> holds
+        /// the serials of the published messages (RTL6j), where an individual serial is null if the message was discarded due to a
+        /// configured conflation rule (PBR2a); <c>Value</c> itself is null when the server's acknowledgement carried no result (a
+        /// connection using a protocol version older than 5).
         /// </returns>
         Task<Result<PublishResult>> PublishAsync(Message message);
 
@@ -186,10 +192,13 @@ namespace Ably.PubSub.Realtime
         /// </summary>
         /// <param name="messages">list of messages.</param>
         /// <returns>
-        /// A task of <see cref="Result{T}"/>. Failure (including a NACK or the confirmation timing out) is reported as a failed
-        /// result rather than thrown (RTL6i). On success <c>Value</c> holds the serials of the published messages (RTL6j), where an
-        /// individual serial is null if the message was discarded due to a configured conflation rule (PBR2a); <c>Value</c> itself is
-        /// null when the server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// A task of <see cref="Result{T}"/>. A NACK or the confirmation timing out is reported as a failed result rather than
+        /// thrown (RTL6i). A publish refused by the channel or connection state (RTL6c4: the channel is SUSPENDED or FAILED, or
+        /// the connection is neither CONNECTED nor allowed to queue the message) is not sent, and the task faults with an
+        /// <see cref="AblyException"/> carrying the refusal's <see cref="ErrorInfo"/> (code 40000). On success <c>Value</c> holds
+        /// the serials of the published messages (RTL6j), where an individual serial is null if the message was discarded due to a
+        /// configured conflation rule (PBR2a); <c>Value</c> itself is null when the server's acknowledgement carried no result (a
+        /// connection using a protocol version older than 5).
         /// </returns>
         Task<Result<PublishResult>> PublishAsync(IEnumerable<Message> messages);
 
@@ -202,10 +211,11 @@ namespace Ably.PubSub.Realtime
         /// <param name="operation">optional description of the update, sent as the version of the message (RTL32b2).</param>
         /// <param name="parameters">optional publish parameters, sent in the params of the protocol message (RTL32e).</param>
         /// <returns>
-        /// A task of <see cref="Result{T}"/> which completes on the ACK or NACK. Failure (including a NACK or the confirmation
-        /// timing out) is reported as a failed result rather than thrown. On success <c>Value</c> holds the version serial of the
-        /// edit (RTL32d); its <see cref="UpdateDeleteResult.VersionSerial"/> is null if the message was superseded, or if the
-        /// server's acknowledgement carried no result (a connection using a protocol version older than 5).
+        /// A task of <see cref="Result{T}"/> which completes on the ACK or NACK. A NACK or the confirmation timing out is reported
+        /// as a failed result rather than thrown; a refusal by the channel or connection state faults the task, as for
+        /// <see cref="PublishAsync(Message)"/>. On success <c>Value</c> holds the version serial of the edit (RTL32d); its
+        /// <see cref="UpdateDeleteResult.VersionSerial"/> is null if the message was superseded, or if the server's acknowledgement
+        /// carried no result (a connection using a protocol version older than 5).
         /// </returns>
         Task<Result<UpdateDeleteResult>> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null);
 

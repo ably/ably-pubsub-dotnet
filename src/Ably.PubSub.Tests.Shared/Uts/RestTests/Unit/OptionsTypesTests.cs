@@ -95,9 +95,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             options.Endpoint.Should().Be("custom.ably.example.com");
 
             // ASSERT options.fallbackHosts == ["fallback1.example.com", "fallback2.example.com"]
-            // DEVIATION: ClientOptions#fallbackHosts absent; using internal ClientOptions.GetFallbackHosts()
-            // NOTE: ClientOptions.FallbackHosts is set-only (TO3k6); GetFallbackHosts() returns the array that was set
-            options.GetFallbackHosts().Should().Equal("fallback1.example.com", "fallback2.example.com");
+            options.FallbackHosts.Should().Equal("fallback1.example.com", "fallback2.example.com");
         }
 
         // UTS: rest/unit/TO3/client-options-auth-url-2

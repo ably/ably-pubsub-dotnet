@@ -26,14 +26,6 @@ namespace Ably.PubSub.Tests.PubSub
     /// </summary>
     public class ClientOptionsCloneSpecs
     {
-        // Public setter, no getter: the loop stamps it via the setter and asserts through the
-        // private backing field (Clone copies the field by reference).
-        private static readonly IReadOnlyDictionary<string, string> WriteOnlyBackingField =
-            new Dictionary<string, string>
-            {
-                ["FallbackHosts"] = "_fallbackHosts",
-            };
-
         // Clone rebuilds these as a fresh dictionary with equal contents (not a shared reference).
         private static readonly HashSet<string> DeepCopiedDictionaries =
             new HashSet<string> { "Agents", "AuthHeaders", "AuthParams", "TransportParams" };
@@ -67,14 +59,7 @@ namespace Ably.PubSub.Tests.PubSub
             //    carries the default).
             foreach (var p in props)
             {
-                if (WriteOnlyBackingField.TryGetValue(p.Name, out var fieldName))
-                {
-                    var field = typeof(ClientOptions)
-                        .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
-                    field.GetValue(clone).Should()
-                        .Be(field.GetValue(original), $"{p.Name} (write-only, via {fieldName})");
-                }
-                else if (DeepCopiedDictionaries.Contains(p.Name))
+                if (DeepCopiedDictionaries.Contains(p.Name))
                 {
                     var cloneVal = (IEnumerable)p.GetValue(clone);
                     var origVal = (IEnumerable)p.GetValue(original);
@@ -115,8 +100,7 @@ namespace Ably.PubSub.Tests.PubSub
         {
             var t = p.PropertyType;
 
-            // Write-only host properties have no getter; do not attempt to read a default.
-            object def = p.CanRead ? p.GetValue(defaults) : null;
+            object def = p.GetValue(defaults);
 
             if (t == typeof(string))
             {
