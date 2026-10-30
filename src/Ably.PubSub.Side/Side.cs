@@ -49,8 +49,8 @@ namespace Ably.PubSub.Internal
         /// <c>new PubSubRealtimeClient(options)</c>. To prevent that, the options are copied via
         /// <see cref="ClientOptions.Clone()"/> and the side is stamped onto the copy; the caller's
         /// instance and its <c>Agents</c> dictionary are left untouched. The copy lives in the core
-        /// (not here) because <c>FallbackHosts</c> is write-only from outside the class and
-        /// cannot be carried across by a copy located here.
+        /// (not here) because some of the options' internal state cannot be carried across by a
+        /// copy located here.
         /// </para>
         /// <para>
         /// The caller's <c>Agents</c> entries are preserved alongside the side stamp, so an SDK

@@ -226,7 +226,8 @@ namespace Ably.PubSub
 
                     try
                     {
-                        await AblyAuth.AuthorizeAsync();
+                        // RSA4b - only the new token is needed, so no wait for the realtime connection.
+                        await AblyAuth.AuthorizeAsync(null, null, waitForConnection: false);
                         await AblyAuth.AddAuthHeader(request);
                         return await ExecuteHttpRequest(request);
                     }
@@ -455,7 +456,7 @@ namespace Ably.PubSub
             {
                 // We don't want to retry the internet check url.
                 var request = new AblyRequest(Defaults.InternetCheckUrl, HttpMethod.Get) { SkipRetry = true };
-                var response = await ExecuteHttpRequest(request).TimeoutAfter(Defaults.MaxHttpOpenTimeout, AblyResponse.EmptyResponse);
+                var response = await ExecuteHttpRequest(request).TimeoutAfter(Defaults.MaxHttpOpenTimeout, AblyResponse.EmptyResponse, Options.TimerScheduler);
                 var success = response.TextResponse.SafeTrim().EqualsTo(Defaults.InternetCheckOkMessage);
                 if (success == false)
                 {

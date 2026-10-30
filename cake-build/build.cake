@@ -20,6 +20,8 @@ var version = Argument("version", "");
 var defineConstants = Argument("define", "");
 var framework = Argument("framework", "");
 var packageOutput = Argument("packageOutput", "");
+// UTS tier for the Test.*.Uts and Test.*.UtsInfra targets: unit, integration or proxy
+var utsTier = Argument("uts-tier", "");
 
 ///////////////////////////////////////////////////////////////////////////////
 // SETUP / TEARDOWN
@@ -34,6 +36,11 @@ Setup(ctx =>
     Information($"Configuration: {configuration}");
     if (!string.IsNullOrEmpty(version))
         Information($"Version: {version}");
+    if (!string.IsNullOrEmpty(utsTier))
+        Information($"UTS tier: {utsTier}");
+    // Fail before the build, not after it, when a UTS target has no valid tier
+    if (target.Contains(".Uts"))
+        testExecutionHelper.ValidateUtsTier(utsTier);
     if (!string.IsNullOrEmpty(framework))
     {
         Information($"Framework: {framework}");

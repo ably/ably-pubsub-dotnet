@@ -126,17 +126,17 @@ namespace Ably.PubSub.Realtime
             PubSubRealtimeClient realtimeClient,
             ChannelOptions options = null,
             IMobileDevice mobileDevice = null)
-            : base(options?.Logger)
+            : base(options?.Logger ?? realtimeClient.Logger)
         {
             Name = name;
             Options = options;
-            MessageDecodingContext = new DecodingContext(options);
+            MessageDecodingContext = new DecodingContext(options) { DeltaDecoder = realtimeClient.Options.DeltaDecoder };
             Presence = new Presence(realtimeClient.ConnectionManager, this, clientId, Logger);
             Annotations = new RealtimeAnnotations(this);
             RealtimeClient = realtimeClient;
             State = ChannelState.Initialized;
-            AttachedAwaiter = new ChannelAwaiter(this, ChannelState.Attached, Logger, OnAttachTimeout);
-            DetachedAwaiter = new ChannelAwaiter(this, ChannelState.Detached, Logger, OnDetachTimeout);
+            AttachedAwaiter = new ChannelAwaiter(this, ChannelState.Attached, Logger, OnAttachTimeout, realtimeClient.Options.TimerScheduler);
+            DetachedAwaiter = new ChannelAwaiter(this, ChannelState.Detached, Logger, OnDetachTimeout, realtimeClient.Options.TimerScheduler);
 
             if (mobileDevice != null)
             {
@@ -569,7 +569,7 @@ namespace Ably.PubSub.Realtime
             }
 
             var failResult = Result.Fail<PublishResult>(new ErrorInfo("PublishAsync timeout expired. Message was not confirmed by the server"));
-            return await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult);
+            return await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult, RealtimeClient.Options.TimerScheduler);
         }
 
         public Task<Result<UpdateDeleteResult>> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
@@ -660,7 +660,7 @@ namespace Ably.PubSub.Realtime
 
             if (!Connection.CanPublishMessages)
             {
-                throw new AblyException(new ErrorInfo($"Message cannot be published. Client is not allowed to queue messages when connection is in {State} state", ErrorCodes.BadRequest, HttpStatusCode.BadRequest));
+                throw new AblyException(new ErrorInfo($"Message cannot be published. Client is not allowed to queue messages when connection is in {Connection.State} state", ErrorCodes.BadRequest, HttpStatusCode.BadRequest));
             }
         }
 
@@ -682,7 +682,7 @@ namespace Ably.PubSub.Realtime
             // RTL32b, RTL32b1, RTL32b2, RTL32c
             var edit = Message.CreateEdit(message, operation, action);
 
-            // The refusal is not wrapped, so the error code of the refusal is preserved (as for annotations).
+            // The refusal is not wrapped, so the error code of the refusal is preserved (as for publish and annotations).
             EnsureCanPublish();
 
             var msg = new ProtocolMessage(ProtocolMessage.MessageAction.Message, Name)
@@ -704,7 +704,7 @@ namespace Ably.PubSub.Realtime
             SendMessage(msg, tw.Callback);
 
             var failResult = Result.Fail<PublishResult>(new ErrorInfo("Message edit timeout expired. The edit was not confirmed by the server"));
-            var published = await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult);
+            var published = await tw.Task.TimeoutAfter(RealtimeClient.Options.RealtimeRequestTimeout, failResult, RealtimeClient.Options.TimerScheduler);
             if (published.IsFailure)
             {
                 return Result.Fail<UpdateDeleteResult>(published.Error);
@@ -901,7 +901,7 @@ namespace Ably.PubSub.Realtime
             // the thread
             _ = Task.Run(async () =>
             {
-                await Task.Delay(retryTimeout);
+                await RealtimeClient.Options.TimerScheduler.Delay(retryTimeout);
 
                 // only retry if the connection is connected (RTL13c)
                 if (Connection.State == ConnectionState.Connected)

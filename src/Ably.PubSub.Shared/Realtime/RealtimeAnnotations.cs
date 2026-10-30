@@ -76,7 +76,7 @@ namespace Ably.PubSub.Realtime
         /// <see cref="RestAnnotations.GetAsync(string, AnnotationsRequestParams)"/> (RTAN3a).
         /// </summary>
         /// <param name="messageSerial">the serial of the annotated message.</param>
-        /// <param name="query">optional query parameters.</param>
+        /// <param name="query">optional query parameters, all sent in the querystring (RTAN3a, RSAN3b).</param>
         /// <returns>The first page of decoded <see cref="Annotation"/> objects.</returns>
         public Task<PaginatedResult<Annotation>> GetAsync(string messageSerial, AnnotationsRequestParams query = null)
         {
@@ -87,7 +87,7 @@ namespace Ably.PubSub.Realtime
         /// Retrieves the annotations of the given message (RTAN3a). The message must have a populated serial.
         /// </summary>
         /// <param name="message">the annotated message.</param>
-        /// <param name="query">optional query parameters.</param>
+        /// <param name="query">optional query parameters, all sent in the querystring (RTAN3a, RSAN3b).</param>
         /// <returns>The first page of decoded <see cref="Annotation"/> objects.</returns>
         public Task<PaginatedResult<Annotation>> GetAsync(Message message, AnnotationsRequestParams query = null)
         {
@@ -222,7 +222,7 @@ namespace Ably.PubSub.Realtime
             _channel.PublishAnnotation(outbound, tw.Callback);
 
             var failResult = Result.Fail(new ErrorInfo("Annotation publish timeout expired. The annotation was not confirmed by the server"));
-            return await tw.Task.TimeoutAfter(_channel.RealtimeClient.Options.RealtimeRequestTimeout, failResult);
+            return await tw.Task.TimeoutAfter(_channel.RealtimeClient.Options.RealtimeRequestTimeout, failResult, _channel.RealtimeClient.Options.TimerScheduler);
         }
     }
 }
