@@ -146,7 +146,7 @@ PubSubHttpClient http = PubSubServer.CreateHttpClient("xxxxxx.yyyyyy:zzzzzzzz");
 IHttpChannel channel = http.Channels.Get("test-channel");
 
 PublishResult published = await channel.PublishAsync("test-event", "hello world");
-Console.WriteLine($"Published, serial {published.Serials[0]}");
+Console.WriteLine($"Published, serials: {string.Join(", ", published.Serials)}");
 
 PaginatedResult<Message> history = await channel.HistoryAsync();
 foreach (Message message in history.Items)
@@ -165,12 +165,24 @@ using Ably.PubSub.Server;
 
 PubSubHttpClient http = PubSubServer.CreateHttpClient("xxxxxx.yyyyyy:zzzzzzzz");
 
-// Return this JSON from the endpoint your devices use as their AuthUrl.
-string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams { ClientId = "me" });
+// Authenticate the caller first, then issue a token request for that user only.
+var capability = new Capability();
+capability.AddResource("test-channel").AllowPublish().AllowSubscribe();
+
+string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams
+{
+    ClientId = "me", // the authenticated user's ID
+    Capability = capability, // without it, the token gets all of the API key's capabilities
+});
+
+// Return this JSON unchanged, with the content type application/json. A text/plain
+// response is treated as a token string.
 Console.WriteLine(tokenRequest);
 ```
 
-See [token authentication](https://ably.com/docs/auth/token) for how devices use it.
+In an ASP.NET Core minimal API, for example, return it with
+`Results.Content(tokenRequest, "application/json")`. See
+[token authentication](https://ably.com/docs/auth/token) for how devices use it.
 
 > **Important:** clients from `PubSubServer` declare themselves as servers. Authenticate them with
 > an API key. Token authentication works only with a token that carries the signed
@@ -201,7 +213,12 @@ IRealtimeChannel channel = realtime.Channels.Get("test-channel");
 var received = new TaskCompletionSource<Message>();
 channel.Subscribe(msg => received.TrySetResult(msg));
 
-await channel.PublishAsync("test-event", "hello world");
+Result<PublishResult> result = await channel.PublishAsync("test-event", "hello world");
+if (result.IsFailure)
+{
+    Console.WriteLine($"Publish failed: {result.Error}");
+    return;
+}
 
 Message message = await received.Task;
 Console.WriteLine($"Received: {message.Data}");
