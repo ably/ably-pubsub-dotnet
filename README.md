@@ -165,9 +165,9 @@ using Ably.PubSub.Server;
 
 PubSubHttpClient http = PubSubServer.CreateHttpClient("xxxxxx.yyyyyy:zzzzzzzz");
 
-// Authenticate the caller first, then issue a token request for that user only.
-var capability = new Capability();
-capability.AddResource("test-channel").AllowPublish().AllowSubscribe();
+// Authenticate the caller first, then issue a token request for that user only,
+// granting only the operations the user needs.
+var capability = new Capability("{\"test-channel\":[\"publish\",\"subscribe\",\"history\"]}");
 
 string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams
 {
@@ -317,8 +317,7 @@ PubSubHttpClient http = PubSubServer.CreateHttpClient(options =>
 });
 ```
 
-If the proxy needs authentication, set `WebProxy.Credentials`. Connection reliability then
-depends on the proxy, and Ably can't help with errors the proxy introduces.
+If the proxy needs authentication, set `WebProxy.Credentials`.
 
 ### Logging
 
@@ -363,8 +362,8 @@ callbacks on the main thread. WebGL builds are not supported. See the
 
 ### MAUI and assembly trimming
 
-The SDK uses reflection, which assembly trimming can break. In a MAUI or trimmed app, keep the Ably
-assembly by adding this to your `.csproj`:
+The SDK uses reflection. In a MAUI or trimmed app, keep the Ably assembly from being trimmed by
+adding this to your `.csproj`:
 
 ```xml
 <ItemGroup>
@@ -374,11 +373,9 @@ assembly by adding this to your `.csproj`:
 
 ### .NET Framework
 
-Both packages run on .NET Framework 4.6.2 or later. In high-throughput scenarios, for example
-sending messages larger than 50 KB, the default WebSocket buffer in the .NET Framework can cause
-instability or errors
-([GitHub issue 446](https://github.com/ably/ably-pubsub-dotnet/issues/446)). Raise it to the
-maximum of 64 KB:
+Both packages run on .NET Framework 4.6.2 or later. For high-throughput use on .NET Framework,
+for example messages larger than 50 KB, set the WebSocket send and receive buffers to the
+64 KB maximum:
 
 ```csharp
 using Ably.PubSub;
@@ -405,8 +402,8 @@ In a device app, set the same `TransportFactory` on the `ClientOptions` you pass
 ## Known limitations
 
 - Device push-receive (activating a device for push notifications on Android or iOS) is not
-  available in 2.0. Its API is public but does not work: `Push.Activate()` and `Push.Deactivate()`
-  throw, and the client's `Device` and a channel's `Push` are `null`. To request the feature,
+  available in 2.0. The API stays public: `Push.Activate()` and `Push.Deactivate()` throw an
+  `AblyException`, and the client's `Device` and a channel's `Push` are `null`. To request the feature,
   comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See
   [Push notifications](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications).
 - Push administration (`Push.Admin`) works, and is intended for server-side use with

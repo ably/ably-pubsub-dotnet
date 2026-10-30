@@ -71,8 +71,8 @@ namespace Example.ChatApp
 - Also check blog on [Multiplayer game in unity with ably](https://ably.com/blog/multiplayer-game-in-unity-with-ably).
 
 ### Unsupported Platforms
-- It doesn't support **WebGL** due to incompatibility with WebSockets. Read the [Direct Socket Access](https://docs.unity3d.com/2019.3/Documentation/Manual/webgl-networking.html) section under WebGL Networking. We have active issue to add support for the same https://github.com/ably/ably-pubsub-dotnet/issues/1211.
-- To support **WebGL**, you should refer to [interaction with browser javascript from WebGL](https://docs.unity3d.com/Manual/webgl-interactingwithbrowserscripting.html). You can import [ably-pubsub-js](https://github.com/ably/ably-pubsub-js) as a browser javascript and call it from WebGL. For more information, refer to the project [Ably Tower Defence](https://github.com/ably-labs/ably-tower-defense/tree/js-branch/).
+- **WebGL** builds are not supported, because WebGL doesn't provide direct socket access. Read the [Direct Socket Access](https://docs.unity3d.com/2019.3/Documentation/Manual/webgl-networking.html) section under WebGL Networking. To request WebGL support, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1211.
+- For **WebGL**, refer to [interaction with browser javascript from WebGL](https://docs.unity3d.com/Manual/webgl-interactingwithbrowserscripting.html). You can import [ably-pubsub-js](https://github.com/ably/ably-pubsub-js) as a browser javascript and call it from WebGL. For more information, refer to the project [Ably Tower Defence](https://github.com/ably-labs/ably-tower-defense/tree/js-branch/).
 
 
 ### Contributing
