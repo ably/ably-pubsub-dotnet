@@ -3,10 +3,10 @@
 > [!IMPORTANT]
 > **This document describes the 1.x push-receive packages, which are not part of the 2.0 package set.**
 >
-> `ably.io.push.android` and `ably.io.push.ios` are Xamarin-era projects. They depend on `ably.io` 1.x, stay supported from the 1.x maintenance branch, and have been removed from this branch along with the `DotnetPush` and `AndroidSample` examples. A modern `Ably.PubSub.Push.Android` / `Ably.PubSub.Push.iOS` port on `net8.0-android` / `net8.0-ios`, built on `Ably.PubSub.Device`, is a possible future follow-up (currently **parked** — no committed milestone); until it lands, a device application cannot combine the 2.0 SDK with Ably push receive.
+> `ably.io.push.android` and `ably.io.push.ios` are Xamarin-era projects. They depend on `ably.io` 1.x and stay supported from the 1.x maintenance branch. They are not part of 2.0, and neither are the `DotnetPush` and `AndroidSample` examples, so a device application cannot combine the 2.0 SDK with Ably push receive.
 >
 >
-> In 2.0 the device push-receive API in the core stays public but **does not work**, because no platform package supplies a device: `Push.Activate()` / `Push.Deactivate()` throw an `AblyException`, and the client `Device` property and channel `Push` return `null`. The examples below that use them apply to `ably.io` 1.x only. To request device push for 2.x, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See also [UPDATING.md](UPDATING.md#push-notifications).
+> In 2.0 the device push-receive API in the core stays public but **does not work**, because no platform package supplies a device: `Push.Activate()` / `Push.Deactivate()` throw an `AblyException`, and the client `Device` property and channel `Push` return `null`. The examples below that use them apply to `ably.io` 1.x only. To request device push for 2.x, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See also [UPDATING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications).
 >
 > Push **administration** (`client.Push.Admin`) is unaffected: it lives in `Ably.PubSub.Core` and remains available from both packages. It is intended for server-side use and needs the `push-admin` capability, which Ably enforces server-side.
 
@@ -29,7 +29,7 @@ On iOS, Ably connects to [APNs](https://developer.apple.com/library/archive/docu
     
 ## Setting up the DotNetPush App
 
-To get push notifications setup in your own app, read [Setting up your own app](#setting-up-your-own-app).
+To get push notifications setup in your own app, read [Usage](#usage).
 
 ### Android
 
@@ -88,7 +88,7 @@ dotnet add package ably.io.push.ios
 
 Devices need to be [activated](#device-activation) with Ably once. Once activated, you can use their device ID, client ID or push token (APNs device token/ FCM registration token) to push messages to them using the Ably dashboard or a [Push Admin](https://ably.com/docs/general/push/admin) (SDKs which provide push admin functionality, such as the .net sdk, [Ably-java](https://github.com/ably/ably-java), [Ably-js](https://github.com/ably/ably-js), etc.). However, to send push notifications through Ably channels, devices need to [subscribe to a channel for push notifications](#subscribing-to-channels-for-push-notifications). Once subscribed, messages on that channel with a [push payload](#sending-messages) will be sent to devices which are subscribed to that channel.
 
-The [DotNetPush app](https://github.com/ably/ably-pubsub-dotnet/tree/main/examples/DotnetPush) contains an example of how to use the Push Notification functionality. For Android devices please refer to [MainActivity.cs](https://github.com/ably/ably-pubsub-dotnet/blob/main/examples/DotnetPush/DotnetPush.Android/MainActivity.cs) and [MyFirebaseMessaging.cs](https://github.com/ably/ably-pubsub-dotnet/blob/main/examples/DotnetPush/DotnetPush.Android/MyFirebaseMessaging.cs). For iOS please refer to [AppDelegate](https://github.com/ably/ably-pubsub-dotnet/blob/main/examples/DotnetPush/DotnetPush.iOS/AppDelegate.cs).
+The [DotNetPush app](https://github.com/ably/ably-pubsub-dotnet/tree/1.2.19/examples/DotnetPush) contains an example of how to use the Push Notification functionality. For Android devices please refer to [MainActivity.cs](https://github.com/ably/ably-pubsub-dotnet/blob/1.2.19/examples/DotnetPush/DotnetPush.Android/MainActivity.cs) and [MyFirebaseMessaging.cs](https://github.com/ably/ably-pubsub-dotnet/blob/1.2.19/examples/DotnetPush/DotnetPush.Android/MyFirebaseMessaging.cs). For iOS please refer to [AppDelegate](https://github.com/ably/ably-pubsub-dotnet/blob/1.2.19/examples/DotnetPush/DotnetPush.iOS/AppDelegate.cs).
 
 ### Device activation
 
@@ -159,7 +159,7 @@ Once you have subscribed to recieve push notifications for a channel, other devi
 
 Shows a notification to the user immediately when it is received by their device.
 
-**Android**: This is known as a [notification message](https://firebase.google.com/docs/cloud-messaging/concept-options). A notification message cannot be customised or handled (e.g. run logic when a user taps the notification) - therefore, if you need to handle user taps or customize a notification, send a data message and [create a local notification](https://developer.android.com/guide/topics/ui/notifiers/notifications).
+**Android**: This is known as a [notification message](https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type). A notification message cannot be customised or handled (e.g. run logic when a user taps the notification) - therefore, if you need to handle user taps or customize a notification, send a data message and [create a local notification](https://developer.android.com/guide/topics/ui/notifiers/notifications).
 
 **iOS**: This is known as an [alert push notification](https://developer.apple.com/documentation/usernotifications/). An alert notification can be [customised](https://developer.apple.com/documentation/usernotificationsui/customizing_the_appearance_of_notifications).
 
@@ -185,7 +185,7 @@ var message = new Message("messageName", "This is an Ably message published on c
 
 Allows you to run logic in your application, such as download the latest content, perform local processing and creating a local notification.
 
-**Android**: This is known as a [data message](https://firebase.google.com/docs/cloud-messaging/concept-options).
+**Android**: This is known as a [data message](https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type).
 
 **iOS**: This is known as a background notification. These messages must have a priority of `5`, a push-type of `background`, and the `content-available` set to `1`, as shown in the code snippet below. To learn more about the message structure required by APNs, read [
 Pushing Background Updates to Your App](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/pushing_background_updates_to_your_app). You may see this documented as "silent notification" in Firebase documentation.

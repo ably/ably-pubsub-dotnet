@@ -16,25 +16,26 @@
 
 ## Working from source
 
-If you want to incorporate `ably-dotnet` into your project from source (perhaps to use a specific development branch) the simplest way to do so is to add references to the relevant ably-dotnet projects. The following steps are specific to Visual Studio 2019, but the principal should transfer to other IDEs
+If you want to incorporate the SDK into your project from source (perhaps to use a specific development branch) the simplest way to do so is to add references to the relevant projects from this repository. The following steps are specific to Visual Studio 2019, but the principle should transfer to other IDEs.
 
-1. Clone this repository to your local system (`git clone --recurse-submodules https://github.com/ably/ably-dotnet.git`)
-2. Open the solution you want to reference ably-dotnet from
+1. Clone this repository to your local system (`git clone --recurse-submodules https://github.com/ably/ably-pubsub-dotnet.git`)
+2. Open the solution you want to reference the SDK from
 3. In Solution Explorer right click the root node (it will be labelled Solution 'YourSolutionName')
 4. Select Add > Existing Project from the context menu
-5. Browse to the ably-dotnet repository and add ably-dotnet\src\Ably.PubSub.Shared\Ably.PubSub.Shared.shproj
-6. Browse to the ably-dotnet repository and add the project that corresponds to your target platform, so if you are targeting .NET Framework (AKA Classic .NET) you would add ably-dotnet\src\Ably.PubSub.Core.NETFramework\Ably.PubSub.Core.NETFramework.csproj, and for .NET / .NET Standard you would add ably-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj.
-7. In any project that you want to use `ably-dotnet` you need to add a project reference, to do so:
+5. Browse to the ably-pubsub-dotnet repository and add ably-pubsub-dotnet\src\Ably.PubSub.Shared\Ably.PubSub.Shared.shproj
+6. Browse to the ably-pubsub-dotnet repository and add the core project that corresponds to your target platform, so if you are targeting .NET Framework (AKA Classic .NET) you would add ably-pubsub-dotnet\src\Ably.PubSub.Core.NETFramework\Ably.PubSub.Core.NETFramework.csproj, and for .NET / .NET Standard you would add ably-pubsub-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj.
+7. Add the door project for the side your code runs on: ably-pubsub-dotnet\src\Ably.PubSub.Server\Ably.PubSub.Server.csproj (on .NET Framework, ably-pubsub-dotnet\src\Ably.PubSub.Server.NETFramework\Ably.PubSub.Server.NETFramework.csproj) or ably-pubsub-dotnet\src\Ably.PubSub.Device\Ably.PubSub.Device.csproj. The client constructors are internal, so clients are created through the door's `PubSubServer` or `PubSubDevice` factories.
+8. In any project that you want to use the SDK in, you need to add a project reference, to do so:
     1. Find your project in Solution Explorer and expand the tree so that the Dependencies node is visible
     2. Right click Dependencies and select Add Reference
-    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to Ably.PubSub.Core.NETFramework (or Ably.PubSub.Core, whichever you added) and click OK.
+    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to the door project you added (Ably.PubSub.Server, Ably.PubSub.Server.NETFramework or Ably.PubSub.Device) and click OK.
 
 ## Spec
 
 The dotnet library follows the Ably [Features spec](https://docs.ably.com/client-lib-development-guide/features/). To ensure it is easier to look up whether a spec item has been implemented or not; we add a Trait attribute to tests that implement parts of the spec. The convention is to add `[Trait("spec", "spec tag")]` to unit tests.
 
 To get a list of all spec items that appear in the tests you can run a script located in the tools directory.
-You need to have .NET Core 3.1 installed. It works on Mac, Linux and Windows. Run `dotnet fsi tools/list-test-categories.fsx`. It will produce a `results.csv` file which will include all spec items, which file it was found and on what line.
+You need a .NET SDK, 6.0 or later, installed. It works on Mac, Linux and Windows. Run `dotnet fsi tools/list-test-categories.fsx`. It will produce a `results.csv` file which will include all spec items, which file it was found and on what line.
 
 ## Development, Debugging and Testing
 
@@ -99,7 +100,7 @@ Integration tests run against the `nonprod:sandbox` endpoint by default. To run 
 >Important Note 
 >- If local dotnet environment + project setup is not available, please use [github codespaces](https://github.com/codespaces) instead.
 >- We have created `.devcontainer` folder at root specifying necessary dependencies for environment setup needed for release process.
->- Visit [ably-dotnet](https://github.com/ably/ably-dotnet) repo, click on `Code` button at the right corner and create codespace for current branch from `Codespaces` tab. It will take some time to create the environment. Once codespace is created for the project, you can proceed with release steps mentioned below.
+>- Visit the [ably-pubsub-dotnet](https://github.com/ably/ably-pubsub-dotnet) repo, click on `Code` button at the right corner and create codespace for current branch from `Codespaces` tab. It will take some time to create the environment. Once codespace is created for the project, you can proceed with release steps mentioned below.
 
 This library uses [semantic versioning](http://semver.org/).
 
@@ -112,7 +113,7 @@ dispatch of `publish.yml` publishes all three in the order core → device → s
 The guards are in the build, not in this document. `Release.Preflight` refuses to release unless the
 version input equals both version files, `nuget/` holds exactly the three packages, and every door pins the
 core exactly; after the pack, `Release.VerifyPackages` opens each `.nupkg` and asserts the packed pin. The
-[Release dry run](https://github.com/ably/ably-dotnet/actions/workflows/release-dry-run.yml) job runs both
+[Release dry run](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/release-dry-run.yml) job runs both
 on every pull request, so any of this being wrong is a red PR, not a bad release.
 
 For each release:
@@ -122,14 +123,14 @@ For each release:
 3. Run `./unity-plugins-updater.sh 2.0.1` (linux/mac) / `.\unity-plugins-updater.cmd 2.0.1` (windows) at root and commit the generated `.dll` and `.pdb` files. (Needs Mono or Windows.)
 4. Optionally check the release locally before pushing: `./build.sh -- --target=Release.Preflight --version=2.0.1`. Note the `--`: Cake reserves `--version` for itself, so arguments for the build script go after it. A full local pack (`./package.cmd 2.0.1`) needs Windows or Mono, because the core and server packages carry a `lib/net46` asset.
 5. Run [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator) to automate the update of the [CHANGELOG](./CHANGELOG.md). This may require some manual intervention, both in terms of how the command is run and how the change log file is modified. Your mileage may vary:
-  - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate token [here](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
+  - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-pubsub-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate token [here](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
   - The `## [2.0.0]` section of the CHANGELOG is hand-written. If the generator produces its own 2.0.0 entry, merge that generated entry into the existing hand-written one rather than letting the two duplicate.
   - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
   - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
   - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
 6. Commit this change: `git add CHANGELOG.md && git commit -m "Update change log."`.
 7. Push the branch and create a release PR (ensure you include an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers) and gain approvals for it, then merge it to the release branch. The `release-dry-run` check on that PR is the packaging gate: it packs all three packages from your commit and asserts them. Until the 2.0 integration branch merges to `main`, the release branch is `integration/v2`; after that it is `main`.
-8. **Dry run.** Dispatch the [Publish](https://github.com/ably/ably-dotnet/actions/workflows/publish.yml) workflow with `version` = the new version, `dry_run` = **true**, against the ref you just merged to:
+8. **Dry run.** Dispatch the [Publish](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/publish.yml) workflow with `version` = the new version, `dry_run` = **true**, against the ref you just merged to:
 
     ```
     gh workflow run publish.yml --ref integration/v2 -f version=2.0.1 -f dry_run=true
