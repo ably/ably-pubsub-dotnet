@@ -28,6 +28,9 @@ namespace Ably.PubSub.Server
         /// <param name="keyOrToken">
         /// A valid Ably API key (of the form <c>APP_ID.KEY_ID:KEY_SECRET</c>) or an Ably token.
         /// The core applies the same colon rule its own constructors use to tell them apart.
+        /// A server client must authenticate with an API key, or with a token that carries the
+        /// signed <c>x-ably-clientType=server</c> claim (a JWT); Ably rejects any other token
+        /// with error 40167.
         /// </param>
         /// <returns> A connected-on-demand realtime client. </returns>
         public static PubSubRealtimeClient CreateRealtimeClient(string keyOrToken)
@@ -65,6 +68,9 @@ namespace Ably.PubSub.Server
         /// <param name="keyOrToken">
         /// A valid Ably API key (of the form <c>APP_ID.KEY_ID:KEY_SECRET</c>) or an Ably token.
         /// The core applies the same colon rule its own constructors use to tell them apart.
+        /// A server client must authenticate with an API key, or with a token that carries the
+        /// signed <c>x-ably-clientType=server</c> claim (a JWT); Ably rejects any other token
+        /// with error 40167.
         /// </param>
         /// <returns> An HTTP client. </returns>
         public static PubSubHttpClient CreateHttpClient(string keyOrToken)

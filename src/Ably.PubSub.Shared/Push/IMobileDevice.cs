@@ -6,7 +6,7 @@ namespace Ably.PubSub.Push
     /// Interface for communicating with a mobile device supporting pushing notifications.
     /// </summary>
     /// <remarks>
-    /// Device push-receive is not available in Ably Pub/Sub 2.0; this type is reserved for a future release.
+    /// Device push-receive is not available in Ably Pub/Sub 2.0.
     /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
     /// </remarks>
     public interface IMobileDevice
