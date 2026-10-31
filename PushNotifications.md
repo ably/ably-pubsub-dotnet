@@ -16,7 +16,7 @@ On iOS, Ably connects to [APNs](https://developer.apple.com/library/archive/docu
 
 ## Known Limitations
  
-- Requires initialising `AblyRealtime`: Currently activating push notifications for a device requires an instance of `AblyRealtime` which gets instantiated when the application starts up. Please, submit an issue if you do not require a realtime instance and would like to use Xamarin push notifications without using an `AblyRealtime` connection. For the time being when calling `(AndroidMobileDevice|AppleMobileDevice).Initialise` please set `ClientOptions.AutoConnect` to `false` which will keep the `AblyRealtime` instance from using any resources.
+- Requires initialising `AblyRealtime`: activating push notifications for a device requires an `AblyRealtime` instance created at application start-up. When calling `(AndroidMobileDevice|AppleMobileDevice).Initialise`, set `ClientOptions.AutoConnect` to `false` so that the instance uses no resources until you connect.
 
 ## Supported platforms
 

@@ -403,8 +403,8 @@ In a device app, set the same `TransportFactory` on the `ClientOptions` you pass
 
 - Device push-receive (activating a device for push notifications on Android or iOS) is not
   available in 2.0. The API stays public: `Push.Activate()` and `Push.Deactivate()` throw an
-  `AblyException`, and the client's `Device` and a channel's `Push` are `null`. To request the feature,
-  comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See
+  `AblyException`, and the client's `Device` and a channel's `Push` are `null`. To request the
+  feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See
   [Push notifications](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications).
 - Push administration (`Push.Admin`) works, and is intended for server-side use with
   `Ably.PubSub.Server`.

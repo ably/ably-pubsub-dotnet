@@ -61,7 +61,7 @@ _More detail to follow around this._
 
 #### Debugging Tip: Enable break on exception throw
 
-To track down sporadic communication problems, enable ‘break on throw’ in your debugger. The SDK catches and retries many exceptions internally, so they don't reach the caller; breaking when they are thrown shows where they start. If you see a `NullReferenceException`, trace it back to its source and the conditions that led to it.
+To track down sporadic communication problems, enable ‘break on throw’ in your debugger. The SDK catches many exceptions internally (logging them or retrying the operation), so they don't reach the caller; breaking when they are thrown shows where they start. If you see a `NullReferenceException`, trace it back to its source and the conditions that led to it.
 
 #### Debugging Tip: Debug and Release execution traces can differ
 
@@ -79,11 +79,11 @@ Testing takes place primarily via GitHub Actions based infrastructure, here Wind
 
 At the present time it is possible for tests to transition from green to red with no code changes on the part of the SDK team. There are two reasons for this:
 
-1. **Unexpected changes to the sandbox**: These tend to occur when the sandbox either evolves ahead of the Ably API specification or improves its conformance to an existing specification point which then subsequently exposes a weak implementation on the client side, in this case within the Ably .NET SDK.
+1. **Unexpected changes to the sandbox**: These tend to occur when the sandbox either evolves ahead of the Ably API specification or improves its conformance to an existing specification point, which a client-side test then detects as a difference.
 
 2. **Uncontrolled dependency evolution**: At the present time the majority of the 3rd party Ably .NET dependencies have open dependency requirements which is to say we specify a minimum but not a maximum or even discrete list of versions against which we certify and support conformance. For example, if the Newtonsoft Json .NET library is updated it will be used by our next build and may contribute to test failures.
 
-When one or more Ably .NET test failures is observed it is worth checking against another Ably client SDK with similar capabilities to see if it is also suffering from similar failures. This is aided somewhat by the fact that tests are decorated (the specifics vary depending on the SDK) with metadata that points to the Ably Specification point the test was originally intended to verify conformance for. So, for example if it is observed that the Channel Presence tests appear to be failing for .NET then check to see if the Ably Go SDK is showing failures in the same area. It is not always enough to just check to see if the Ably Go SDK happens to be gree as this just means it was green at the time the last pull request was created, updated or merged.
+When one or more Ably .NET test failures is observed it is worth checking against another Ably client SDK with similar capabilities to see if it is also suffering from similar failures. This is aided somewhat by the fact that tests are decorated (the specifics vary depending on the SDK) with metadata that points to the Ably Specification point the test was originally intended to verify conformance for. So, for example if it is observed that the Channel Presence tests appear to be failing for .NET then check to see if the Ably Go SDK is showing failures in the same area. It is not always enough to just check to see if the Ably Go SDK happens to be green as this just means it was green at the time the last pull request was created, updated or merged.
 
 As touched upon above, the recommended hardware for replicating cross platform test failures is at least an Intel based MacBook Pro. Ideally the developer should have access to both Intel and Apple Silicon (ARM64) hardware. ARM based CLR implementations are not a 1:1 substitute for older, more mature Intel based implementations at least at the current time. You need both and will observe behavioral differences in test execution when comparing one platform against the other.
 
