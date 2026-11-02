@@ -93,6 +93,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\MessageEditSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\PublishResultSandboxSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\PublishResultSpecs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelOptionsDecodingSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelsSpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ConnectionAttemptsInfoSpecs.cs" />

@@ -407,8 +407,9 @@ In a device app, set the same `TransportFactory` on the `ClientOptions` you pass
   `AblyException`, and the client's `Device` and a channel's `Push` are `null`. To request the
   feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See
   [Push notifications](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications).
-- Push administration (`Push.Admin`) works, and is intended for server-side use with
-  `Ably.PubSub.Server`.
+- Push administration (`Push.Admin`) is available on clients from both `Ably.PubSub.Device` and
+  `Ably.PubSub.Server`. It is intended for server-side use and needs the `push-admin` capability,
+  so use it from a backend built on `Ably.PubSub.Server`.
 - Unity WebGL builds are not supported (https://github.com/ably/ably-pubsub-dotnet/issues/1211).
 
 ## Further reading

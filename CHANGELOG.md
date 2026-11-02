@@ -34,6 +34,7 @@ Ably Pub/Sub 2.0 splits the SDK into device-side and server-side packages so tha
 - Realtime channel history and realtime presence history on a channel with a `cipher` now decrypt the retrieved messages with the realtime channel's options (RTL10a, RTP12a, RSL5a), without changing the options of the `HttpClient` channel of the same name. Previously they were decrypted only if the `HttpClient` channel of the same name had been given the cipher.
 - `IRealtimeChannel.HistoryAsync(PaginatedRequestParams, bool untilAttach)` with `untilAttach: true` no longer adds `fromSerial` to the caller's `PaginatedRequestParams` (RTL10b), so the same query can be reused and `PaginatedRequestParams.Empty` is left unchanged. The attach serial replaces any `fromSerial` the caller set, where 1.x threw.
 - A server that sends a fatal `ERROR` (or `DISCONNECTED`) and then closes the socket no longer leaves the connection `CONNECTING` after `FAILED`: the transport close is handled after the command the message queued, as it was delivered. A connection that fails with a non-renewable token error also no longer appends its message to the shared `40171` error that later connections report.
+- A realtime channel now decodes the messages it receives with its current options (RTL16, RTS3c). After `SetOptions` or `Channels.Get(name, options)` changes the cipher, received messages are decrypted with the new cipher, and options without a cipher stop their decryption. Previously, received messages were still decrypted with the options the channel was created with.
 
 **Behaviour changes**
 
