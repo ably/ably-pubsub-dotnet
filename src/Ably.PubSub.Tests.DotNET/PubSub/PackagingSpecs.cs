@@ -20,7 +20,7 @@ namespace Ably.PubSub.Tests.PubSub
     ///
     /// What cannot be asserted here is the packed output: whether nuget substitutes `$version$`
     /// inside a dependency's version attribute is a property of the packer, not of the source, so
-    /// the release process in CONTRIBUTING.md checks the packed pin in the produced .nupkg files.
+    /// `_Package_Verify_NuGet` asserts the packed pin in the produced .nupkg files after every pack.
     /// </summary>
     public class PackagingSpecs
     {

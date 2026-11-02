@@ -21,7 +21,7 @@
              the core are released in lockstep, and consumers must never resolve two core
              versions. NuGet does substitute $version$ inside a dependency version attribute
              (verified: the packed pin comes out as [2.0.0]). PackagingSpecs asserts the token on
-             every PR, and the release process in CONTRIBUTING.md checks the packed pin. -->
+             every PR, and _Package_Verify_NuGet asserts the packed pin after every Package run. -->
         <dependencies>
           <group targetFramework="netstandard2.0">
             <dependency id="Ably.PubSub.Core" version="[$version$]" />

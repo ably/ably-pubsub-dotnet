@@ -121,6 +121,13 @@ from the package set at the top of `cake-build/tasks/package.cake`
 Add `--packageOutput=<dir>` to pack somewhere other than the repository root; a
 relative path is resolved against the repository root.
 
+After the pack, `Package` runs `_Package_Verify_NuGet`, which opens each produced
+`.nupkg` and asserts its version and that every dependency group of both door
+packages pins `Ably.PubSub.Core` as exactly `[<version>]`. That is the one part of
+the contract the source nuspecs cannot prove: it depends on the packer substituting
+`$version$` inside the dependency's version attribute. To check packages that are
+already packed: `./build.sh -- --target=Package.Verify --version=2.0.0 --packageOutput=<dir>`.
+
 During release process, these packages are hosted on
 [nuget.org/packages/Ably.PubSub.Server](https://www.nuget.org/packages/Ably.PubSub.Server),
 [.Device](https://www.nuget.org/packages/Ably.PubSub.Device) and

@@ -44,6 +44,87 @@ public string RequirePackageVersionArgument()
     return version;
 }
 
+// Asserts, in the produced .nupkg files, what the source nuspecs cannot prove:
+// that the packer substituted $version$ into each package's <version> and into
+// every door dependency group's Ably.PubSub.Core dependency as the exact range
+// [x.y.z]. A loose pin (x.y.z alone is a minimum) still restores against the
+// local source the package-install test uses, so only this check catches it.
+public List<string> VerifyPackedNuGetPackages(DirectoryPath packageDirectory, string packageVersion)
+{
+    var errors = new List<string>();
+    var corePackageId = nugetPackageSet["ably.pubsub.core.nuspec"];
+    var exactPin = $"[{packageVersion}]";
+
+    foreach (var packageId in nugetPackageSet.Values)
+    {
+        var nupkg = packageDirectory.CombineWithFilePath($"{packageId}.{packageVersion}.nupkg");
+        if (!FileExists(nupkg))
+        {
+            errors.Add($"{nupkg.FullPath} was not produced.");
+            continue;
+        }
+
+        System.Xml.Linq.XDocument nuspec;
+        using (var archive = System.IO.Compression.ZipFile.OpenRead(nupkg.FullPath))
+        {
+            var entry = archive.Entries.SingleOrDefault(e =>
+                !e.FullName.Contains("/") && e.FullName.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+            {
+                errors.Add($"{nupkg.GetFilename()} contains no .nuspec.");
+                continue;
+            }
+
+            using (var stream = entry.Open())
+            {
+                nuspec = System.Xml.Linq.XDocument.Load(stream);
+            }
+        }
+
+        var metadata = nuspec.Root.Elements().Single(e => e.Name.LocalName == "metadata");
+        var packedVersion = metadata.Elements().FirstOrDefault(e => e.Name.LocalName == "version")?.Value;
+        if (packedVersion != packageVersion)
+        {
+            errors.Add($"{nupkg.GetFilename()} declares version '{packedVersion}', expected '{packageVersion}'.");
+        }
+
+        if (packageId == corePackageId)
+        {
+            continue;
+        }
+
+        var groups = metadata.Descendants().Where(e => e.Name.LocalName == "group").ToList();
+        if (groups.Count == 0)
+        {
+            errors.Add($"{nupkg.GetFilename()} has no dependency groups, so it does not pin {corePackageId}.");
+        }
+
+        foreach (var group in groups)
+        {
+            var targetFramework = (string)group.Attribute("targetFramework") ?? "(any)";
+            var pins = group.Elements()
+                .Where(e => e.Name.LocalName == "dependency" &&
+                            string.Equals((string)e.Attribute("id"), corePackageId, StringComparison.OrdinalIgnoreCase))
+                .Select(e => (string)e.Attribute("version"))
+                .ToList();
+
+            if (pins.Count != 1 || pins[0] != exactPin)
+            {
+                errors.Add(
+                    $"{nupkg.GetFilename()} group {targetFramework} pins {corePackageId} as " +
+                    $"[{string.Join(", ", pins.Select(p => $"'{p}'"))}], expected exactly '{exactPin}'. Without the " +
+                    "brackets the pin is a minimum, and a consumer could resolve a core this door was not built with.");
+            }
+            else
+            {
+                Information($"  {packageId} {targetFramework}: {corePackageId} {pins[0]}");
+            }
+        }
+    }
+
+    return errors;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // PACKAGE TASKS (Internal)
 ///////////////////////////////////////////////////////////////////////////////
@@ -154,6 +235,26 @@ Task("_Package_Create_NuGet")
     }
 });
 
+Task("_Package_Verify_NuGet")
+    .Description("Assert the packed packages carry the version and each door pins the core exactly")
+    .Does(() =>
+{
+    var packageVersion = RequirePackageVersionArgument();
+    var packageDirectory = PackageOutputDirectory();
+
+    Information($"Verifying the packed packages in {packageDirectory.FullPath}");
+    var errors = VerifyPackedNuGetPackages(packageDirectory, packageVersion);
+
+    if (errors.Count > 0)
+    {
+        throw new Exception(
+            $"Packed package verification failed with {errors.Count} problem(s); do not publish these " +
+            "packages:\n\n  - " + string.Join("\n\n  - ", errors) + "\n");
+    }
+
+    Information($"All {nugetPackageSet.Count} packages are at {packageVersion}, and every door dependency group pins the core as [{packageVersion}].");
+});
+
 Task("_Package_Unity")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
@@ -214,7 +315,13 @@ Task("_Package_Unity")
 
 Task("Package")
     .Description("Create the NuGet packages (Ably.PubSub.Core, Ably.PubSub.Device, Ably.PubSub.Server)")
-    .IsDependentOn("_Package_Create_NuGet");
+    // Dependencies run in declaration order: pack, then check the packed pins.
+    .IsDependentOn("_Package_Create_NuGet")
+    .IsDependentOn("_Package_Verify_NuGet");
+
+Task("Package.Verify")
+    .Description("Check .nupkg files already in --packageOutput: version, and each door pins the core exactly")
+    .IsDependentOn("_Package_Verify_NuGet");
 
 Task("UnityPackage")
     .Description("Create Unity package")
