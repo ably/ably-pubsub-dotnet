@@ -10,6 +10,7 @@ namespace Ably.PubSub.Tests.Infrastructure
     {
         private readonly CancellationTokenSource _cancellationTokenSource;
         private TaskCompletionSource<bool> _taskCompletionSource;
+        private int _taskCount;
 
         /// <summary>
         /// Wait for task(s) to complete
@@ -26,7 +27,7 @@ namespace Ably.PubSub.Tests.Infrastructure
                 throw new ArgumentException("Must be greater than zero", nameof(taskCount));
             }
 
-            TaskCount = taskCount;
+            _taskCount = taskCount;
 
             _cancellationTokenSource = new CancellationTokenSource(TimeoutMs);
             _taskCompletionSource = new TaskCompletionSource<bool>();
@@ -48,7 +49,7 @@ namespace Ably.PubSub.Tests.Infrastructure
 
         public int TimeoutMs { get; }
 
-        public int TaskCount { get; private set; }
+        public int TaskCount => Volatile.Read(ref _taskCount);
 
         public bool TimeoutExpired { get; private set; }
 
@@ -59,8 +60,7 @@ namespace Ably.PubSub.Tests.Infrastructure
 
         public void Tick()
         {
-            TaskCount--;
-            if (TaskCount < 1)
+            if (Interlocked.Decrement(ref _taskCount) < 1)
             {
                 SetCompleted();
             }

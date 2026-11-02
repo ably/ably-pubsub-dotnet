@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Ably.PubSub.Push;
@@ -13,6 +14,7 @@ using Xunit.Abstractions;
 
 namespace Ably.PubSub.Tests.Push
 {
+    [Collection(PushTestCollection.Name)]
     public sealed class LocalDeviceTests : MockHttpRestSpecs, IDisposable
     {
         [Fact]
@@ -373,18 +375,26 @@ namespace Ably.PubSub.Tests.Push
             var stateMachine = realtime.Push.StateMachine;
             stateMachine.CurrentState = new ActivationStateMachine.WaitingForPushDeviceDetails(stateMachine);
 
-            // We trigger the GotPushDeviceDetails event
-            await stateMachine.HandleEvent(new ActivationStateMachine.GotPushDeviceDetails());
-
             // From here we expect the stateMachine to move to WaitingForDeviceRegistration and try to register the Device
             // The registration will hit our mocked rest client above and return a localDevice with a new clientId.
-            // Once the clientId is received we should expect to receive GotPushDeviceDetails event and the new clientId to be persisted
+            // Once the clientId is received we should expect to receive a second GotPushDeviceDetails event and the new clientId to be persisted.
+            // The callback must be registered BEFORE the first event is handled: the second event is raised on a background task
+            // as soon as the first HandleEvent releases its lock, so registering afterwards can miss it.
+            var processedEventCount = 0;
             realtime.Push.StateMachine.ProcessingEventCallback = @event =>
             {
                 // Check we received the correct event
                 @event.Should().BeOfType<ActivationStateMachine.GotPushDeviceDetails>();
-                taskAwaiter.Done();
+
+                // The first invocation is the event triggered by this test, the second is the one raised after the clientId change.
+                if (Interlocked.Increment(ref processedEventCount) == 2)
+                {
+                    taskAwaiter.Done();
+                }
             };
+
+            // We trigger the GotPushDeviceDetails event
+            await stateMachine.HandleEvent(new ActivationStateMachine.GotPushDeviceDetails());
 
             (await taskAwaiter).Should().BeTrue();
             mobileDevice.GetPreference(PersistKeys.Device.ClientId, PersistKeys.Device.SharedName).Should().Be(newClientId);

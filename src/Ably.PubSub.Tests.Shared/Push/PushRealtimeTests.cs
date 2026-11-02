@@ -6,6 +6,7 @@ using Xunit.Abstractions;
 
 namespace Ably.PubSub.Tests.Push
 {
+    [Collection(PushTestCollection.Name)]
     public class PushRealtimeTests : AblyRealtimeSpecs
     {
         [Fact]
@@ -32,6 +33,17 @@ namespace Ably.PubSub.Tests.Push
         public PushRealtimeTests(ITestOutputHelper output)
             : base(output)
         {
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+
+            // InitialiseStateMachine reads the client's Device, which sets the process-wide LocalDevice.Instance.
+            // Clear it, as the other push test classes in this collection do, so a later test doesn't start with a
+            // device it didn't create. It is cleared last, in case the base teardown disposes a client: that reads
+            // Device and would set it again.
+            LocalDevice.Instance = null;
         }
     }
 }

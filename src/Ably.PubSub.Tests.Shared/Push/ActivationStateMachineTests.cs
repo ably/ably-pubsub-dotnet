@@ -16,6 +16,7 @@ namespace Ably.PubSub.Tests.Push
 {
     public static class ActivationStateMachineTests
     {
+        [Collection(PushTestCollection.Name)]
         public sealed class GeneralTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -313,6 +314,7 @@ namespace Ably.PubSub.Tests.Push
             }
         }
 
+        [Collection(PushTestCollection.Name)]
         public sealed class NotActivatedStateTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -554,6 +556,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH3b")]
+        [Collection(PushTestCollection.Name)]
         public sealed class WaitingForPushDeviceDetailsTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -739,6 +742,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH3c")]
+        [Collection(PushTestCollection.Name)]
         public sealed class WaitingForDeviceRegistrationTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -868,6 +872,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH3d")]
+        [Collection(PushTestCollection.Name)]
         public sealed class WaitingForNewPushDeviceDetailsTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -1055,6 +1060,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH3e")]
+        [Collection(PushTestCollection.Name)]
         public sealed class WaitingForRegistrationSync : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -1225,6 +1231,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH3f")]
+        [Collection(PushTestCollection.Name)]
         public sealed class AfterRegistrationSyncFailedTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
@@ -1348,6 +1355,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH3g")]
+        [Collection(PushTestCollection.Name)]
         public sealed class WaitingForDeregistrationTests : MockHttpRestSpecs, IDisposable
         {
             [Fact]
