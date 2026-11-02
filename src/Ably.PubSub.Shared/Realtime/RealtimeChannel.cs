@@ -97,7 +97,17 @@ namespace Ably.PubSub.Realtime
         public ChannelOptions Options
         {
             get => _options;
-            set => _options = value ?? new ChannelOptions();
+            set
+            {
+                _options = value ?? new ChannelOptions();
+
+                // RTL16: received messages are decoded with the channel's current options. Update the
+                // context in place: it also holds the delta base payload (RTL19), which must survive.
+                if (MessageDecodingContext != null)
+                {
+                    MessageDecodingContext.ChannelOptions = _options;
+                }
+            }
         }
 
         public ReadOnlyChannelParams Params { get; internal set; } = new ReadOnlyChannelParams(new Dictionary<string, string>());
@@ -150,7 +160,7 @@ namespace Ably.PubSub.Realtime
         {
             Name = name;
             Options = options;
-            MessageDecodingContext = new DecodingContext(options);
+            MessageDecodingContext = new DecodingContext(Options);
             Presence = new Presence(realtimeClient.ConnectionManager, this, clientId, Logger);
             Annotations = new RealtimeAnnotations(this);
             RealtimeClient = realtimeClient;
