@@ -37,12 +37,14 @@ namespace Ably.PubSub.MessageEncoders
                     return Result.Fail<ProcessedPayload>(new VcDiffErrorInfo("Missing previous payload"));
                 }
 
-                var result = DeltaDecoder.ApplyDelta(previousPayload, payloadBytes);
+                var result = context.DeltaDecoder != null
+                    ? context.DeltaDecoder(previousPayload, payloadBytes)
+                    : DeltaDecoder.ApplyDelta(previousPayload, payloadBytes).AsByteArray();
                 var nextEncoding = RemoveCurrentEncodingPart(payload);
 
-                context.PreviousPayload = new PayloadCache(result.AsByteArray(), nextEncoding);
+                context.PreviousPayload = new PayloadCache(result, nextEncoding);
                 return Result.Ok(new ProcessedPayload(
-                    result.AsByteArray(),
+                    result,
                     RemoveCurrentEncodingPart(payload)));
             }
             catch (Exception ex)

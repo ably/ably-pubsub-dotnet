@@ -10,6 +10,10 @@ namespace Ably.PubSub
         private ChannelModes _modes = new ChannelModes();
         private ChannelParams _params = new ChannelParams();
 
+        /// <summary>
+        /// Gets or sets the logger explicitly chosen for the channel. Null (the default) means the channel logs through the
+        /// logger of the client that owns it; the message encoders, which have no client, fall back to the default logger.
+        /// </summary>
         internal ILogger Logger { get; set; }
 
         /// <summary>
@@ -48,7 +52,7 @@ namespace Ably.PubSub
         /// </summary>
         /// <param name="params"><see cref="Ably.PubSub.CipherParams"/>.</param>
         public ChannelOptions(CipherParams @params)
-            : this(DefaultLogger.LoggerInstance, true, @params) { }
+            : this(null, true, @params) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChannelOptions"/> class.
@@ -71,7 +75,7 @@ namespace Ably.PubSub
             ChannelModes modes = null,
             ChannelParams channelParams = null)
         {
-            Logger = logger ?? DefaultLogger.LoggerInstance;
+            Logger = logger;
             Encrypted = encrypted;
             CipherParams = @params ?? Crypto.GetDefaultParams();
             Modes = modes;
@@ -84,7 +88,6 @@ namespace Ably.PubSub
         /// <param name="key">cipher key.</param>
         public ChannelOptions(byte[] key)
         {
-            Logger = DefaultLogger.LoggerInstance;
             Encrypted = true;
             CipherParams = new CipherParams(key);
         }

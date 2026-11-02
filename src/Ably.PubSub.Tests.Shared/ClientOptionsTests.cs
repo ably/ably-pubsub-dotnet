@@ -33,6 +33,58 @@ namespace Ably.PubSub.Tests.Shared
         }
 
         [Fact]
+        [Trait("spec", "TO3k6")]
+        public void FallbackHosts_WhenUnset_ReadsNull()
+        {
+            var options = new ClientOptions { Endpoint = "acme" };
+
+            options.FallbackHosts.Should().BeNull();
+            options.GetFallbackHosts().Should().Equal(Defaults.GetEndpointFallbackHosts("acme"));
+        }
+
+        [Fact]
+        [Trait("spec", "TO3k6")]
+        public void FallbackHosts_WhenSet_ReadsTheHostsThatWereSet()
+        {
+            var hosts = new[] { "custom-fallback1.ably.com", "custom-fallback2.ably.com" };
+            var options = new ClientOptions { FallbackHosts = hosts };
+
+            options.FallbackHosts.Should().BeSameAs(hosts);
+            options.GetFallbackHosts().Should().Equal(hosts).And.NotBeSameAs(hosts);
+        }
+
+        [Fact]
+        [Trait("spec", "TO3k6")]
+        public void FallbackHosts_WhenSetToEmpty_ReadsEmpty()
+        {
+            var options = new ClientOptions { FallbackHosts = new string[0] };
+
+            options.FallbackHosts.Should().BeEmpty();
+        }
+
+        [Fact]
+        [Trait("spec", "TO3k6")]
+        public void FallbackHosts_WhenResetToNull_RestoresTheDefaults()
+        {
+            var options = new ClientOptions { FallbackHosts = new[] { "custom-fallback.ably.com" } };
+
+            options.FallbackHosts = null;
+
+            options.FallbackHosts.Should().BeNull();
+            options.GetFallbackHosts().Should().Equal(Defaults.FallbackHosts);
+        }
+
+        [Fact]
+        [Trait("spec", "TO3k6")]
+        public void Clone_CarriesFallbackHosts()
+        {
+            var options = new ClientOptions { FallbackHosts = new[] { "custom-fallback.ably.com" } };
+
+            options.Clone().FallbackHosts.Should().Equal("custom-fallback.ably.com");
+            new ClientOptions().Clone().FallbackHosts.Should().BeNull();
+        }
+
+        [Fact]
         [Trait("spec", "REC2a2")]
         public void Options_WithCustomFallbackHosts_UsesThem()
         {

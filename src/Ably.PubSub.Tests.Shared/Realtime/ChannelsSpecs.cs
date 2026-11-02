@@ -5,6 +5,8 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 
+using Ably.PubSub.AcceptanceTests;
+using Ably.PubSub.Encryption;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Types;
 
@@ -326,6 +328,67 @@ namespace Ably.PubSub.Tests.Realtime
 
             Assert.Equal(options.ToJson(), channel2.Options.ToJson());
             options.CipherParams.Equals(cipherParams).Should().BeTrue();
+        }
+
+        public static IEnumerable<object[]> PublicChannelOptions => new[]
+        {
+            new object[] { "none", null },
+            new object[] { "default", new ChannelOptions() },
+            new object[] { "modes", new ChannelOptions(modes: new ChannelModes(ChannelMode.Subscribe)) },
+            new object[] { "cipher params", new ChannelOptions(Crypto.GetDefaultParams()) },
+            new object[] { "cipher key", new ChannelOptions(Crypto.GenerateRandomKey()) },
+        };
+
+        [Theory]
+        [MemberData(nameof(PublicChannelOptions))]
+        [Trait("spec", "RTS3a")]
+        [Trait("spec", "RTS3b")]
+        public async Task Get_ShouldReturnAChannelThatLogsThroughTheClientLogger(string description, ChannelOptions options)
+        {
+            var clientLogger = InternalLogger.Create(LogLevel.Warning, new TestLoggerSink());
+            var client = await GetConnectedClient(o => o.Logger = clientLogger);
+
+            var channel = (RealtimeChannel)client.Channels.Get("logger-" + description, options);
+
+            channel.Logger.Should().BeSameAs(clientLogger);
+            channel.Presence.Logger.Should().BeSameAs(clientLogger);
+        }
+
+        [Fact]
+        [Trait("spec", "RTS3b")]
+        public async Task Get_WithOptionsCarryingAnExplicitLogger_ShouldKeepThatLogger()
+        {
+            var channelLogger = InternalLogger.Create(LogLevel.Warning, new TestLoggerSink());
+            var client = await GetConnectedClient(o => o.Logger = InternalLogger.Create(LogLevel.Warning, new TestLoggerSink()));
+
+            var channel = (RealtimeChannel)client.Channels.Get("test", new ChannelOptions(channelLogger));
+
+            channel.Logger.Should().BeSameAs(channelLogger);
+            channel.Presence.Logger.Should().BeSameAs(channelLogger);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        [Trait("spec", "RTAN4e")]
+        public async Task AnnotationSubscribeWarning_ShouldReachTheClientLogSink(bool withOptions)
+        {
+            var sink = new TestLoggerSink();
+            var client = await GetConnectedClient(o => o.Logger = InternalLogger.Create(LogLevel.Warning, sink));
+            var channelName = "rtan4e-" + Guid.NewGuid().ToString("N");
+            var channel = withOptions
+                ? client.Channels.Get(channelName, new ChannelOptions(modes: new ChannelModes(ChannelMode.Subscribe)))
+                : client.Channels.Get(channelName);
+
+            channel.Annotations.Subscribe(_ => { });
+            client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached, channelName)
+            {
+                Flags = (int)(ProtocolMessage.Flag.Subscribe | ProtocolMessage.Flag.Publish),
+            });
+            await client.ProcessCommands();
+
+            channel.State.Should().Be(ChannelState.Attached);
+            sink.Messages.Should().Contain(x => x.StartsWith("Warning") && x.Contains(channelName) && x.Contains("AnnotationSubscribe"));
         }
     }
 }
