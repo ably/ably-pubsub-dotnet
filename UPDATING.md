@@ -80,7 +80,7 @@ using IO.Ably.Rest;             using Ably.PubSub.Http;
 
 Sub-namespaces map one-to-one, with one deliberate exception: `IO.Ably.Rest` becomes `Ably.PubSub.Http` (matching the [type renames](#renamed-types)). The door factories are new in 2.0 and live in `Ably.PubSub.Device` and `Ably.PubSub.Server`.
 
-Because v1 keeps `IO.Ably.*` and v2 lives under `Ably.PubSub.*`, the two no longer share any type names (except the internal delta-decoding helper `IO.Ably.DeltaCodec.dll`, which keeps its namespace and is unified as one assembly) — see [Do not mix 1.x and 2.0](#do-not-mix-1x-and-20-in-one-project) for what that does and does not buy you.
+Because v1 keeps `IO.Ably.*` and v2 lives under `Ably.PubSub.*`, the two no longer share any type names (except the internal delta-decoding helper `IO.Ably.DeltaCodec.dll`, which keeps its namespace and is unified as one assembly; on .NET Framework, 2.0 builds it into `Ably.PubSub.Core.dll`, so it isn't shared there) — see [Do not mix 1.x and 2.0](#do-not-mix-1x-and-20-in-one-project) for what that does and does not buy you.
 
 ## Renamed types
 
@@ -219,13 +219,34 @@ realtime.Channels.Release("my-channel");
 
 ## Do not mix 1.x and 2.0 in one project
 
-With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`, apart from the shared delta-decoding helper `IO.Ably.DeltaCodec.dll`) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.
+With the namespace move, `ably.io` (all types under `IO.Ably.*`) and `Ably.PubSub.*` (all types under `Ably.PubSub.*`, apart from the delta-decoding helper `IO.Ably.DeltaCodec.dll`, which they share everywhere except on .NET Framework) **no longer collide**: a project that resolves both — even transitively, through a library that still depends on `ably.io` 1.x — compiles side-by-side, with each package's types unambiguous. A dependency that has not migrated yet no longer blocks your own migration.
 
 Do not settle into a mixed graph, though. Two SDKs in one process means two independent realtime connections and two token flows, and v1 clients carry no device/server classification, so they receive the 1.x billing treatment. A library's v1 types (`IO.Ably.Message`, …) are also distinct from your v2 types (`Ably.PubSub.Message`, …) — values crossing that boundary must be converted explicitly. Migrate the remaining `ably.io` consumers when you can; use `dotnet nuget why <project> ably.io` to find them.
 
 ## Pin the door and the core at the same version
 
 `Ably.PubSub.Device` and `Ably.PubSub.Server` depend on `Ably.PubSub.Core` with an **exact** version range (e.g. `[2.0.0]`), so restoring a door restores exactly the matching core. Do not add a separate `Ably.PubSub.Core` reference at a different version — keep the whole set on one version.
+
+## Newtonsoft.Json on .NET Framework
+
+In 1.x, the .NET Framework and Xamarin builds of `ably.io` carried a private copy of `Newtonsoft.Json`. In 2.0 the NuGet packages depend on the `Newtonsoft.Json` package, version 13.0.1 or later, on every platform. (The Unity package still bundles its own copy.)
+
+- **Your app uses `Newtonsoft.Json` 13.x:** nothing to do.
+- **Your project references an older version:** restore fails with `NU1605: Detected package downgrade`. Update the reference to 13.0.1 or later.
+- **Another library in your app was built against an older version:** .NET Framework needs a binding redirect to 13.0.0.0. Without one you get `FileLoadException: Could not load file or assembly 'Newtonsoft.Json, Version=…'`.
+  - Apps get it automatically when they're built (`AutoGenerateBindingRedirects`, on by default for .NET Framework 4.5.1+ apps).
+  - Web apps: add it to `web.config` when Visual Studio prompts you.
+  - Test projects: `Microsoft.NET.Test.Sdk` already sets this up. Without it, set `AutoGenerateBindingRedirects` and `GenerateBindingRedirectsOutputType` to `true`.
+  - Plug-ins inside a host that owns the configuration file (for example Revit/AutoCAD, SSIS or Windows PowerShell 5.1 modules) usually can't add one, and can get `FileLoadException` if the host, another plug-in or one of their own libraries uses a `Newtonsoft.Json` older than 13.
+
+  ```xml
+  <dependentAssembly>
+    <assemblyIdentity name="Newtonsoft.Json" publicKeyToken="30ad4fe6b2a6aeed" culture="neutral" />
+    <bindingRedirect oldVersion="0.0.0.0-13.0.0.0" newVersion="13.0.0.0" />
+  </dependentAssembly>
+  ```
+
+- Your own `JObject` and `JToken` values now work directly with `DeviceDetails.Metadata`, `Request(...)`, `HttpPaginatedResponse.Items` and `Push.Admin.PublishAsync`.
 
 ## Push notifications
 
