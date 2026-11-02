@@ -177,13 +177,14 @@ namespace Ably.PubSub.Realtime.Workflow
 
         public JObject WhatDoIHave()
         {
+            var serializer = JsonHelper.GetPlainSerializer();
             var stateJson = new JObject
             {
-                ["connection"] = JObject.FromObject(Connection),
-                ["pings"] = JArray.FromObject(PingRequests),
-                ["attempts"] = JObject.FromObject(AttemptsInfo),
-                ["pendingMessages"] = JArray.FromObject(PendingMessages),
-                ["waitingForAck"] = JArray.FromObject(WaitingForAck),
+                ["connection"] = JObject.FromObject(Connection, serializer),
+                ["pings"] = JArray.FromObject(PingRequests, serializer),
+                ["attempts"] = JObject.FromObject(AttemptsInfo, serializer),
+                ["pendingMessages"] = JArray.FromObject(PendingMessages, serializer),
+                ["waitingForAck"] = JArray.FromObject(WaitingForAck, serializer),
             };
             return stateJson;
         }

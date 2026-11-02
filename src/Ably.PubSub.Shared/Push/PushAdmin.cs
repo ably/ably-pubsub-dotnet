@@ -88,7 +88,7 @@ namespace Ably.PubSub.Push
                     var response = await _restClient.ExecuteRequest(request);
 
                     var jsonResponse = JObject.Parse(response.TextResponse);
-                    var localDevice = jsonResponse.ToObject<LocalDevice>();
+                    var localDevice = jsonResponse.ToObject<LocalDevice>(JsonHelper.GetPlainSerializer());
                     var deviceToken = (string)jsonResponse["deviceIdentityToken"]?["token"];
                     if (deviceToken != null)
                     {
@@ -118,10 +118,12 @@ namespace Ably.PubSub.Push
         /// <param name="details">Device details which contain the update.</param>
         internal async Task PatchDeviceRecipient(DeviceDetails details)
         {
-            var body = JObject.FromObject(new
-            {
-                push = new { recipient = details.Push.Recipient },
-            });
+            var body = JObject.FromObject(
+                new
+                {
+                    push = new { recipient = details.Push.Recipient },
+                },
+                JsonHelper.GetPlainSerializer());
 
             ValidateDeviceDetails();
             var request = _restClient.CreateRequest($"/push/deviceRegistrations/{details.Id}", new HttpMethod("PATCH"));
