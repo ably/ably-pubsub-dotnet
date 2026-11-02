@@ -137,7 +137,6 @@ namespace Ably.PubSub.Http
 
         /// <summary>
         /// Publishes, deletes and retrieves annotations of the messages on this channel (RSL10).
-        /// Experimental: the annotations API may change.
         /// </summary>
         HttpAnnotations Annotations { get; }
 

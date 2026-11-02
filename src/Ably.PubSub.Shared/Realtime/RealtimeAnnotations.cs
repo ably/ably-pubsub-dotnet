@@ -9,7 +9,6 @@ namespace Ably.PubSub.Realtime
     /// <summary>
     /// Publishes, deletes, retrieves and subscribes to the annotations of the messages on a realtime channel (RTL26).
     /// Accessed through <see cref="IRealtimeChannel.Annotations"/>.
-    /// Experimental: the annotations API may change.
     /// </summary>
     public sealed class RealtimeAnnotations : IDisposable
     {

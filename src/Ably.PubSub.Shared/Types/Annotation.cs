@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 namespace Ably.PubSub
 {
     /// <summary>
-    /// An annotation on a message (TAN1). Experimental: the annotations API may change.
+    /// An annotation on a message (TAN1).
     /// </summary>
     [DebuggerDisplay("{ToString()}")]
     public class Annotation : IMessage

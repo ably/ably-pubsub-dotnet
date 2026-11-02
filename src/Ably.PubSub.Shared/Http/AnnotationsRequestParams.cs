@@ -4,7 +4,6 @@ namespace Ably.PubSub
 {
     /// <summary>
     /// Parameters for <see cref="Http.HttpAnnotations.GetAsync(string, AnnotationsRequestParams)"/> (RSAN3a).
-    /// Experimental: the annotations API may change.
     /// </summary>
     public class AnnotationsRequestParams
     {
