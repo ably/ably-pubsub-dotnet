@@ -99,71 +99,174 @@ Integration tests run against the `nonprod:sandbox` endpoint by default. To run 
 >Important Note 
 >- If local dotnet environment + project setup is not available, please use [github codespaces](https://github.com/codespaces) instead.
 >- We have created `.devcontainer` folder at root specifying necessary dependencies for environment setup needed for release process.
->- Visit [ably-dotnet](https://github.com/ably/ably-dotnet) repo, click on `Code` button at the right corner and create codespace for current branch from `Codespaces` tab. It will take some time to create the environment. Once codespace is created for the project, you can proceed with release steps mentioned below.
+>- Visit the [ably-pubsub-dotnet](https://github.com/ably/ably-pubsub-dotnet) repo, click on `Code` button at the right corner and create codespace for current branch from `Codespaces` tab. It will take some time to create the environment. Once codespace is created for the project, you can proceed with release steps mentioned below.
 
 This library uses [semantic versioning](http://semver.org/).
 
 **`Ably.PubSub.Core`, `Ably.PubSub.Device` and `Ably.PubSub.Server` are released together, always, at one
 version.** Each door package declares an exact dependency on `[<that version>]` of the core, so a door
 released without its core, or at a different version from it, is unresolvable for consumers. There is
-therefore no such thing as releasing one of the three: one version number is bumped in one commit, and one
-dispatch of `publish.yml` publishes all three in the order core → device → server.
+therefore no such thing as releasing one of the three: one version number is bumped in one commit, one run of
+the [Package ably](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/package.yml) workflow packs all
+three, and you push them to nuget.org by hand, core first.
 
-The guards are in the build, not in this document. `Release.Preflight` refuses to release unless the
-version input equals both version files, `nuget/` holds exactly the three packages, and every door pins the
-core exactly; after the pack, `Release.VerifyPackages` opens each `.nupkg` and asserts the packed pin. The
-[Release dry run](https://github.com/ably/ably-dotnet/actions/workflows/release-dry-run.yml) job runs both
-on every pull request, so any of this being wrong is a red PR, not a bad release.
+What checks this before you publish:
 
-For each release:
+- `PackagingSpecs`, in the unit tests on every pull request, asserts the nuspec contract: exactly these three
+  packages, each taking its version from the pack input, every door dependency group pinning the core as
+  `[$version$]`, no dependency on the 1.x `ably.io` packages, and the two version files agreeing.
+- The package-install test (`Test.PackageConsumption`) packs the three packages and installs them into small
+  .NET Framework and .NET apps the way a customer would, on every pull request: on the .NET Framework CLR in
+  the Windows (NetFramework) workflow and on Mono in the macOS (Mono) workflow. `package.yml` runs it again on
+  the exact packages it uploads.
+- The manual checks in step 9 below, on the packages you are about to push.
 
-1. Create a branch for the release, named like release/2.0.1 (where 2.0.1 is the new version number).
-2. Replace all references of the current version number with the new version number and commit the changes. There are exactly two files: `src/CommonAssemblyInfo.cs` (all three assembly version attributes) and `unity/Assets/Ably/version.txt`. Every nuspec takes its version, and each door its core pin, from the release input, so nothing else is edited.
-3. Run `./unity-plugins-updater.sh 2.0.1` (linux/mac) / `.\unity-plugins-updater.cmd 2.0.1` (windows) at root and commit the generated `.dll` and `.pdb` files. (Needs Mono or Windows.)
-4. Optionally check the release locally before pushing: `./build.sh -- --target=Release.Preflight --version=2.0.1`. Note the `--`: Cake reserves `--version` for itself, so arguments for the build script go after it. A full local pack (`./package.cmd 2.0.1`) needs Windows or Mono, because the core and server packages carry a `lib/net46` asset.
-5. Run [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator) to automate the update of the [CHANGELOG](./CHANGELOG.md). This may require some manual intervention, both in terms of how the command is run and how the change log file is modified. Your mileage may vary:
-  - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate token [here](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
-  - The `## [2.0.0]` section of the CHANGELOG is hand-written. If the generator produces its own 2.0.0 entry, merge that generated entry into the existing hand-written one rather than letting the two duplicate.
-  - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
-  - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
-  - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
-6. Commit this change: `git add CHANGELOG.md && git commit -m "Update change log."`.
-7. Push the branch and create a release PR (ensure you include an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers) and gain approvals for it, then merge it to the release branch. The `release-dry-run` check on that PR is the packaging gate: it packs all three packages from your commit and asserts them. Until the 2.0 integration branch merges to `main`, the release branch is `integration/v2`; after that it is `main`.
-8. **Dry run.** Dispatch the [Publish](https://github.com/ably/ably-dotnet/actions/workflows/publish.yml) workflow with `version` = the new version, `dry_run` = **true**, against the ref you just merged to:
+### Prerequisites (once)
 
+- A nuget.org account that is a member of the `ably-realtime` organization, which owns the packages. Before
+  the first 2.0 release, request the [ID prefix reservation](https://learn.microsoft.com/en-us/nuget/nuget-org/id-prefix-reservation)
+  of `Ably.PubSub.` for that organization.
+- A nuget.org API key for the release: owner `ably-realtime`, scope **Push new packages and package
+  versions**, glob pattern `Ably.PubSub.*`, and a short expiry. Keep it in the team password manager, never in
+  the repository or its secrets.
+- The [GitHub CLI](https://cli.github.com/) (`gh`), signed in, and a .NET 6 or later SDK.
+- Windows, or Mono on macOS/Linux, to run the package-install test locally (step 9).
+
+### Steps
+
+The shell examples use `VERSION=2.0.1`; set it to the version being released.
+
+1. Create a branch for the release, named like `release/2.0.1`. Until the 2.0 integration branch merges to `main`, the release branch is `integration/v2`; after that it is `main`. The 2.0 docs must be on `main` before the packages are published, because the package README links to `https://github.com/ably/ably-pubsub-dotnet/blob/main/...`.
+2. Bump the version and commit:
+    - `src/CommonAssemblyInfo.cs`: `AssemblyVersion` and `AssemblyFileVersion` take the numeric part only (`2.0.1`), and `AssemblyInformationalVersion` takes the full version, including any prerelease label (`2.0.1-rc.1`).
+    - `unity/Assets/Ably/version.txt`.
+    - The `PackageReference Version="..."` examples in `README.md`.
+    - If the year has changed, the `<copyright>` year in the three nuspecs under `nuget/`.
+
+    Don't edit the nuspec versions or the door pins: they come from `$version$`, the version the packages are packed at.
+3. Regenerate the Unity plugin **after** the bump: run `./unity-plugins-updater.sh 2.0.1` (needs Mono) or `.\unity-plugins-updater.cmd 2.0.1` at the root. It builds from the committed `src/CommonAssemblyInfo.cs`, and also rewrites `unity/Assets/Ably/version.txt`. Commit the regenerated `unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll`. Check that its product version is the new version, e.g. in PowerShell: `(Get-Item unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll).VersionInfo.ProductVersion`.
+4. Run [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator) to automate the update of the [CHANGELOG](./CHANGELOG.md). This may require some manual intervention, both in terms of how the command is run and how the change log file is modified. Your mileage may vary:
+    - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-pubsub-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate a token in [GitHub personal access token settings](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
+    - The `## [2.0.0]` section of the CHANGELOG is hand-written. If the generator produces its own 2.0.0 entry, merge that generated entry into the existing hand-written one rather than letting the two duplicate.
+    - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
+    - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
+    - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
+
+    Commit this change: `git add CHANGELOG.md && git commit -m "Update change log."`.
+5. Check the build and the packaging contract locally: `./build.sh --target=Build.NetStandard`, then `./build.sh --target=Test.NetStandard.Unit.WithRetry --framework=net6.0`. `PackagingSpecs` fails if the two version files disagree or a door pin has been loosened.
+6. Push the branch and create a release PR (ensure you include an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers) and gain approvals for it, then merge it to the release branch. The PR's checks include the package-install test on the .NET Framework CLR and on Mono.
+7. **Package.** Dispatch the [Package ably](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/package.yml) workflow on the release branch, with the new version (or use `Run workflow` in the Actions tab):
+
+    ```shell
+    VERSION=2.0.1
+    gh workflow run package.yml --ref main -f version="$VERSION"
+    # Give the run a few seconds to appear, then:
+    RUN_ID=$(gh run list --workflow package.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
+    gh run watch "$RUN_ID" --exit-status
     ```
-    gh workflow run publish.yml --ref integration/v2 -f version=2.0.1 -f dry_run=true
+
+    Use `--ref integration/v2` and `--branch integration/v2` while that is the release branch. Every job must succeed. The workflow publishes nothing.
+8. **Download** the merged artifact:
+
+    ```shell
+    gh run download "$RUN_ID" -n output-package -D "release-$VERSION"
+    ls "release-$VERSION"
+    shasum -a 256 "release-$VERSION"/*
     ```
 
-    (Or use `Run workflow` in the Actions tab. `workflow_dispatch` reads the workflow file from the default branch but runs it against the ref you choose.) This builds, packs, asserts and prints exactly what it would push, and pushes nothing. Read the output.
-9. **Publish.** Dispatch the same workflow again with `dry_run` = **false**. It publishes core → device → server, waiting for the core version to be listed on nuget.org before the doors that pin it go out, skipping any version already published, and then creates the `2.0.1` tag and GitHub release with the three `.nupkg` files and the `.unitypackage` attached. No API key is involved: the workflow authenticates with nuget.org Trusted Publishing over GitHub OIDC.
-    - **If it fails partway, re-run it with the same version.** Every push is skipped if that version is already on nuget.org, and the GitHub release is created only if it does not already exist, so a re-run completes the release instead of duplicating it. Do not push anything by hand.
-    - **If the release has to be abandoned:** NuGet cannot delete a published version and the number can never be reused. The workflow prints the `dotnet nuget delete` commands that *unlist* each package (doors first, then the core), and then a new version has to be released.
-10. Create the entry on the [Ably Changelog](https://changelog.ably.com/) (via [headwayapp](https://headwayapp.co/)).
+    It holds exactly `Ably.PubSub.Core.$VERSION.nupkg`, `Ably.PubSub.Device.$VERSION.nupkg`, `Ably.PubSub.Server.$VERSION.nupkg` and `ably.pubsub.$VERSION.unitypackage`. The SHA-256 values must match the ones the run printed in its "Merge artifacts into single directory" step. Run the commands in this and the next steps from the repository root, on the release commit. Don't commit the download directory; delete it after the release.
+9. **Verify the packages before pushing anything:**
+    1. **Version:** every file name carries the version, and it equals `AssemblyInformationalVersion` in `src/CommonAssemblyInfo.cs` on the release commit.
+    2. **Exact core pin:** for each door package,
 
-### nuget.org Trusted Publishing setup
+        ```shell
+        unzip -p "release-$VERSION/Ably.PubSub.Device.$VERSION.nupkg" Ably.PubSub.Device.nuspec | grep -E '<version>|<group|<dependency'
+        unzip -p "release-$VERSION/Ably.PubSub.Server.$VERSION.nupkg" Ably.PubSub.Server.nuspec | grep -E '<version>|<group|<dependency'
+        ```
 
-`publish.yml` has no long-lived NuGet API key. It exchanges a GitHub OIDC token for an API key valid for one
-hour, via the [`NuGet/login`](https://github.com/NuGet/login) action, immediately before pushing. This
-requires a one-time setup on nuget.org, which someone who can administer the packages' owning account has to do:
+        Every `<group>` must contain `<dependency id="Ably.PubSub.Core" version="[2.0.1]" />`, **with the square brackets**: without them the pin is a minimum. `<version>` must be the release version, and nothing may depend on `ably.io`.
+    3. **Contents:** `unzip -l` each package. Each has `README.md` and `icon.png` at the root, and these `lib/<tfm>` folders, as declared in the nuspecs under `nuget/`:
+        - `Ably.PubSub.Core`: `lib/net46`, `lib/netstandard2.0`, `lib/net6.0` and `lib/net7.0`, each with `Ably.PubSub.Core.dll` and `IO.Ably.DeltaCodec.dll`;
+        - `Ably.PubSub.Device`: `lib/netstandard2.0`, `lib/net6.0` and `lib/net7.0`, each with `Ably.PubSub.Device.dll`;
+        - `Ably.PubSub.Server`: `lib/net46`, `lib/netstandard2.0`, `lib/net6.0` and `lib/net7.0`, each with `Ably.PubSub.Server.dll`.
+    4. **Strong name:** every `Ably.PubSub.*.dll` in the three packages has the public key token `70c9e5c3d2c68b16`. The core grants the doors access to its internals by that key, so a mismatch breaks them at runtime. In PowerShell 7 (`pwsh`):
 
-- Sign in to nuget.org → your username → **Trusted Publishing** → add a policy, owned by the account (or
-  organization) that owns the `Ably.PubSub.*` package ids, with **Repository Owner** `ably`, **Repository**
-  the name of this repository, and **Workflow File** `publish.yml` (the file name only, not the path). The
-  workflow runs its publish job in the **`release` GitHub environment** (that environment, configured with
-  required reviewers, is the human approval gate); the policy's **Environment** field can be set to
-  `release` to pin it, or left empty — an empty field matches any environment.
-- Set the policy's **scope** to allow publishing new packages as well as new versions, with a glob covering
-  `Ably.PubSub.*`. A policy does not require the package to exist already: the "new packages" scope is how
-  the first version of a brand-new id is published, which is what claims the name.
-- Add a repository secret `NUGET_USER` holding the nuget.org **username** (the profile name, not an email
-  address). It is not a credential; it is a secret only to keep the account name out of public logs.
-- A policy on a private repository starts out *temporarily active* for 7 days and becomes permanent on the
-  first successful publish, because nuget.org needs the repository and owner IDs from a real token to lock
-  the policy against repository-resurrection attacks.
-- The policy matches the repository by **name**, so it must be created (or re-created) **after** any rename
-  of this repository.
+        ```powershell
+        $v = '2.0.1'
+        Remove-Item -Recurse -Force "release-$v/unpacked" -ErrorAction SilentlyContinue
+        Get-ChildItem "release-$v/*.nupkg" | ForEach-Object {
+            [IO.Compression.ZipFile]::ExtractToDirectory($_.FullName, (Join-Path "release-$v/unpacked" $_.BaseName))
+        }
+        Get-ChildItem "release-$v/unpacked" -Recurse -Filter 'Ably.PubSub.*.dll' | ForEach-Object {
+            $token = [Reflection.AssemblyName]::GetAssemblyName($_.FullName).GetPublicKeyToken()
+            '{0}  {1}' -f (($token | ForEach-Object { $_.ToString('x2') }) -join ''), $_.FullName.Substring($PWD.Path.Length + 1)
+        }
+        ```
 
-To fall back to a long-lived API key instead: delete the `NuGet login` step in `publish.yml`, drop
-`id-token: write` from that job's permissions, add a `NUGET_API_KEY` repository secret, and use it in the
-push step. The workflow says so at the top, in a comment next to the step.
+    5. **Package-install test on the downloaded packages:** `package.yml` already ran it on Windows. Run it again on your machine, against the files you are about to push (on macOS/Linux this needs Mono):
+
+        ```shell
+        ./build.sh -- --target=Test.PackageConsumption.NoPack --version="$VERSION" --packageOutput="release-$VERSION"
+        ```
+
+        On Windows: `.\build.cmd -- --target=Test.PackageConsumption.NoPack --version=2.0.1 --packageOutput=release-2.0.1`. A relative `--packageOutput` is resolved against the repository root. All eight cases must pass.
+    6. **README:** the `README.md` in each package is the repository README at the release commit, e.g. `unzip -p "release-$VERSION/Ably.PubSub.Core.$VERSION.nupkg" README.md | diff --strip-trailing-cr - README.md` (the packages are packed on Windows, so their README has CRLF line endings), and its absolute links to `https://github.com/ably/ably-pubsub-dotnet/blob/main/...` resolve.
+    7. **Unity:** the `.unitypackage` carries the version in its name, and the plugin it bundles (the committed `unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll`) has that product version (step 3).
+10. **Push the core alone first.** One file at a time, never a glob such as `Ably.PubSub.*.nupkg`, which would push the doors without waiting for the core:
+
+    ```shell
+    read -rs NUGET_API_KEY  # paste the key; it is not echoed
+    dotnet nuget push "release-$VERSION/Ably.PubSub.Core.$VERSION.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+    ```
+
+11. **Wait until the core is indexed** on nuget.org. A door pinned to a core version that isn't indexed yet can't be restored. This can take several minutes:
+
+    ```shell
+    until curl -fsS https://api.nuget.org/v3-flatcontainer/ably.pubsub.core/index.json | grep -q "\"$VERSION\""; do sleep 30; done
+    ```
+
+    Also check that the [package page](https://www.nuget.org/packages/Ably.PubSub.Core) shows the version as validated.
+12. **Push the device package, then the server package**, one at a time, with the same command:
+
+    ```shell
+    dotnet nuget push "release-$VERSION/Ably.PubSub.Device.$VERSION.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+    dotnet nuget push "release-$VERSION/Ably.PubSub.Server.$VERSION.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+    ```
+
+    If a push fails partway, carry on from the first package that isn't on nuget.org yet. Pushing a version that is already there is rejected; it never overwrites.
+13. **Confirm** that all three packages are listed at the new version on nuget.org, and that each door's dependencies show `Ably.PubSub.Core (= 2.0.1)`.
+14. **Tag the packaged commit and create the GitHub release** with the `.unitypackage` attached:
+
+    ```shell
+    git fetch origin
+    git tag "$VERSION" "$(gh run view "$RUN_ID" --json headSha --jq .headSha)"
+    git push origin "$VERSION"
+    gh release create "$VERSION" "release-$VERSION/ably.pubsub.$VERSION.unitypackage" --title "$VERSION" --notes "See the [CHANGELOG](https://github.com/ably/ably-pubsub-dotnet/blob/main/CHANGELOG.md) for the changes in $VERSION."
+    ```
+
+    Add `--prerelease` for a version with a prerelease label, e.g. `2.0.1-rc.1`. The tag is the bare version; the CHANGELOG links to `tree/<version>`.
+15. **Unity:** check that the GitHub release has the `.unitypackage`, and, for a stable release, that [the latest release](https://github.com/ably/ably-pubsub-dotnet/releases/latest), which the Unity install instructions link to, is this one.
+16. **After the release:**
+    - Check the nuget.org pages for [`Ably.PubSub.Core`](https://www.nuget.org/packages/Ably.PubSub.Core), [`Ably.PubSub.Device`](https://www.nuget.org/packages/Ably.PubSub.Device) and [`Ably.PubSub.Server`](https://www.nuget.org/packages/Ably.PubSub.Server): the README renders (header image, badges, tables, callouts) and its links resolve, and the icon, license and project URL are right.
+    - Create the entry on the [Ably Changelog](https://changelog.ably.com/) (via [headwayapp](https://headwayapp.co/)).
+    - Revoke the API key, or let it expire.
+    - For 2.0.0, a few days after GA: carry out the `ably.io` deprecation plan in https://github.com/ably/ably-pubsub-dotnet/issues/1356.
+
+**If a release has to be abandoned:** NuGet can't delete a published version, and the version number can never be reused. Unlist the packages, the doors first and then the core, and release a new version:
+
+```shell
+dotnet nuget delete Ably.PubSub.Server "$VERSION" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --non-interactive
+dotnet nuget delete Ably.PubSub.Device "$VERSION" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --non-interactive
+dotnet nuget delete Ably.PubSub.Core "$VERSION" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --non-interactive
+```
+
+### Release checklist
+
+- [ ] The 2.0 docs (`README.md`, `UPDATING.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `PushNotifications.md`, `unity/README.md`) are on `main` (steps 1 and 9.6).
+- [ ] The version is bumped in `src/CommonAssemblyInfo.cs`, `unity/Assets/Ably/version.txt` and the README `PackageReference` examples, and the Unity plugin is regenerated after the bump (steps 2 and 3).
+- [ ] `package.yml` succeeded, and `output-package` holds exactly three `.nupkg` files and one `.unitypackage` (steps 7 and 8).
+- [ ] Every door dependency group pins `Ably.PubSub.Core` as `[<version>]` (step 9.2).
+- [ ] The package-install test passed on the downloaded packages (step 9.5).
+- [ ] The core was indexed on nuget.org before the doors were pushed (steps 10 to 12).
+- [ ] The tag and GitHub release exist, with the `.unitypackage` attached (step 14).
+- [ ] The nuget.org pages render the README for all three packages, and the API key is revoked (step 16).
