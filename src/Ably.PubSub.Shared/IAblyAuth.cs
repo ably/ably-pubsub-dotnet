@@ -46,7 +46,7 @@ namespace Ably.PubSub
         /// </summary>
         /// <param name="tokenParams"><see cref="TokenParams"/>. If null a token request is generated from options passed when the client was created.</param>
         /// <param name="authOptions"><see cref="AuthOptions"/>. If null the default AuthOptions are used.</param>
-        /// <returns>serialized signed token request.</returns>
+        /// <returns>The signed token request, serialized as JSON.</returns>
         Task<string> CreateTokenRequestAsync(TokenParams tokenParams = null, AuthOptions authOptions = null);
 
         /// <summary>
@@ -75,7 +75,7 @@ namespace Ably.PubSub
         /// </summary>
         /// <param name="tokenParams"><see cref="TokenParams"/>. If null a token request is generated from options passed when the client was created.</param>
         /// <param name="authOptions"><see cref="AuthOptions"/>. If null the default AuthOptions are used.</param>
-        /// <returns>serialized signed token request.</returns>
+        /// <returns>The signed token request, serialized as JSON.</returns>
         string CreateTokenRequest(TokenParams tokenParams = null, AuthOptions authOptions = null);
     }
 }
