@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 using Ably.PubSub.AcceptanceTests;
 using Ably.PubSub.Encryption;
+using Ably.PubSub.Http;
 using Ably.PubSub.MessageEncoders;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Realtime.Workflow;
@@ -1941,6 +1942,184 @@ namespace Ably.PubSub.Tests.Realtime
             }
 
             public HistoryUntilAttachSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL10a")]
+        [Trait("spec", "RTP12a")]
+        [Trait("spec", "RTL28")]
+        [Trait("spec", "RTL31")]
+        [Trait("spec", "RTAN3a")]
+        [Trait("spec", "RSN3c")]
+        public class RetrievalHttpChannelOptionsSpecs : ChannelSpecs
+        {
+            private const string Serial = "01826232498871-001@abcdefghij:001";
+
+            public static IEnumerable<object[]> Retrievals => new[]
+            {
+                "History", "HistoryUntilAttach", "PresenceHistory", "GetMessage", "GetMessageVersions", "AnnotationsGet",
+            }.Select(x => new object[] { x });
+
+            [Theory]
+            [MemberData(nameof(Retrievals))]
+            public async Task Retrieval_ShouldKeepTheCipherOfTheHttpChannelOfTheSameName(string retrieval)
+            {
+                // The realtime retrievals go over REST with the realtime channel's options. Getting the
+                // app's HttpClient channel with those options would replace its own (RSN3c), so a later
+                // REST publish on it would go out unencrypted.
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var cipher = new ChannelOptions(Crypto.GetDefaultParams());
+                var httpChannel = (HttpChannel)client.HttpClient.Channels.Get("test", cipher);
+                var realtimeChannel = await GetAttachedChannel(client, new ChannelOptions());
+
+                await Retrieve(realtimeChannel, retrieval);
+
+                client.HttpClient.Channels.Get("test").Should().BeSameAs(httpChannel);
+                httpChannel.Options.Should().BeSameAs(cipher);
+                var published = await PublishOnHttpChannel(httpChannel);
+                published.Encoding.Should().Contain("cipher+aes-256-cbc");
+                published.Data.Should().NotBe("secret");
+            }
+
+            [Theory]
+            [MemberData(nameof(Retrievals))]
+            public async Task Retrieval_OnACipherChannel_ShouldNotEncryptThePlainHttpChannelOfTheSameName(string retrieval)
+            {
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var httpChannel = (HttpChannel)client.HttpClient.Channels.Get("test");
+                var optionsBefore = httpChannel.Options; // null, as the app gave none
+                var realtimeChannel = await GetAttachedChannel(client, new ChannelOptions(Crypto.GetDefaultParams()));
+
+                await Retrieve(realtimeChannel, retrieval);
+
+                client.HttpClient.Channels.Get("test").Should().BeSameAs(httpChannel);
+                ReferenceEquals(httpChannel.Options, optionsBefore).Should().BeTrue("the realtime retrieval must not set options on the app's channel");
+                var published = await PublishOnHttpChannel(httpChannel);
+                published.Data.Should().Be("secret");
+                published.Encoding.Should().BeNullOrEmpty();
+            }
+
+            [Fact]
+            public async Task RestChannel_ShouldBeReusedWhileTheOptionsAreUnchanged()
+            {
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var channel = (RealtimeChannel)await GetAttachedChannel(client, new ChannelOptions(Crypto.GetDefaultParams()));
+
+                var restChannel = channel.RestChannel;
+                await channel.HistoryAsync();
+                await channel.Presence.HistoryAsync();
+
+                channel.RestChannel.Should().BeSameAs(restChannel);
+                restChannel.Should().NotBeSameAs(client.HttpClient.Channels.Get("test"));
+            }
+
+            [Theory]
+            [InlineData("SetOptions")]
+            [InlineData("ChannelsGet")]
+            [Trait("spec", "RTL16")]
+            [Trait("spec", "RTS3c")]
+            public async Task Retrieval_AfterTheChannelOptionsChange_ShouldDecodeWithTheNewOptions(string update)
+            {
+                var first = new ChannelOptions(Crypto.GetDefaultParams());
+                var second = new ChannelOptions(Crypto.GetDefaultParams());
+                var serverOptions = first;
+                var client = await GetConnectedClient(handleRequestFunc: request =>
+                {
+                    // The server's copy is encrypted with whichever key the channel uses at the time.
+                    var message = new Message("n", "secret") { Serial = Serial };
+                    var presenceMessage = new PresenceMessage(PresenceAction.Enter, "client", "secret");
+                    MessageHandler.EncodePayloads(serverOptions.ToDecodingContext(), new IMessage[] { message, presenceMessage });
+                    return new AblyResponse
+                    {
+                        TextResponse = request.Url.EndsWith("/presence/history") ? JsonHelper.Serialize(new[] { presenceMessage })
+                            : request.Url.EndsWith("/messages") ? JsonHelper.Serialize(new[] { message })
+                            : JsonHelper.Serialize(message),
+                    }.ToTask();
+                });
+                var channel = await GetAttachedChannel(client, first);
+                (await channel.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+
+                serverOptions = second;
+                if (update == "SetOptions")
+                {
+                    channel.SetOptions(second);
+                }
+                else
+                {
+                    client.Channels.Get("test", second).Should().BeSameAs(channel);
+                }
+
+                channel.Options.Should().BeSameAs(second);
+                (await channel.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+                (await channel.Presence.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+                (await channel.GetMessageAsync(Serial)).Data.Should().Be("secret");
+            }
+
+            private static Task<AblyResponse> Respond(AblyRequest request)
+            {
+                string response;
+                if (request.Method == System.Net.Http.HttpMethod.Post)
+                {
+                    response = "{\"serials\":[\"serial-1\"]}";
+                }
+                else if (request.Url.EndsWith("/messages") || request.Url.EndsWith("/history")
+                    || request.Url.EndsWith("/versions") || request.Url.EndsWith("/annotations"))
+                {
+                    response = "[]";
+                }
+                else
+                {
+                    response = JsonHelper.Serialize(new Message("n", "data") { Serial = Serial });
+                }
+
+                return new AblyResponse { TextResponse = response }.ToTask();
+            }
+
+            private static Task Retrieve(IRealtimeChannel channel, string retrieval)
+            {
+                switch (retrieval)
+                {
+                    case "History":
+                        return channel.HistoryAsync();
+                    case "HistoryUntilAttach":
+                        return channel.HistoryAsync(new PaginatedRequestParams(), true);
+                    case "PresenceHistory":
+                        return channel.Presence.HistoryAsync();
+                    case "GetMessage":
+                        return channel.GetMessageAsync(Serial);
+                    case "GetMessageVersions":
+                        return channel.GetMessageVersionsAsync(Serial);
+                    case "AnnotationsGet":
+                        return channel.Annotations.GetAsync(Serial);
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(retrieval), retrieval, null);
+                }
+            }
+
+            private async Task<IRealtimeChannel> GetAttachedChannel(PubSubRealtimeClient client, ChannelOptions options)
+            {
+                var channel = client.Channels.Get("test", options);
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = "attach-serial-1",
+                });
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Attached);
+                return channel;
+            }
+
+            private async Task<Message> PublishOnHttpChannel(HttpChannel channel)
+            {
+                Requests.Clear();
+                await channel.PublishAsync("n", "secret");
+                return ((IEnumerable<Message>)Requests.Single().PostData).Single();
+            }
+
+            public RetrievalHttpChannelOptionsSpecs(ITestOutputHelper output)
                 : base(output)
             {
             }

@@ -181,7 +181,8 @@ Console.WriteLine(tokenRequest);
 ```
 
 In an ASP.NET Core minimal API, for example, return it with
-`Results.Content(tokenRequest, "application/json")`. See
+`Results.Content(tokenRequest, "application/json")`. To work with it as a `TokenRequest` object, use
+`JsonHelper.Deserialize<TokenRequest>(tokenRequest)`. See
 [token authentication](https://ably.com/docs/auth/token) for how devices use it.
 
 > **Important:** clients from `PubSubServer` declare themselves as servers. Authenticate them with

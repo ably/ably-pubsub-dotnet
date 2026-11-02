@@ -24,6 +24,7 @@ namespace Ably.PubSub.Realtime
 #pragma warning restore CA2213
 
         private ChannelOptions _options;
+        private volatile HttpChannel _restChannel; // see RestChannel
         private ChannelState _state;
         private readonly PushChannel _pushChannel;
         private int _retryCount = 0;
@@ -58,10 +59,30 @@ namespace Ably.PubSub.Realtime
 
         private Connection Connection => RealtimeClient.Connection;
 
-        // The REST channel of the same name carrying this channel's options, so that payloads of the
-        // messages, presence messages and annotations it retrieves (history included) are decoded
-        // (and decrypted) as the realtime ones are.
-        internal IHttpChannel RestChannel => RealtimeClient.HttpClient.Channels.Get(Name, Options);
+        // A REST channel of the same name carrying this channel's current options, so that payloads of
+        // the messages, presence messages and annotations it retrieves (history included) are decoded
+        // (and decrypted) as the realtime ones are. It is this channel's own instance, not the one in
+        // HttpClient.Channels: getting that one with options would replace the options the app set on
+        // it (RSN3c), e.g. drop its cipher so that a later REST publish goes out unencrypted.
+        // It is cached and rebuilt when Options changes. Every change replaces the ChannelOptions
+        // object (the setter, SetOptions, Channels.Get with options), and HttpChannel reads its
+        // options on each request, so a reference check is enough to never use stale options. A
+        // concurrent rebuild only creates a spare instance with the same options.
+        internal IHttpChannel RestChannel
+        {
+            get
+            {
+                var options = Options;
+                var restChannel = _restChannel;
+                if (restChannel == null || !ReferenceEquals(restChannel.Options, options))
+                {
+                    restChannel = new HttpChannel(RealtimeClient.HttpClient, Name, options);
+                    _restChannel = restChannel;
+                }
+
+                return restChannel;
+            }
+        }
 
         internal ChannelAwaiter AttachedAwaiter { get; }
 
