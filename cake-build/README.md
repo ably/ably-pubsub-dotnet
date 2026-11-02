@@ -127,6 +127,7 @@ packages to nuget.org by hand, following the release process in `CONTRIBUTING.md
 - Responsible for creating all three NuGet packages.
 - Works only on Windows (or with Mono): the core package carries a `lib/net46`
   asset built by an old-style MSBuild head, and `NuGetPack` needs `nuget.exe`.
+- Merges `IO.Ably.DeltaCodec.dll` into the `net46` `Ably.PubSub.Core.dll` with ILRepack (internalized, signed).
 
 ```cmd
 .\package.cmd 2.0.0

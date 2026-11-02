@@ -208,8 +208,25 @@ Task("_Package_Build_All")
     }
 });
 
-Task("_Package_Create_NuGet")
+// The signed net46 core must not reference the unsigned IO.Ably.DeltaCodec, so merge it in
+// (internalized, signed with Ably.PubSub.snk), as ably.io 1.2.16+ did. Only DeltaCodec is merged.
+Task("_Package_Merge_NetFramework")
     .IsDependentOn("_Package_Build_All")
+    .Does(() =>
+{
+    var binPath = paths.Src.Combine("Ably.PubSub.Core.NETFramework/bin/Release");
+    var packagedPath = binPath.Combine("Packaged");
+
+    ilRepackHelper.MergeDLLs(
+        binPath.CombineWithFilePath("Ably.PubSub.Core.dll"),
+        new[] { binPath.CombineWithFilePath("IO.Ably.DeltaCodec.dll") },
+        packagedPath.CombineWithFilePath("Ably.PubSub.Core.dll"));
+
+    CopyFile(binPath.CombineWithFilePath("Ably.PubSub.Core.xml"), packagedPath.CombineWithFilePath("Ably.PubSub.Core.xml"));
+});
+
+Task("_Package_Create_NuGet")
+    .IsDependentOn("_Package_Merge_NetFramework")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {

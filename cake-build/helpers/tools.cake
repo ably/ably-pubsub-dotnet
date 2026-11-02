@@ -25,7 +25,7 @@ public class ILRepackHelper
         
         // Get the root directory (parent of cake-build)
         var rootDir = _context.MakeAbsolute(_context.Directory("../"));
-        var ilRepackPath = rootDir.CombineWithFilePath("tools/ilrepack.exe");
+        var ilRepackPath = rootDir.CombineWithFilePath("tools/ILRepack.exe");
         
         // Build list of DLL paths - primary first, then merging DLLs
         var dllPaths = new List<string> { $"\"{primaryDll.FullPath}\"" };
