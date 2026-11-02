@@ -814,7 +814,7 @@ namespace Ably.PubSub.Realtime
         /// <returns>Paginated list of Presence messages.</returns>
         public Task<PaginatedResult<PresenceMessage>> HistoryAsync()
         {
-            return _channel.HttpChannel.Presence.HistoryAsync(new PaginatedRequestParams());
+            return _channel.RestChannel.Presence.HistoryAsync(new PaginatedRequestParams());
         }
 
         /// <summary>
@@ -827,7 +827,7 @@ namespace Ably.PubSub.Realtime
         public Task<PaginatedResult<PresenceMessage>> HistoryAsync(PaginatedRequestParams query)
         {
             query = query ?? new PaginatedRequestParams();
-            return _channel.HttpChannel.Presence.HistoryAsync(query);
+            return _channel.RestChannel.Presence.HistoryAsync(query);
         }
 
         /// <summary>
@@ -844,10 +844,10 @@ namespace Ably.PubSub.Realtime
             var query = new PaginatedRequestParams();
             if (untilAttach)
             {
-                _channel.AddUntilAttachParameter(query);
+                query = _channel.WithUntilAttachParameter(query);
             }
 
-            return _channel.HttpChannel.Presence.HistoryAsync(query);
+            return _channel.RestChannel.Presence.HistoryAsync(query);
         }
 
         /// <summary>
@@ -865,10 +865,10 @@ namespace Ably.PubSub.Realtime
             query = query ?? new PaginatedRequestParams();
             if (untilAttach)
             {
-                _channel.AddUntilAttachParameter(query);
+                query = _channel.WithUntilAttachParameter(query);
             }
 
-            return _channel.HttpChannel.Presence.HistoryAsync(query);
+            return _channel.RestChannel.Presence.HistoryAsync(query);
         }
 
         private void NotifySyncCompleted()

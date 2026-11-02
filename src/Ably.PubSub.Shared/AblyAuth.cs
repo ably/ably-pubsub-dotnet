@@ -361,7 +361,9 @@ namespace Ably.PubSub
                             throw new AblyException(new ErrorInfo($"AuthCallback returned a string which can't be converted to TokenRequest. ({callbackString})."), e);
                         }
 
-                        if (TokenDetails.IsToken(callbackJson))
+                        // A TokenRequest has no token field, so one marks a TokenDetails even without
+                        // the issued field that TokenDetails.IsToken looks for, e.g. {"token":"..."}.
+                        if (callbackJson["token"]?.Type == JTokenType.String || TokenDetails.IsToken(callbackJson))
                         {
                             return JsonHelper.DeserializeObject<TokenDetails>(callbackJson);
                         }

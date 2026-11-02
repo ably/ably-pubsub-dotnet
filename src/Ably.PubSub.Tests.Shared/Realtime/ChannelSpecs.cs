@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Ably.PubSub.AcceptanceTests;
+using Ably.PubSub.Encryption;
 using Ably.PubSub.MessageEncoders;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Realtime.Workflow;
@@ -1842,6 +1843,76 @@ namespace Ably.PubSub.Tests.Realtime
 
                 await channel.HistoryAsync();
                 LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL10b")]
+            public async Task HistoryAsync_WithUntilAttach_ShouldLeaveTheCallersQueryUnchanged()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+                var query = new PaginatedRequestParams { Limit = 10 };
+
+                // A second call with the same query must not fail on the fromSerial the first one added.
+                await channel.HistoryAsync(query, true);
+                await channel.HistoryAsync(query, true);
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+#pragma warning disable CS0618 // the deprecated presence overload shares the untilAttach helper
+                await channel.Presence.HistoryAsync(query, true);
+#pragma warning restore CS0618
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+                query.ExtraParameters.Should().BeEmpty();
+
+                await channel.HistoryAsync(query, false);
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+                LastRequest.AssertContainsParameter("limit", "10");
+
+                await channel.HistoryAsync(PaginatedRequestParams.Empty, true);
+                PaginatedRequestParams.Empty.ExtraParameters.Should().BeEmpty();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL10a")]
+            [Trait("spec", "RTP12")]
+            public async Task HistoryAsync_OnACipherChannel_ShouldDecryptTheRetrievedMessages()
+            {
+                var options = new ChannelOptions(Crypto.GetDefaultParams());
+                var message = new Message("n", "secret message");
+                var presenceMessage = new PresenceMessage(PresenceAction.Enter, "client", "secret presence");
+                MessageHandler.EncodePayloads(options.ToDecodingContext(), new IMessage[] { message, presenceMessage }).IsSuccess.Should().BeTrue();
+                message.Encoding.Should().Contain("cipher+aes-256-cbc");
+
+                var client = await GetConnectedClient(handleRequestFunc: request =>
+                    new AblyResponse
+                    {
+                        TextResponse = request.Url.EndsWith("/presence/history")
+                            ? JsonHelper.Serialize(new[] { presenceMessage })
+                            : JsonHelper.Serialize(new[] { message }),
+                    }.ToTask());
+
+                // Each call starts without the REST channel, so the call itself has to bring the options.
+                var channel = client.Channels.Get("test", options);
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = AttachSerial,
+                });
+                await client.ProcessCommands();
+
+                foreach (var history in new Func<Task<PaginatedResult<Message>>>[]
+                {
+                    () => channel.HistoryAsync(),
+                    () => channel.HistoryAsync(true),
+                    () => channel.HistoryAsync(new PaginatedRequestParams()),
+                    () => channel.HistoryAsync(new PaginatedRequestParams(), true),
+                })
+                {
+                    client.HttpClient.Channels.Release(channel.Name);
+                    (await history()).Items.Should().ContainSingle().Which.Data.Should().Be("secret message");
+                }
+
+                client.HttpClient.Channels.Release(channel.Name);
+                (await channel.Presence.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret presence");
             }
 
             [Fact]

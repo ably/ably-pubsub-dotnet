@@ -286,6 +286,29 @@ namespace Ably.PubSub.Tests.AuthTests
 
         [Theory]
         [Trait("spec", "RSA8d")]
+        [Trait("spec", "RSA4f")]
+        [InlineData("{\"token\":\"abc.def\"}", null)]
+        [InlineData("{\"token\":\"abc.def\",\"expires\":4102444800000}", 4102444800000L)]
+        public async Task RequestToken_WithAuthCallbackReturningTokenOnlyJson_ReturnsTokenDetailsWithoutHttpRequest(string callbackResult, long? expires)
+        {
+            // No issued field, so TokenDetails.IsToken alone would take this for a TokenRequest
+            // and post it to /keys//requestToken.
+            var rest = GetRestClient();
+            var options = new AuthOptions { AuthCallback = _ => Task.FromResult<object>(callbackResult) };
+
+            var result = await rest.Auth.RequestTokenAsync(new TokenParams(), options);
+
+            result.Token.Should().Be("abc.def");
+            if (expires.HasValue)
+            {
+                result.Expires.Should().Be(expires.Value.FromUnixTimeInMilliseconds());
+            }
+
+            Requests.Should().BeEmpty();
+        }
+
+        [Theory]
+        [Trait("spec", "RSA8d")]
         [Trait("spec", "RSA4c1")]
         [InlineData("")]
         [InlineData("   ")]
