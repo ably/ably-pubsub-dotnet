@@ -14,6 +14,7 @@ namespace Ably.PubSub.Tests.Push
     public static class PushChannelTests
     {
         [Trait("spec", "RSH7")]
+        [Collection(PushTestCollection.Name)]
         public class WhenPlatformSupportsPushNotifications : AblyRealtimeSpecs
         {
             [Fact]
@@ -58,6 +59,7 @@ namespace Ably.PubSub.Tests.Push
         }
 
         [Trait("spec", "RSH7")]
+        [Collection(PushTestCollection.Name)]
         public class WhenPlatformDoesNotSupportPushNotifications : AblyRealtimeSpecs
         {
             [Fact]
@@ -103,6 +105,7 @@ namespace Ably.PubSub.Tests.Push
             }
         }
 
+        [Collection(PushTestCollection.Name)]
         public class GeneralTests : MockHttpRestSpecs
         {
             [Fact]

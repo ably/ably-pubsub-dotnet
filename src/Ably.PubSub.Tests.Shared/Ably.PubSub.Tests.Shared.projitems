@@ -42,6 +42,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\AblySpecs.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\ConditionalAwaiter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\ConnectionAwaiter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\ConnectionAwaiterTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\FakeConnectionContext.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\FakeHttpMessageHandler.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Infrastructure\FakeTimer.cs" />
@@ -84,6 +85,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdminTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushChannelTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushRealtimeTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Push\PushTestCollection.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushTestHelpers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\RegistrationTokenTest.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Realtime\ChannelSandboxSpecs.cs" />

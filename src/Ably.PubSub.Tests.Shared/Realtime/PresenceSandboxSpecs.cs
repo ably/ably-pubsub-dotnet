@@ -528,104 +528,53 @@ namespace Ably.PubSub.Tests.Realtime
                 channelB.State.Should().Be(ChannelState.Attaching);
                 await channelB.WaitForAttachedState();
                 channelB.State.Should().Be(ChannelState.Attached);
-                // ENTER
-                PresenceMessage msgA = null, msgB = null;
-                await WaitForMultiple(2, partialDone =>
-                {
-                    channelA.Presence.Subscribe(msg =>
-                    {
-                        msgA = msg;
-                        channelA.Presence.Unsubscribe();
-                        partialDone();
-                    });
+                // ENTER by client A. Both channels should see the event, other events (e.g. PRESENT from a SYNC) are ignored.
+                var enterA = new PresenceEventWaiter("channelA", channelA.Presence, PresenceAction.Enter, "A");
+                var enterB = new PresenceEventWaiter("channelB", channelB.Presence, PresenceAction.Enter, "A");
+                await WaitForPresenceEvents("ENTER by A", () => channelA.Presence.Enter("chA"), enterA, enterB);
 
-                    channelB.Presence.Subscribe(msg =>
-                    {
-                        msgB = msg;
-                        channelB.Presence.Unsubscribe();
-                        partialDone();
-                    });
-
-                    channelA.Presence.Enter("chA");
-                });
-
-                msgA.Should().NotBeNull();
+                var msgA = enterA.Message;
+                var msgB = enterB.Message;
                 msgA.Action.Should().Be(PresenceAction.Enter);
                 msgA.ConnectionId.Should().Be(clientA.Connection.Id);
                 channelA.Presence.MembersMap.Members.Should().HaveCount(1);
                 channelA.Presence.InternalMembersMap.Members.Should().HaveCount(1);
-                channelA.Presence.Unsubscribe();
 
-                msgB.Should().NotBeNull();
                 msgB.Action.Should().Be(PresenceAction.Enter);
                 msgB.ConnectionId.Should().NotBe(clientB.Connection.Id);
                 channelB.Presence.MembersMap.Members.Should().HaveCount(1);
                 channelB.Presence.InternalMembersMap.Members.Should().HaveCount(0);
-                channelB.Presence.Unsubscribe();
 
-                msgA = null;
-                msgB = null;
-                await WaitForMultiple(2, partialDone =>
-                {
-                    channelA.Presence.Subscribe(msg =>
-                    {
-                        msgA = msg;
-                        channelA.Presence.Unsubscribe();
-                        partialDone();
-                    });
+                // ENTER by client B
+                var enterBA = new PresenceEventWaiter("channelA", channelA.Presence, PresenceAction.Enter, "B");
+                var enterBB = new PresenceEventWaiter("channelB", channelB.Presence, PresenceAction.Enter, "B");
+                await WaitForPresenceEvents("ENTER by B", () => channelB.Presence.Enter("chB"), enterBA, enterBB);
 
-                    channelB.Presence.Subscribe(msg =>
-                    {
-                        msgB = msg;
-                        channelB.Presence.Unsubscribe();
-                        partialDone();
-                    });
-
-                    channelB.Presence.Enter("chB");
-                });
-
-                msgA.Should().NotBeNull();
+                msgA = enterBA.Message;
+                msgB = enterBB.Message;
                 msgA.Action.Should().Be(PresenceAction.Enter);
                 msgA.ConnectionId.Should().NotBe(clientA.Connection.Id);
                 channelA.Presence.MembersMap.Members.Should().HaveCount(2);
                 channelA.Presence.InternalMembersMap.Members.Should().HaveCount(1);
 
-                msgB.Should().NotBeNull();
                 msgB.Action.Should().Be(PresenceAction.Enter);
                 msgB.ConnectionId.Should().Be(clientB.Connection.Id);
                 channelB.Presence.MembersMap.Members.Should().HaveCount(2);
                 channelB.Presence.InternalMembersMap.Members.Should().HaveCount(1);
 
                 // UPDATE
-                msgA = null;
-                msgB = null;
-                await WaitForMultiple(2, partialDone =>
-                {
-                    channelA.Presence.Subscribe(msg =>
-                    {
-                        msgA = msg;
-                        channelA.Presence.Unsubscribe();
-                        partialDone();
-                    });
+                var updateA = new PresenceEventWaiter("channelA", channelA.Presence, PresenceAction.Update, "B");
+                var updateB = new PresenceEventWaiter("channelB", channelB.Presence, PresenceAction.Update, "B");
+                await WaitForPresenceEvents("UPDATE by B", () => channelB.Presence.Update("chB-update"), updateA, updateB);
 
-                    channelB.Presence.Subscribe(msg =>
-                    {
-                        msgB = msg;
-                        channelB.Presence.Unsubscribe();
-                        partialDone();
-                    });
-
-                    channelB.Presence.Update("chB-update");
-                });
-
-                msgA.Should().NotBeNull();
+                msgA = updateA.Message;
+                msgB = updateB.Message;
                 msgA.Action.Should().Be(PresenceAction.Update);
                 msgA.ConnectionId.Should().NotBe(clientA.Connection.Id);
                 msgA.Data.ToString().Should().Be("chB-update");
                 channelA.Presence.MembersMap.Members.Should().HaveCount(2);
                 channelA.Presence.InternalMembersMap.Members.Should().HaveCount(1);
 
-                msgB.Should().NotBeNull();
                 msgB.Action.Should().Be(PresenceAction.Update);
                 msgB.ConnectionId.Should().Be(clientB.Connection.Id);
                 msgB.Data.ToString().Should().Be("chB-update");
@@ -633,48 +582,28 @@ namespace Ably.PubSub.Tests.Realtime
                 channelB.Presence.InternalMembersMap.Members.Should().HaveCount(1);
 
                 // LEAVE with synthesized message
-                msgA = null;
-                msgB = null;
                 var synthesizedMsg = new PresenceMessage(PresenceAction.Leave, clientB.ClientId) { ConnectionId = null };
                 synthesizedMsg.IsServerSynthesized().Should().BeTrue();
                 channelB.Presence.OnPresence(new[] { synthesizedMsg });
 
-                msgB.Should().BeNull();
                 channelB.Presence.MembersMap.Members.Should().HaveCount(2);
 
                 // message was synthesized so should not have been removed (RTP17b)
                 channelB.Presence.InternalMembersMap.Members.Should().HaveCount(1);
 
                 // LEAVE
-                msgA = null;
-                msgB = null;
-                await WaitForMultiple(2, partialDone =>
-                {
-                    channelA.Presence.Subscribe(msg =>
-                    {
-                        msgA = msg;
-                        channelA.Presence.Unsubscribe();
-                        partialDone();
-                    });
+                var leaveA = new PresenceEventWaiter("channelA", channelA.Presence, PresenceAction.Leave, "B");
+                var leaveB = new PresenceEventWaiter("channelB", channelB.Presence, PresenceAction.Leave, "B");
+                await WaitForPresenceEvents("LEAVE by B", () => channelB.Presence.Leave("chB-leave"), leaveA, leaveB);
 
-                    channelB.Presence.Subscribe(msg =>
-                    {
-                        msgB = msg;
-                        channelB.Presence.Unsubscribe();
-                        partialDone();
-                    });
-
-                    channelB.Presence.Leave("chB-leave");
-                });
-
-                msgA.Should().NotBeNull();
+                msgA = leaveA.Message;
+                msgB = leaveB.Message;
                 msgA.Action.Should().Be(PresenceAction.Leave);
                 msgA.ConnectionId.Should().NotBe(clientA.Connection.Id);
                 msgA.Data.ToString().Should().Be("chB-leave");
                 channelA.Presence.MembersMap.Members.Should().HaveCount(1);
                 channelA.Presence.InternalMembersMap.Members.Should().HaveCount(1);
 
-                msgB.Should().NotBeNull();
                 msgB.Action.Should().Be(PresenceAction.Leave);
                 msgB.ConnectionId.Should().Be(clientB.Connection.Id);
                 msgB.Data.ToString().Should().Be("chB-leave");
@@ -2120,6 +2049,82 @@ namespace Ably.PubSub.Tests.Realtime
             public With250PresentMembersOnAChannel(AblySandboxFixture fixture, ITestOutputHelper output)
                 : base(fixture, output)
             {
+            }
+        }
+
+        private static async Task WaitForPresenceEvents(string step, Action trigger, params PresenceEventWaiter[] waiters)
+        {
+            try
+            {
+                trigger();
+                var all = Task.WhenAll(waiters.Select(x => x.Task));
+                var completed = await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(20)));
+                if (completed != all)
+                {
+                    var pending = waiters.Where(x => !x.Task.IsCompleted).Select(x => x.Describe());
+                    throw new TimeoutException($"Timed out waiting for presence events in step '{step}': {string.Join("; ", pending)}");
+                }
+
+                await all;
+            }
+            finally
+            {
+                foreach (var waiter in waiters)
+                {
+                    waiter.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Waits for one specific presence event (action and clientId) on a channel, ignoring any other presence
+        /// event such as a PRESENT delivered by a SYNC. Only its own handler is unsubscribed.
+        /// </summary>
+        private sealed class PresenceEventWaiter : IDisposable
+        {
+            private readonly string _channelLabel;
+            private readonly Presence _presence;
+            private readonly PresenceAction _action;
+            private readonly string _clientId;
+            private readonly TaskCompletionSource<PresenceMessage> _tcs = new TaskCompletionSource<PresenceMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly System.Collections.Concurrent.ConcurrentQueue<string> _ignored = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            private readonly Action<PresenceMessage> _handler;
+
+            public PresenceEventWaiter(string channelLabel, Presence presence, PresenceAction action, string clientId)
+            {
+                _channelLabel = channelLabel;
+                _presence = presence;
+                _action = action;
+                _clientId = clientId;
+                _handler = OnPresenceMessage;
+                _presence.Subscribe(_handler);
+            }
+
+            public Task<PresenceMessage> Task => _tcs.Task;
+
+            public PresenceMessage Message => _tcs.Task.Result;
+
+            public string Describe()
+            {
+                var ignored = _ignored.IsEmpty ? "none" : string.Join(", ", _ignored);
+                return $"{_channelLabel} expected {_action} from client '{_clientId}' (other events seen: {ignored})";
+            }
+
+            public void Dispose()
+            {
+                _presence.Unsubscribe(_handler);
+            }
+
+            private void OnPresenceMessage(PresenceMessage message)
+            {
+                if (message.Action == _action && message.ClientId == _clientId)
+                {
+                    _tcs.TrySetResult(message);
+                }
+                else
+                {
+                    _ignored.Enqueue($"{message.Action}/{message.ClientId}");
+                }
             }
         }
 

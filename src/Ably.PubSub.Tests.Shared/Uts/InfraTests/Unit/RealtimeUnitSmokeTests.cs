@@ -181,8 +181,12 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Unit
                 }
             });
             InstallMock(mock);
-            var client = Realtime(new ClientOptions { Key = ValidKey, FallbackHosts = new string[0] });
+
+            // Record before connecting: the mock refuses at once, so an AutoConnect client could reach DISCONNECTED
+            // before the recorder subscribes.
+            var client = Realtime(new ClientOptions { Key = ValidKey, FallbackHosts = new string[0], AutoConnect = false });
             var changes = UtsRecord.ConnectionStateChanges(client.Connection);
+            client.Connect();
             await UtsWait.PollUntil(() => attempts == 2 && client.Connection.State == ConnectionState.Disconnected);
             await ProcessPendingEvents();
             var retryIn = changes.Last(c => c.Current == ConnectionState.Disconnected).RetryIn;
@@ -205,8 +209,11 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Unit
             EnableFakeTimers();
             var mock = new MockWebSocket();
             InstallMock(mock);
-            var client = Realtime(new ClientOptions { Key = ValidKey, FallbackHosts = new string[0] });
+
+            // Record before connecting, so the first CONNECTING the assertion below expects is captured.
+            var client = Realtime(new ClientOptions { Key = ValidKey, FallbackHosts = new string[0], AutoConnect = false });
             var changes = UtsRecord.ConnectionStateChanges(client.Connection);
+            client.Connect();
 
             var refused = 0;
             while (client.Connection.State != ConnectionState.Suspended && refused < 40)

@@ -104,8 +104,11 @@ namespace Ably.PubSub.Tests.Uts.InfraTests
             InstallMock(mock);
             for (var i = 0; i < 20; i++)
             {
-                var client = Realtime(new ClientOptions { Key = ValidKey });
+                // Record before connecting: the recorder only sees changes made after it subscribes, and the
+                // mock answers at once, so an AutoConnect client can reach FAILED (and stay there) first.
+                var client = Realtime(new ClientOptions { Key = ValidKey, AutoConnect = false });
                 var states = UtsRecord.ConnectionStates(client.Connection);
+                client.Connect();
                 await UtsWait.PollUntil(() => states.Contains(ConnectionState.Failed));
                 await ProcessPendingEvents();
 

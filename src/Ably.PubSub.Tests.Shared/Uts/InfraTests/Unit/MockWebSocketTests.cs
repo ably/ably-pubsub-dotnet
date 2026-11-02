@@ -289,8 +289,11 @@ namespace Ably.PubSub.Tests.Uts.InfraTests.Unit
             client.Channels.Get(name).Attach();
             await mock.AwaitClientMessage(ProtocolMessages.Attach);
             mock.SendPingFrame();
-            mock.SimulateDisconnect();
+
+            // Record before the disconnect: the reconnection attempt is refused at once, so the DISCONNECTED read
+            // below could otherwise happen before the recorder subscribes.
             var changes = UtsRecord.ConnectionStateChanges(client.Connection);
+            mock.SimulateDisconnect();
             await UtsWait.PollUntil(() => attempts == 2 && client.Connection.State == ConnectionState.Disconnected);
             await ProcessPendingEvents();
             await AdvanceTime(changes.Last(c => c.Current == ConnectionState.Disconnected).RetryIn.Value);
