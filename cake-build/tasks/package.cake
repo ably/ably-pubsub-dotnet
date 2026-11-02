@@ -1,6 +1,60 @@
 ///////////////////////////////////////////////////////////////////////////////
+// PACKAGE SET AND OUTPUT
+///////////////////////////////////////////////////////////////////////////////
+
+// The NuGet packages built from this repository: nuspec file name -> package id.
+// All three ship together at one version, and each door package pins the core
+// exactly. Packed core-first, the order they are published in (CONTRIBUTING.md).
+var nugetPackageSet = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+{
+    { "ably.pubsub.core.nuspec", "Ably.PubSub.Core" },
+    { "ably.pubsub.device.nuspec", "Ably.PubSub.Device" },
+    { "ably.pubsub.server.nuspec", "Ably.PubSub.Server" }
+};
+
+public DirectoryPath NuspecDirectory()
+{
+    return paths.Root.Combine("nuget");
+}
+
+// Where Package writes the .nupkg files and where Test.PackageConsumption.NoPack
+// reads them: --packageOutput, or the repository root by default.
+public DirectoryPath PackageOutputDirectory()
+{
+    if (string.IsNullOrEmpty(packageOutput))
+    {
+        return paths.Root;
+    }
+
+    // Resolved against the repository root, not Cake's working directory (which
+    // is cake-build/), so --packageOutput=consumption-packages means what it reads like.
+    DirectoryPath candidate = packageOutput;
+    return candidate.IsRelative ? paths.Root.Combine(candidate) : candidate;
+}
+
+public string RequirePackageVersionArgument()
+{
+    if (string.IsNullOrWhiteSpace(version))
+    {
+        throw new Exception(
+            "No --version was supplied. Pass the package version after a -- separator, e.g. " +
+            "./build.sh -- --target=Package --version=2.0.0 (Cake reserves --version for itself).");
+    }
+
+    return version;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // PACKAGE TASKS (Internal)
 ///////////////////////////////////////////////////////////////////////////////
+
+Task("_Package_Require_Version")
+    .Does(() =>
+{
+    // Without a version, _Package_Create_NuGet would be skipped and Package would
+    // succeed having packed nothing.
+    RequirePackageVersionArgument();
+});
 
 Task("_Restore_Package")
     .Does(() =>
@@ -9,6 +63,7 @@ Task("_Restore_Package")
 });
 
 Task("_Package_Build_All")
+    .IsDependentOn("_Package_Require_Version")
     .IsDependentOn("_Clean")
     .IsDependentOn("_Version")
     .IsDependentOn("_Restore_Package")
@@ -60,23 +115,10 @@ Task("_Package_Build_All")
 
 Task("_Package_Create_NuGet")
     .IsDependentOn("_Package_Build_All")
-    // Runs between the build and the pack: nuget silently omits a files entry it
-    // cannot resolve, so this is the last moment an empty package can be caught.
-    .IsDependentOn("_Release_Verify_Files")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
     Information($"Creating NuGet packages version {version}...");
-
-    // The lockstep package set. Every package here is built from this repository
-    // and released at the same version, and both door packages pin the core exactly.
-    // Packed core-first so the order matches the publish order stack PR 3 adds.
-    var nuspecFiles = new[]
-    {
-        "nuget/ably.pubsub.core.nuspec",
-        "nuget/ably.pubsub.device.nuspec",
-        "nuget/ably.pubsub.server.nuspec"
-    };
 
     var nugetSettings = new NuGetPackSettings
     {
@@ -85,7 +127,7 @@ Task("_Package_Create_NuGet")
         {
             { "Configuration", "Release" }
         },
-        OutputDirectory = ReleasePackageOutputDirectory()
+        OutputDirectory = PackageOutputDirectory()
     };
 
     CreateDirectory(nugetSettings.OutputDirectory);
@@ -97,9 +139,9 @@ Task("_Package_Create_NuGet")
         nugetSettings.ToolPath = nugetPath;
     }
 
-    foreach (var nuspec in nuspecFiles)
+    foreach (var nuspec in nugetPackageSet.Keys)
     {
-        var nuspecFile = paths.Root.CombineWithFilePath(nuspec);
+        var nuspecFile = NuspecDirectory().CombineWithFilePath(nuspec);
 
         if (!FileExists(nuspecFile))
         {
@@ -172,11 +214,7 @@ Task("_Package_Unity")
 
 Task("Package")
     .Description("Create the NuGet packages (Ably.PubSub.Core, Ably.PubSub.Device, Ably.PubSub.Server)")
-    // Dependencies run in declaration order: pack, then assert the produced
-    // .nupkg files. Together with _Release_Preflight (before the build) and
-    // _Release_Verify_Files (before the pack), the pack is bracketed by checks.
-    .IsDependentOn("_Package_Create_NuGet")
-    .IsDependentOn("_Release_Verify_Packages");
+    .IsDependentOn("_Package_Create_NuGet");
 
 Task("UnityPackage")
     .Description("Create Unity package")

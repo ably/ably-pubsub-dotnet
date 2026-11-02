@@ -16,8 +16,8 @@ public class BuildPaths
     public FilePath DeltaCodecProject { get; }
 
     // Single source of truth for the committed merged Unity plugin, referenced by
-    // the build task (output), the packaging guard and the release pre-flight so
-    // the three sites cannot drift.
+    // the build task (output) and the Unity packaging guard so the two sites
+    // cannot drift.
     public FilePath UnityPluginDll { get; }
     
     public BuildPaths(ICakeContext context)

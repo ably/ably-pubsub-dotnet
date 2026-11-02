@@ -100,14 +100,14 @@ public void PackageConsumptionAssertMatrixMatchesNuspecs(List<string> errors)
     {
         foreach (var expected in testCase.ExpectedAssets)
         {
-            var nuspecName = releasePackageSet.FirstOrDefault(e => e.Value == expected.PackageId).Key;
+            var nuspecName = nugetPackageSet.FirstOrDefault(e => e.Value == expected.PackageId).Key;
             if (nuspecName == null)
             {
-                errors.Add($"{testCase.Name}: {expected.PackageId} is not in the lockstep package set (release.cake).");
+                errors.Add($"{testCase.Name}: {expected.PackageId} is not in the package set (nugetPackageSet in cake-build/tasks/package.cake).");
                 continue;
             }
 
-            var nuspecText = System.IO.File.ReadAllText(ReleaseNuspecDirectory().CombineWithFilePath(nuspecName).FullPath);
+            var nuspecText = System.IO.File.ReadAllText(NuspecDirectory().CombineWithFilePath(nuspecName).FullPath);
             if (!Regex.IsMatch(nuspecText, $@"target=""lib[\\/]{Regex.Escape(expected.Lib)}"""))
             {
                 errors.Add(
@@ -171,7 +171,7 @@ public void PackageConsumptionAssertAssets(PackageConsumptionCase testCase, File
 
 public void PackageConsumptionAssertLocalSource(DirectoryPath globalPackages, DirectoryPath packageSource, string releaseVersion, List<string> errors)
 {
-    foreach (var packageId in releasePackageSet.Values.OrderBy(v => v))
+    foreach (var packageId in nugetPackageSet.Values.OrderBy(v => v))
     {
         var metadata = globalPackages.Combine(packageId.ToLowerInvariant()).Combine(releaseVersion.ToLowerInvariant()).CombineWithFilePath(".nupkg.metadata");
         if (!FileExists(metadata))
@@ -195,8 +195,8 @@ Task("_Test_PackageConsumption")
     .Description("Restore, build and run the package-consumption apps against already packed .nupkg files")
     .Does(() =>
 {
-    var releaseVersion = ReleaseReadRequiredVersionArgument();
-    var packageSource = MakeAbsolute(ReleasePackageOutputDirectory());
+    var releaseVersion = RequirePackageVersionArgument();
+    var packageSource = MakeAbsolute(PackageOutputDirectory());
     var appsSource = paths.Root.Combine("tests/PackageConsumption");
     var workRoot = paths.TestResults.Combine("package-consumption");
     var appsRoot = workRoot.Combine("apps");
@@ -207,7 +207,7 @@ Task("_Test_PackageConsumption")
 
     var errors = new List<string>();
     PackageConsumptionAssertMatrixMatchesNuspecs(errors);
-    foreach (var packageId in releasePackageSet.Values)
+    foreach (var packageId in nugetPackageSet.Values)
     {
         var nupkg = packageSource.CombineWithFilePath($"{packageId}.{releaseVersion}.nupkg");
         if (!FileExists(nupkg))

@@ -10,18 +10,17 @@ using Xunit;
 namespace Ably.PubSub.Tests.PubSub
 {
     /// <summary>
-    /// The lockstep packaging contract, asserted from the nuspec files themselves.
+    /// The lockstep packaging contract, asserted from the nuspec files themselves: the three
+    /// packages ship at one version and each door pins the core exactly.
     ///
-    /// The same assertions live in the Cake release pre-flight (`cake-build/tasks/release.cake`),
-    /// which is what guards the actual release. They are duplicated here so that a PR which edits
-    /// a nuspec fails the ordinary unit test run rather than waiting for a packaging job: the
-    /// mistakes being guarded against - a door pinned loosely, a resurrected `ably.io` package, a
-    /// hard-coded version - are all silent at build time and only visible to a consumer after the
-    /// version has been published and can never be changed.
+    /// These run in the ordinary unit test run, so a PR which edits a nuspec fails there rather
+    /// than on release day: the mistakes being guarded against - a door pinned loosely, a
+    /// resurrected `ably.io` package, a hard-coded version - are all silent at build time and only
+    /// visible to a consumer after the version has been published and can never be changed.
     ///
     /// What cannot be asserted here is the packed output: whether nuget substitutes `$version$`
     /// inside a dependency's version attribute is a property of the packer, not of the source, so
-    /// it is asserted post-pack by `_Release_Verify_Packages` against the produced .nupkg files.
+    /// the release process in CONTRIBUTING.md checks the packed pin in the produced .nupkg files.
     /// </summary>
     public class PackagingSpecs
     {
@@ -156,10 +155,9 @@ namespace Ably.PubSub.Tests.PubSub
             var unityVersion = File.ReadAllText(
                 Path.Combine(RepositoryRoot(), "unity", "Assets", "Ably", "version.txt")).Trim();
 
-            // Mirrors _Version and ReleaseAssertVersionFilesAgree: AssemblyVersion and
-            // AssemblyFileVersion carry the numeric identity only (a SemVer2 label in
-            // either is CS7034); AssemblyInformationalVersion carries the full string,
-            // prerelease label included.
+            // Mirrors _Version: AssemblyVersion and AssemblyFileVersion carry the numeric
+            // identity only (a SemVer2 label in either is CS7034); AssemblyInformationalVersion
+            // carries the full string, prerelease label included.
             var numericVersion = unityVersion.Split('-')[0];
 
             foreach (var (attribute, expected) in new[]
