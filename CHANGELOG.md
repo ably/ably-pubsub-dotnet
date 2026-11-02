@@ -1,6 +1,6 @@
 # Change Log
 
-## [2.0.0](https://github.com/ably/ably-pubsub-dotnet/tree/2.0.0) (TBD)
+## [2.0.0](https://github.com/ably/ably-pubsub-dotnet/tree/2.0.0) (2026-11-03)
 
 [Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/1.2.19...2.0.0)
 
