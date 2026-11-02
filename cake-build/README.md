@@ -125,9 +125,8 @@ packages to nuget.org by hand, following the release process in `CONTRIBUTING.md
 ### package.cmd
 
 - Responsible for creating all three NuGet packages.
-- Works only on Windows (or with Mono): the core and server packages carry a
-  `lib/net46` asset built by an old-style MSBuild head, and `NuGetPack` needs
-  `nuget.exe`.
+- Works only on Windows (or with Mono): the core package carries a `lib/net46`
+  asset built by an old-style MSBuild head, and `NuGetPack` needs `nuget.exe`.
 
 ```cmd
 .\package.cmd 2.0.0
@@ -179,8 +178,8 @@ Installs the packed packages into small apps the way a customer does, so problem
 that exist only in the shipped `.nupkg` files fail here rather than in a customer's
 app. The unit tests can't catch these, because they use project references, which
 skip NuGet's per-framework asset selection and the Package-only signing. For example,
-a .NET Framework app gets the Device `netstandard2.0` asset paired with the Core
-`net46` asset.
+a .NET Framework app gets the Device or Server `netstandard2.0` asset paired with
+the Core `net46` asset.
 
 The target runs `Package`, then:
 
@@ -215,8 +214,8 @@ The full `Test.PackageConsumption` runs on every PR in two workflows: the Window
 (NetFramework) workflow, where the .NET Framework apps run on the .NET Framework
 CLR, and the macOS (Mono) workflow, where they run on Mono.
 
-On macOS/Linux, `Package` needs Mono: it builds the `net46` heads with Mono MSBuild
-and the other target frameworks with the .NET SDK.
+On macOS/Linux, `Package` needs Mono: it builds the core's `net46` head with Mono
+MSBuild and the other target frameworks with the .NET SDK.
 
 ## Advanced Options
 

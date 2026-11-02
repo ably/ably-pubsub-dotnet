@@ -1,7 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Identical to the core head, so every consumer of the core has a Server asset. -->
+    <!-- Identical to the core head, so every consumer of the core has a Server asset. As with
+         Ably.PubSub.Device there is no separate .NET Framework head: a .NET Framework app gets
+         the netstandard2.0 asset alongside the core's net46 one. -->
     <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
     <CodeAnalysisRuleSet>..\Ably.PubSub.ruleset</CodeAnalysisRuleSet>
     <Configurations>Debug;Release;package</Configurations>

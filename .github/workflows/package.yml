@@ -29,8 +29,8 @@ permissions:
 
 jobs:
   package-library:
-    # Windows: the core and server packages carry a lib/net46 asset built by an
-    # old-style MSBuild head, and Windows runs the .NET Framework apps of the
+    # Windows: the core package carries a lib/net46 asset built by an old-style
+    # MSBuild head, and Windows runs the .NET Framework apps of the
     # package-install test on the real .NET Framework CLR.
     runs-on: windows-2022
     env:

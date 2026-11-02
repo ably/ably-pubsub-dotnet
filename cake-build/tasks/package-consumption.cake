@@ -39,8 +39,9 @@ var packageConsumptionMatrix = new[]
     new PackageConsumptionCase("DeviceApp", "net48", ("Ably.PubSub.Device", "netstandard2.0"), ("Ably.PubSub.Core", "net46")),
     new PackageConsumptionCase("DeviceApp", "net6.0", ("Ably.PubSub.Device", "net6.0"), ("Ably.PubSub.Core", "net6.0")),
     new PackageConsumptionCase("DeviceApp", "net7.0", ("Ably.PubSub.Device", "net7.0"), ("Ably.PubSub.Core", "net7.0")),
-    new PackageConsumptionCase("ServerApp", "net462", ("Ably.PubSub.Server", "net46"), ("Ably.PubSub.Core", "net46")),
-    new PackageConsumptionCase("ServerApp", "net48", ("Ably.PubSub.Server", "net46"), ("Ably.PubSub.Core", "net46")),
+    // Likewise a .NET Framework server app: the netstandard2.0 Server door with the net46 core.
+    new PackageConsumptionCase("ServerApp", "net462", ("Ably.PubSub.Server", "netstandard2.0"), ("Ably.PubSub.Core", "net46")),
+    new PackageConsumptionCase("ServerApp", "net48", ("Ably.PubSub.Server", "netstandard2.0"), ("Ably.PubSub.Core", "net46")),
     new PackageConsumptionCase("ServerApp", "net6.0", ("Ably.PubSub.Server", "net6.0"), ("Ably.PubSub.Core", "net6.0")),
     new PackageConsumptionCase("ServerApp", "net7.0", ("Ably.PubSub.Server", "net7.0"), ("Ably.PubSub.Core", "net7.0")),
 };

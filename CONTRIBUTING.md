@@ -24,13 +24,12 @@ If you want to incorporate the SDK into your project from source (perhaps to use
 4. Select Add > Existing Project from the context menu
 5. Browse to the ably-pubsub-dotnet repository and add ably-pubsub-dotnet\src\Ably.PubSub.Shared\Ably.PubSub.Shared.shproj
 6. Add the projects for the side your code runs on. The client constructors are internal, so clients are created through the door's `PubSubServer` or `PubSubDevice` factories.
-    - A server app on .NET Framework: add ably-pubsub-dotnet\src\Ably.PubSub.Core.NETFramework\Ably.PubSub.Core.NETFramework.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Server.NETFramework\Ably.PubSub.Server.NETFramework.csproj.
-    - Any other server app: add ably-pubsub-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Server\Ably.PubSub.Server.csproj.
+    - A server app, on any target framework including .NET Framework: add ably-pubsub-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Server\Ably.PubSub.Server.csproj.
     - A device app, on any target framework including .NET Framework: add ably-pubsub-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Device\Ably.PubSub.Device.csproj.
 7. In any project that you want to use the SDK in, you need to add a project reference to the door project, to do so:
     1. Find your project in Solution Explorer and expand the tree so that the Dependencies node is visible
     2. Right click Dependencies and select Add Reference
-    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to the door project you added (Ably.PubSub.Server, Ably.PubSub.Server.NETFramework or Ably.PubSub.Device) and click OK.
+    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to the door project you added (Ably.PubSub.Server or Ably.PubSub.Device) and click OK.
 
 ## Spec
 
