@@ -221,6 +221,34 @@ namespace Ably.PubSub.Tests.CustomSerializers
             }
         }
 
+        [Theory]
+        [MemberData(nameof(AppSettings))]
+        public void ClientCurrentState_WithAppDefaultSettings_IsTheSame(string appSettings)
+        {
+            using (var client = new PubSubRealtimeClient(new ClientOptions(ValidKey) { AutoConnect = false }))
+            {
+                var channel = (RealtimeChannel)client.Channels.Get("test");
+                var member = new PresenceMessage(PresenceAction.Present, "client-1", new JObject { ["status"] = "online" })
+                {
+                    ConnectionId = "conn-1",
+                    Id = "conn-1:0:0",
+                    Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(1700000000000),
+                };
+                channel.Presence.MembersMap.Put(member);
+                channel.Presence.PendingPresenceQueue.Enqueue(
+                    new Presence.QueuedPresenceMessage(new PresenceMessage(PresenceAction.Enter, "client-2"), null));
+                var expected = client.GetCurrentState();
+
+                var actual = WithAppDefaultSettings(appSettings, () => client.GetCurrentState());
+
+                actual.Should().Be(expected);
+                var state = JObject.Parse(actual);
+                state["state"]["connection"].Should().NotBeNull();
+                state["channels"][0]["presence"]["members"]["members"].Should().HaveCount(1);
+                state["channels"][0]["presence"]["pendingQueue"][0]["action"].Type.Should().Be(JTokenType.Integer);
+            }
+        }
+
         private static T WithAppDefaultSettings<T>(string name, Func<T> action)
         {
             _appSettingsOnThisThread = CreateAppSettings(name);
