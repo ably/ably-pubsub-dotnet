@@ -880,7 +880,7 @@ namespace Ably.PubSub.Realtime
         {
             ["handlers"] = _handlers.GetState(),
             ["members"] = MembersMap.GetState(),
-            ["pendingQueue"] = new JArray(PendingPresenceQueue.Select(x => JObject.FromObject(x.Message))),
+            ["pendingQueue"] = new JArray(PendingPresenceQueue.Select(x => JObject.FromObject(x.Message, JsonHelper.GetPlainSerializer()))),
         };
 
         /// <summary>

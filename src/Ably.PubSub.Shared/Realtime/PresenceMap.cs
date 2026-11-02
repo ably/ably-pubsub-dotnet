@@ -222,7 +222,7 @@ namespace Ably.PubSub.Realtime
 
         internal JObject GetState()
         {
-            var matchingMembers = _members.Select(x => JObject.FromObject(new { Name = x.Key, Data = x.Value }));
+            var matchingMembers = _members.Select(x => JObject.FromObject(new { Name = x.Key, Data = x.Value }, JsonHelper.GetPlainSerializer()));
 
             var state = new JObject
             {
