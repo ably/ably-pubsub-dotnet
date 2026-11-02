@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Assets.Tests.AblySandbox;
 using Cysharp.Threading.Tasks;
-using IO.Ably;
+using Ably.PubSub;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 

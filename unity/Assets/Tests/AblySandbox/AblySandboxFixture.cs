@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Encryption;
+using Ably.PubSub;
+using Ably.PubSub.Encryption;
 using Newtonsoft.Json.Linq;
 
 namespace Assets.Tests.AblySandbox
@@ -14,28 +14,28 @@ namespace Assets.Tests.AblySandbox
 
         private static Dictionary<string, TestEnvironmentSettings> _settings = new Dictionary<string, TestEnvironmentSettings>();
 
-        public async Task<TestEnvironmentSettings> GetSettings(string environment = null)
+        public async Task<TestEnvironmentSettings> GetSettings(string endpoint = null)
         {
-            environment = environment ?? "sandbox";
-            if (_settings.ContainsKey(environment))
+            endpoint = endpoint ?? TestEnvironmentSettings.DefaultEndpoint;
+            if (_settings.ContainsKey(endpoint))
             {
-                return _settings[environment];
+                return _settings[endpoint];
             }
 
-            _settings[environment] = await Initialise("sandbox");
-            return _settings[environment];
+            _settings[endpoint] = await Initialise(endpoint);
+            return _settings[endpoint];
         }
 
-        private static async Task<TestEnvironmentSettings> Initialise(string environment)
+        private static async Task<TestEnvironmentSettings> Initialise(string endpoint)
         {
             var settings = new TestEnvironmentSettings
             {
                 Tls = true,
             };
 
-            if (environment != null)
+            if (endpoint != null)
             {
-                settings.Environment = environment;
+                settings.Endpoint = endpoint;
             }
 
             JObject testAppSpec = JObject.Parse(TestAppSetup._testAppSetup);
@@ -53,7 +53,7 @@ namespace Assets.Tests.AblySandbox
             request.RequestBody = testAppSpec["post_apps"].ToString().GetBytes();
             request.Protocol = Protocol.Json;
 
-            AblyHttpClient client = settings.GetHttpClient(environment);
+            AblyHttpRequester client = settings.GetHttpClient(endpoint);
             var response = await RetryExecute(() => client.Execute(request));
 
             var json = JObject.Parse(response.TextResponse);
@@ -113,13 +113,13 @@ namespace Assets.Tests.AblySandbox
             json = json.Replace("[[Interval2]]", interval2.ToString("yyyy-MM-dd:HH:mm"));
             json = json.Replace("[[Interval3]]", interval3.ToString("yyyy-MM-dd:HH:mm"));
 
-            AblyHttpClient client = settings.GetHttpClient();
+            AblyHttpRequester client = settings.GetHttpClient();
             var request = new AblyRequest("/stats", HttpMethod.Post);
             request.Protocol = Protocol.Json;
             request.Headers.Add("Accept", "application/json");
             request.Headers.Add("Content-Type", "application/json");
 
-            AblyRest ablyRest = new AblyRest(settings.FirstValidKey);
+            PubSubHttpClient ablyRest = new PubSubHttpClient(settings.FirstValidKey);
             await ablyRest.AblyAuth.AddAuthHeader(request);
             request.RequestBody = json.GetBytes();
 

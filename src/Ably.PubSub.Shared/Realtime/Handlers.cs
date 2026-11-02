@@ -1,0 +1,190 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using Newtonsoft.Json.Linq;
+
+namespace Ably.PubSub.Realtime
+{
+    internal class Handlers<T> : IDisposable
+        where T : IMessage
+    {
+        private readonly List<MessageHandlerAction<T>> _handlers = new List<MessageHandlerAction<T>>();
+        private readonly Dictionary<string, List<MessageHandlerAction<T>>> _specificHandlers = new Dictionary<string, List<MessageHandlerAction<T>>>();
+        private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
+        private readonly bool _caseSensitive;
+
+        /// <summary>Initializes a new instance of the <see cref="Handlers{T}"/> class.</summary>
+        /// <param name="caseSensitive">When true, filter names must match exactly; by default they are matched case-insensitively.</param>
+        public Handlers(bool caseSensitive = false)
+        {
+            _caseSensitive = caseSensitive;
+        }
+
+        private string Key(string eventName) => _caseSensitive ? eventName : eventName.ToLower();
+
+        public IEnumerable<MessageHandlerAction<T>> GetHandlers(string eventName = null)
+        {
+            try
+            {
+                _lock.EnterReadLock();
+                if (eventName.IsNotEmpty())
+                {
+                    List<MessageHandlerAction<T>> result;
+                    if (_specificHandlers.TryGetValue(Key(eventName), out result))
+                    {
+                        return new List<MessageHandlerAction<T>>(result);
+                    }
+
+                    return Enumerable.Empty<MessageHandlerAction<T>>();
+                }
+
+                return new List<MessageHandlerAction<T>>(_handlers);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
+        /// <summary>Gets a value indicating whether there are no handlers, with or without a filter.</summary>
+        public bool IsEmpty
+        {
+            get
+            {
+                try
+                {
+                    _lock.EnterReadLock();
+                    return _handlers.Count == 0 && _specificHandlers.Values.All(x => x.Count == 0);
+                }
+                finally
+                {
+                    _lock.ExitReadLock();
+                }
+            }
+        }
+
+        /// <summary>Add handler to the collection.</summary>
+        /// <param name="handler">MessageHandler action to be added.</param>
+        public void Add(MessageHandlerAction<T> handler)
+        {
+            try
+            {
+                _lock.EnterWriteLock();
+                _handlers.Add(handler);
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        public void Add(string eventName, MessageHandlerAction<T> handler)
+        {
+            try
+            {
+                _lock.EnterWriteLock();
+                List<MessageHandlerAction<T>> result;
+                var key = Key(eventName);
+                if (_specificHandlers.TryGetValue(key, out result))
+                {
+                    if (result != null)
+                    {
+                        result.Add(handler);
+                        return;
+                    }
+                }
+
+                _specificHandlers[key] = new List<MessageHandlerAction<T>> { handler };
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        /// <summary>Remove handler from the collection.</summary>
+        /// <param name="handler">MessageHandler action to be removed.</param>
+        /// <returns>True if removed, false if not found.</returns>
+        public bool Remove(MessageHandlerAction<T> handler)
+        {
+            try
+            {
+                _lock.EnterWriteLock();
+                return _handlers.RemoveAll(x => x.Equals(handler)) > 0;
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        public bool Remove(string eventName, MessageHandlerAction<T> handler = null)
+        {
+            if (eventName.IsEmpty())
+            {
+                return false;
+            }
+
+            try
+            {
+                _lock.EnterWriteLock();
+                var key = Key(eventName);
+                if (_specificHandlers.ContainsKey(key))
+                {
+                    if (handler == null)
+                    {
+                        _specificHandlers.Remove(key);
+                        return true;
+                    }
+                    else
+                    {
+                        return _specificHandlers[key].Remove(handler);
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        public void RemoveAll()
+        {
+            try
+            {
+                _lock.EnterWriteLock();
+                _specificHandlers.Clear();
+                _handlers.Clear();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        internal JObject GetState()
+        {
+            var state = new JObject
+            {
+                ["*"] = _handlers.Count,
+            };
+
+            foreach (var key in _specificHandlers.Keys)
+            {
+                state[key] = _specificHandlers[key].Count;
+            }
+
+            return state;
+        }
+
+        public void Dispose()
+        {
+            _lock.Dispose();
+        }
+    }
+}

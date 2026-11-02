@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - main
+      - 'integration/**'
 
 permissions:
   contents: read
 
 jobs:
   check:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       DOTNET_NOLOGO: true
 

@@ -5,9 +5,9 @@ using System.Net;
 using System.Net.Http;
 using Assets.Tests.AblySandbox;
 using Cysharp.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Realtime;
-using IO.Ably.Unity;
+using Ably.PubSub;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Unity;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 
@@ -215,7 +215,7 @@ namespace Assets.Tests.EditMode
             {
                 var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("Success") };
                 var handler = new FakeHttpMessageHandler(response);
-                var client = new AblyHttpClient(new AblyHttpOptions { HttpClient = new HttpClient(handler) });
+                var client = new AblyHttpRequester(new AblyHttpOptions { HttpClient = new HttpClient(handler) });
 
                 await client.Execute(new AblyRequest("/test", HttpMethod.Get));
                 string[] values = handler.LastRequest.Headers.GetValues("Ably-Agent").ToArray();
@@ -227,7 +227,7 @@ namespace Assets.Tests.EditMode
 
                 var keys = new List<string>()
                 {
-                    "ably-dotnet/",
+                    "ably-pubsub-dotnet/",
                     Agent.DotnetRuntimeIdentifier,
                     UnityHelper.UnityIdentifier,
                     Agent.OsIdentifier

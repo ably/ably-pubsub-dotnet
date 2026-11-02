@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'integration/**'
 
 permissions:
   contents: read
@@ -34,3 +35,16 @@ jobs:
 
       - name: Integration tests
         run: ./build.cmd --target=Test.NetFramework.Integration.WithRetry
+
+      # Packs all three packages at the committed version and runs the package-install test
+      # against them: small .NET Framework (net462, net48) and .NET (net6.0, net7.0) apps
+      # install the packages the way a customer would, and the .NET Framework apps run on the
+      # .NET Framework CLR. Offline: no credentials. Last, because Package cleans and rebuilds
+      # the solution in the signed Package configuration.
+      - name: Package-install test (.NET Framework CLR)
+        run: |
+          $match = Select-String -Path src/CommonAssemblyInfo.cs -Pattern 'AssemblyInformationalVersion\("([^"]+)"\)'
+          if (-not $match) { throw "No AssemblyInformationalVersion in src/CommonAssemblyInfo.cs" }
+          $version = $match.Matches[0].Groups[1].Value
+          Write-Host "Version under test: $version"
+          ./build.cmd -- --target=Test.PackageConsumption "--version=$version" --packageOutput=consumption-packages

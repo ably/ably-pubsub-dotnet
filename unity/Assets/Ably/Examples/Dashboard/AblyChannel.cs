@@ -1,5 +1,5 @@
 ﻿using System.Linq;
-using IO.Ably;
+using Ably.PubSub;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,7 +7,7 @@ namespace Assets.Ably.Examples.Chat
 {
     internal class AblyChannel
     {
-        private readonly AblyRealtime _ably;
+        private PubSubRealtimeClient _ably;
         private readonly IUiConsole _uiConsole;
 
         private Button _subscribe;
@@ -19,15 +19,22 @@ namespace Assets.Ably.Examples.Chat
         private InputField _eventName;
         private InputField _payload;
 
-        private AblyChannel(AblyRealtime ably, IUiConsole uiConsole)
+        private AblyChannel(PubSubRealtimeClient ably, IUiConsole uiConsole)
         {
             _ably = ably;
             _uiConsole = uiConsole;
         }
 
-        internal static AblyChannel CreateInstance(AblyRealtime ably, IUiConsole uiConsole)
+        internal static AblyChannel CreateInstance(PubSubRealtimeClient ably, IUiConsole uiConsole)
         {
             return new AblyChannel(ably, uiConsole);
+        }
+
+        // The client is recreated at connect time (so the latest ClientId is captured);
+        // point this console at the current instance.
+        internal void UpdateClient(PubSubRealtimeClient ably)
+        {
+            _ably = ably;
         }
 
         internal void RegisterUiComponents()

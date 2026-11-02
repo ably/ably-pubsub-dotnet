@@ -4,7 +4,7 @@
     {
         public static string _testAppSetup = @"
         {
-          ""_post_apps"": ""/* JSON body using in POST sandbox-rest.ably.io/apps request to set up the Test app */"",
+          ""_post_apps"": ""/* JSON body using in POST sandbox.realtime.ably-nonprod.net/apps request to set up the Test app */"",
           ""post_apps"": {
             ""limits"": { ""presence"": { ""maxMembers"": 250 } },
             ""keys"": [

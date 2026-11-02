@@ -42,6 +42,10 @@ bld/
 # NUNIT
 *.VisualState.xml
 TestResult.xml
+*.trx
+
+# Cake test output (paths.cake: TestResults = test-results/)
+test-results/
 
 # Chutzpah Test files
 _Chutzpah*

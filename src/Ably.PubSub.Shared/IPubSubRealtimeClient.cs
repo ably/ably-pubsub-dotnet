@@ -1,0 +1,60 @@
+using System;
+using System.Threading.Tasks;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime;
+
+namespace Ably.PubSub
+{
+    /// <summary>
+    /// The top-level interface for the Ably Realtime library.
+    /// </summary>
+    public interface IPubSubRealtimeClient : IStatsCommands
+    {
+        /// <summary>
+        /// Initiate a connection.
+        /// </summary>
+        void Connect();
+
+        /// <summary>
+        ///     This simply calls connection.close. Causes the connection to close, entering the closed state. Once
+        ///     closed, the library will not attempt to re-establish the connection without a call to connect().
+        /// </summary>
+        void Close();
+
+        /// <summary>
+        /// Gets the initialised Auth.
+        /// </summary>
+        IAblyAuth Auth { get; }
+
+        /// <summary>A reference to the connection object for this library instance.</summary>
+        Connection Connection { get; }
+
+        /// <summary>
+        /// Methods for managing Push notifications subscriptions and device registrations.
+        /// </summary>
+        PushRealtime Push { get; }
+
+        /// <summary>
+        /// Current client id.
+        /// </summary>
+        string ClientId { get; }
+
+        /// <summary>The collection of channels instanced, indexed by channel name.</summary>
+        RealtimeChannels Channels { get; }
+
+        /// <summary>
+        /// The local device instance represents the current state of the device in respect of it being a target for push notifications.
+        /// </summary>
+        /// <remarks>
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>.
+        /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+        /// </remarks>
+        LocalDevice Device { get; }
+
+        /// <summary>
+        /// Retrieves the ably service time.
+        /// </summary>
+        /// <returns>returns current server time as DateTimeOffset.</returns>
+        Task<DateTimeOffset> TimeAsync();
+    }
+}

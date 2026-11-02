@@ -46,7 +46,7 @@ Implements RTN23 dead-transport detection and the connection-recovery spec point
 - [ECO-4285] Fix build system by @sacOO7 in https://github.com/ably/ably-dotnet/pull/1300
 - [ECO-4285] Fix delta compression by @sacOO7 in https://github.com/ably/ably-dotnet/pull/1304
 
-## [1.2.15](https://github.com/ably/ably-dotnet/tree/1.2.15) (2023-04-19)
+## [1.2.15](https://github.com/ably/ably-dotnet/tree/1.2.15) (2024-04-19)
 
 [Full Changelog](https://github.com/ably/ably-dotnet/compare/1.2.14...1.2.15)
 

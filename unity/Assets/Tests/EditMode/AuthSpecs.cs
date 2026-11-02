@@ -6,8 +6,8 @@ using System.Net;
 using System.Threading.Tasks;
 using Assets.Tests.AblySandbox;
 using Cysharp.Threading.Tasks;
-using IO.Ably;
-using IO.Ably.Realtime;
+using Ably.PubSub;
+using Ably.PubSub.Realtime;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -75,7 +75,7 @@ namespace Assets.Tests.EditMode
                 Assert.AreEqual(1, helper.Requests.Count);
                 var realtimeClient = await helper.GetRealTimeClientWithRequests(protocol, token, invalidateKey: true);
                 Assert.AreEqual(1, helper.Requests.Count);
-                await realtimeClient.RestClient.TimeAsync();
+                await realtimeClient.HttpClient.TimeAsync();
                 Assert.AreEqual(2, helper.Requests.Count);
             });
         }
@@ -221,7 +221,7 @@ namespace Assets.Tests.EditMode
                     options.AutoConnect = false;
                 });
 
-                realtimeClient.RestClient.ExecuteHttpRequest = helper.AblyResponseWith500Status;
+                realtimeClient.HttpClient.ExecuteHttpRequest = helper.AblyResponseWith500Status;
 
                 var awaiter = new TaskCompletionAwaiter(5000);
 
@@ -626,9 +626,9 @@ namespace Assets.Tests.EditMode
 
                 var options = await _sandboxFixture.GetSettings();
                 var httpTokenAbly =
-                    new AblyRest(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = false });
+                    new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = options.Endpoint, Tls = false });
                 var httpsTokenAbly =
-                    new AblyRest(new ClientOptions { Token = token.Token, Environment = options.Environment, Tls = true });
+                    new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = options.Endpoint, Tls = true });
 
                 // If it doesn't throw we are good :)
                 await httpTokenAbly.Channels.Get("foo").PublishAsync("test", "true");
@@ -670,7 +670,7 @@ namespace Assets.Tests.EditMode
 
                 var token = ably.Auth.RequestTokenAsync(CreateTokenParams(capability), null).Result;
 
-                var tokenAbly = new AblyRest(new ClientOptions { Token = token.Token, Environment = "sandbox" });
+                var tokenAbly = new PubSubHttpClient(new ClientOptions { Token = token.Token, Endpoint = ably.Options.Endpoint });
 
                 var error =
                     await E7Assert.ThrowsAsync<AblyException>(tokenAbly.Channels.Get("boo").PublishAsync("test", "true"));
@@ -726,10 +726,10 @@ namespace Assets.Tests.EditMode
                 var client = await AblySandbox.GetRestClient(protocol, opts => opts.QueryTime = true);
                 var settings = await _sandboxFixture.GetSettings();
                 var token = await client.Auth.RequestTokenAsync();
-                var tokenClient = new AblyRest(new ClientOptions
+                var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -751,10 +751,10 @@ namespace Assets.Tests.EditMode
                 var client = await AblySandbox.GetRestClient(protocol);
                 var settings = await _sandboxFixture.GetSettings();
                 var token = await client.Auth.RequestTokenAsync();
-                var tokenClient = new AblyRest(new ClientOptions
+                var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -772,10 +772,10 @@ namespace Assets.Tests.EditMode
                 var client = await AblySandbox.GetRestClient(protocol);
                 var settings = await _sandboxFixture.GetSettings();
                 var token = await client.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" });
-                var tokenClient = new AblyRest(new ClientOptions
+                var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -797,10 +797,10 @@ namespace Assets.Tests.EditMode
                 var client = await AblySandbox.GetRestClient(protocol);
                 var settings = await _sandboxFixture.GetSettings();
                 var token = await client.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" });
-                var tokenClient = new AblyRest(new ClientOptions
+                var tokenClient = new PubSubHttpClient(new ClientOptions
                 {
                     TokenDetails = token,
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -823,10 +823,10 @@ namespace Assets.Tests.EditMode
                 var settings = await _sandboxFixture.GetSettings();
                 var authUrl = "http://echo.ably.io/?type=text&body=" + token.Token;
 
-                var authUrlClient = new AblyRest(new ClientOptions
+                var authUrlClient = new PubSubHttpClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol
                 });
 
@@ -849,10 +849,10 @@ namespace Assets.Tests.EditMode
                 var settings = await _sandboxFixture.GetSettings();
                 var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeUriString(token.ToJson());
 
-                var authUrlClient = new AblyRest(new ClientOptions
+                var authUrlClient = new PubSubHttpClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol,
                     HttpRequestTimeout = new TimeSpan(0, 0, 20)
                 });
@@ -877,10 +877,10 @@ namespace Assets.Tests.EditMode
                 var tokenJson = token.ToJson();
                 var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeUriString(tokenJson);
 
-                var client = new AblyRealtime(new ClientOptions
+                var client = new PubSubRealtimeClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol,
                     HttpRequestTimeout = new TimeSpan(0, 0, 20),
                     AutomaticNetworkStateMonitoring = false
@@ -902,10 +902,10 @@ namespace Assets.Tests.EditMode
                 var incorrectJson = $"[{token.ToJson()}]";
                 var authUrl = "http://echo.ably.io/?type=json&body=" + Uri.EscapeUriString(incorrectJson);
 
-                var client = new AblyRealtime(new ClientOptions
+                var client = new PubSubRealtimeClient(new ClientOptions
                 {
                     AuthUrl = new Uri(authUrl),
-                    Environment = settings.Environment,
+                    Endpoint = settings.Endpoint,
                     UseBinaryProtocol = protocol == Defaults.Protocol,
                     HttpRequestTimeout = new TimeSpan(0, 0, 20),
                     AutomaticNetworkStateMonitoring = false
@@ -938,7 +938,7 @@ namespace Assets.Tests.EditMode
                 {
                     options.AuthCallback = tokenParams =>
                         tokenClient.Auth.RequestTokenAsync(new TokenParams { ClientId = "*" }).Convert();
-                    options.Environment = settings.Environment;
+                    options.Endpoint = settings.Endpoint;
                     options.UseBinaryProtocol = protocol == Defaults.Protocol;
                 });
 
@@ -964,7 +964,7 @@ namespace Assets.Tests.EditMode
                 {
                     options.AuthCallback = async tokenParams =>
                         await tokenClient.Auth.CreateTokenRequestAsync(new TokenParams { ClientId = "*" });
-                    options.Environment = settings.Environment;
+                    options.Endpoint = settings.Endpoint;
                     options.UseBinaryProtocol = protocol == Defaults.Protocol;
                 });
 
@@ -1010,7 +1010,7 @@ namespace Assets.Tests.EditMode
                 Specs = specs;
             }
 
-            public async Task<AblyRest> GetRestClientWithRequests(Protocol protocol, TokenDetails token,
+            public async Task<PubSubHttpClient> GetRestClientWithRequests(Protocol protocol, TokenDetails token,
                 bool invalidateKey, Action<ClientOptions> optionsAction = null)
             {
                 void DefaultOptionsAction(ClientOptions options)
@@ -1040,7 +1040,7 @@ namespace Assets.Tests.EditMode
                 return restClient;
             }
 
-            public async Task<AblyRealtime> GetRealTimeClientWithRequests(Protocol protocol, TokenDetails token,
+            public async Task<PubSubRealtimeClient> GetRealTimeClientWithRequests(Protocol protocol, TokenDetails token,
                 bool invalidateKey, Action<ClientOptions, TestEnvironmentSettings> optionsAction = null)
             {
                 var restClient = await GetRestClientWithRequests(protocol, token, invalidateKey);

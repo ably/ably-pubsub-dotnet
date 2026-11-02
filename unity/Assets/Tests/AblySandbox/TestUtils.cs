@@ -2,7 +2,7 @@
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
-using IO.Ably;
+using Ably.PubSub;
 
 namespace Assets.Tests.AblySandbox
 {

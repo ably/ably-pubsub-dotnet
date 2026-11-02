@@ -1,0 +1,53 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Ably.PubSub.Push;
+using Xunit.Abstractions;
+
+namespace Ably.PubSub.Tests
+{
+    public abstract class MockHttpRestSpecs : AblySpecs
+    {
+        internal virtual AblyResponse DefaultResponse { get; } = AblyResponse.EmptyResponse;
+
+        /// <summary>A 2xx publish response body (RSL1n) for tests that await a REST publish.</summary>
+        internal static Task<AblyResponse> PublishResultResponse(AblyRequest request) =>
+            new AblyResponse { TextResponse = "{\"serials\":[\"serial\"]}" }.ToTask();
+
+        internal AblyRequest LastRequest => Requests.LastOrDefault();
+
+        internal AblyRequest FirstRequest => Requests.FirstOrDefault();
+
+        internal List<AblyRequest> Requests { get; } = new List<AblyRequest>();
+
+        internal PubSubHttpClient GetRestClient(Func<AblyRequest, Task<AblyResponse>> handleRequestFunc, ClientOptions options, IMobileDevice mobileDevice = null)
+        {
+            var client = new PubSubHttpClient(options, mobileDevice);
+            client.ExecuteHttpRequest = request =>
+            {
+                Requests.Add(request);
+                if (handleRequestFunc != null)
+                {
+                    return handleRequestFunc(request);
+                }
+
+                return DefaultResponse.ToTask();
+            };
+            return client;
+        }
+
+        internal PubSubHttpClient GetRestClient(Func<AblyRequest, Task<AblyResponse>> handleRequestFunc = null, Action<ClientOptions> setOptionsAction = null, IMobileDevice mobileDevice = null)
+        {
+            var options = new ClientOptions(ValidKey) { UseBinaryProtocol = false };
+            setOptionsAction?.Invoke(options);
+
+            return GetRestClient(handleRequestFunc, options, mobileDevice);
+        }
+
+        protected MockHttpRestSpecs(ITestOutputHelper output)
+            : base(output)
+        {
+        }
+    }
+}
