@@ -24,6 +24,7 @@ namespace Ably.PubSub.Realtime
 #pragma warning restore CA2213
 
         private ChannelOptions _options;
+        private volatile HttpChannel _restChannel; // see RestChannel
         private ChannelState _state;
         private readonly PushChannel _pushChannel;
         private int _retryCount = 0;
@@ -58,11 +59,30 @@ namespace Ably.PubSub.Realtime
 
         private Connection Connection => RealtimeClient.Connection;
 
-        internal IHttpChannel HttpChannel => RealtimeClient.HttpClient.Channels.Get(Name);
+        // A REST channel of the same name carrying this channel's current options, so that payloads of
+        // the messages, presence messages and annotations it retrieves (history included) are decoded
+        // (and decrypted) as the realtime ones are. It is this channel's own instance, not the one in
+        // HttpClient.Channels: getting that one with options would replace the options the app set on
+        // it (RSN3c), e.g. drop its cipher so that a later REST publish goes out unencrypted.
+        // It is cached and rebuilt when Options changes. Every change replaces the ChannelOptions
+        // object (the setter, SetOptions, Channels.Get with options), and HttpChannel reads its
+        // options on each request, so a reference check is enough to never use stale options. A
+        // concurrent rebuild only creates a spare instance with the same options.
+        internal IHttpChannel RestChannel
+        {
+            get
+            {
+                var options = Options;
+                var restChannel = _restChannel;
+                if (restChannel == null || !ReferenceEquals(restChannel.Options, options))
+                {
+                    restChannel = new HttpChannel(RealtimeClient.HttpClient, Name, options);
+                    _restChannel = restChannel;
+                }
 
-        // The REST channel of the same name carrying this channel's options, so that payloads of the
-        // messages and annotations it retrieves are decoded (and decrypted) as the realtime ones are.
-        internal IHttpChannel RestChannel => RealtimeClient.HttpClient.Channels.Get(Name, Options);
+                return restChannel;
+            }
+        }
 
         internal ChannelAwaiter AttachedAwaiter { get; }
 
@@ -112,7 +132,7 @@ namespace Ably.PubSub.Realtime
             {
                 if (_pushChannel is null)
                 {
-                    Logger.Warning("The current device is does not support or is not configured for Push notifications.");
+                    Logger.Warning($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
                     return null;
                 }
 
@@ -590,13 +610,35 @@ namespace Ably.PubSub.Realtime
         public Task<PaginatedResult<Message>> HistoryAsync()
         {
             var query = new PaginatedRequestParams();
-            return HttpChannel.HistoryAsync(query);
+            return RestChannel.HistoryAsync(query);
+        }
+
+        public Task<PaginatedResult<Message>> HistoryAsync(bool untilAttach)
+        {
+            var query = new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                query = WithUntilAttachParameter(query); // RTL10b
+            }
+
+            return RestChannel.HistoryAsync(query);
         }
 
         public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query)
         {
             query = query ?? new PaginatedRequestParams();
-            return HttpChannel.HistoryAsync(query);
+            return RestChannel.HistoryAsync(query);
+        }
+
+        public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query, bool untilAttach)
+        {
+            query = query ?? new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                query = WithUntilAttachParameter(query); // RTL10b
+            }
+
+            return RestChannel.HistoryAsync(query);
         }
 
         public Task<Message> GetMessageAsync(string serial)
@@ -641,14 +683,31 @@ namespace Ably.PubSub.Realtime
             InternalStateChanged = null;
         }
 
-        internal void AddUntilAttachParameter(PaginatedRequestParams query)
+        // RTL10b. Returns a copy carrying fromSerial, so the caller's query - which may be reused, or be
+        // the shared PaginatedRequestParams.Empty - is left unchanged.
+        internal PaginatedRequestParams WithUntilAttachParameter(PaginatedRequestParams query)
         {
             if (State != ChannelState.Attached)
             {
                 throw new AblyException("Channel is not attached. Cannot use untilAttach parameter");
             }
 
-            query.ExtraParameters.Add("fromSerial", Properties.AttachSerial);
+            var result = new PaginatedRequestParams
+            {
+                HttpMethod = query.HttpMethod,
+                Headers = query.Headers,
+                Body = query.Body,
+                Path = query.Path,
+                Start = query.Start,
+                End = query.End,
+                Limit = query.Limit,
+                Direction = query.Direction,
+                ExtraParameters = query.ExtraParameters != null
+                    ? new Dictionary<string, string>(query.ExtraParameters)
+                    : new Dictionary<string, string>(),
+            };
+            result.ExtraParameters["fromSerial"] = Properties.AttachSerial;
+            return result;
         }
 
         private void EnsureCanPublish()

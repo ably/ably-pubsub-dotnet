@@ -38,12 +38,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // The spec's authCallback: generate_jwt(keyName: key_name, keySecret: key_secret)
-        // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
         private Func<TokenParams, Task<object>> JwtAuthCallback()
         {
             var keyName = ExtractKeyName(ApiKey);
             var keySecret = ExtractKeySecret(ApiKey);
-            return tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret)));
+            return tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret));
         }
 
         // UTS: realtime/proxy/RTL4f/attach-timeout-suppressed-0

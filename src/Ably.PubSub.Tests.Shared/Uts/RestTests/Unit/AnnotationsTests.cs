@@ -45,7 +45,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
             var channel = client.Channels.Get("test-RSL10");
 
             // Assertions
-            channel.Annotations.Should().BeAssignableTo<RestAnnotations>();
+            channel.Annotations.Should().BeAssignableTo<HttpAnnotations>();
         }
 
         // UTS: rest/unit/RSAN1c6/publish-post-annotation-create-0

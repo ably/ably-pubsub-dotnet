@@ -51,7 +51,6 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
             var keyName = ExtractKeyName(ApiKey);
             var keySecret = ExtractKeySecret(ApiKey);
 
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             var client = ProxyRealtime(session, new ClientOptions
             {
                 AuthCallback = tokenParams =>
@@ -60,7 +59,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
 
                     // Generate a JWT token signed with the sandbox key
                     var jwt = GenerateJwt(keyName, keySecret);
-                    return Task.FromResult<object>(new TokenDetails(jwt));
+                    return Task.FromResult<object>(jwt);
                 },
                 AutoConnect = false,
             });

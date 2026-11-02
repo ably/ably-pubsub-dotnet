@@ -149,10 +149,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
 
             // Create Realtime client through proxy for publishing.
             // Uses a JWT authCallback: the callback signs a JWT locally (no outbound request needed).
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             var realtimeClient = ProxyRealtime(session, new ClientOptions
             {
-                AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret))),
+                AuthCallback = tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret)),
                 AutoConnect = false,
             });
 
@@ -160,7 +159,7 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
             // Also uses JWT authCallback for the same reason.
             var restClient = ProxyRest(session, new ClientOptions
             {
-                AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret))),
+                AuthCallback = tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret)),
             });
 
             var channelName = "test-RTL6-publish-history-" + RandomId();

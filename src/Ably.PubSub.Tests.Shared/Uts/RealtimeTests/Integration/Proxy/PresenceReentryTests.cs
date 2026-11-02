@@ -54,10 +54,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
 
             // client: the presence member, connects through the proxy so we can inject ATTACHED
             // Needs a clientId for presence — use authCallback with JWT that includes clientId
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             var client = ProxyRealtime(session, new ClientOptions
             {
-                AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret, clientId: "client-a"))),
+                AuthCallback = tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret, clientId: "client-a")),
                 AutoConnect = false,
             });
 
@@ -164,10 +163,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
             });
 
             // client_a: the presence member, connects through the proxy
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             var clientA = ProxyRealtime(session, new ClientOptions
             {
-                AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret, clientId: "client-a"))),
+                AuthCallback = tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret, clientId: "client-a")),
                 AutoConnect = false,
             });
 

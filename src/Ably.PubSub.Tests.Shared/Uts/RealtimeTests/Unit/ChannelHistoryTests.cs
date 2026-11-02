@@ -92,11 +92,8 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             attachResult.IsSuccess.Should().BeTrue("AWAIT channel.attach() succeeds ({0})", attachResult.Error?.Message);
             channel.State.Should().Be(ChannelState.Attached);
 
-            // DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)
             // AWAIT channel.history(untilAttach: true)
-            var query = new PaginatedRequestParams();
-            ((RealtimeChannel)channel).AddUntilAttachParameter(query);
-            await UtsWait.WithTimeout(channel.HistoryAsync(query), TimeSpan.FromSeconds(10), "HistoryAsync");
+            await UtsWait.WithTimeout(channel.HistoryAsync(untilAttach: true), TimeSpan.FromSeconds(10), "HistoryAsync");
 
             // Assertions
             var request = capturedRequests[0];
@@ -130,11 +127,8 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             Exception error = null;
             try
             {
-                // DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)
                 // AWAIT channel.history(untilAttach: true)
-                var query = new PaginatedRequestParams();
-                ((RealtimeChannel)channel).AddUntilAttachParameter(query);
-                await channel.HistoryAsync(query);
+                await channel.HistoryAsync(untilAttach: true);
             }
             catch (Exception e)
             {

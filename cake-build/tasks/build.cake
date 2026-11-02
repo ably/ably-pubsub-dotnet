@@ -21,10 +21,6 @@ Task("_Restore_Main")
 });
 
 Task("_Version")
-    // The pre-flight runs first and unconditionally: it is the only chance to
-    // compare the --version input against the committed version files, because
-    // this task then overwrites CommonAssemblyInfo.cs with that same input.
-    .IsDependentOn("_Release_Preflight")
     .WithCriteria(() => !string.IsNullOrEmpty(version))
     .Does(() =>
 {
@@ -143,8 +139,8 @@ Task("_Build_Ably_Unity_Dll")
     // The merged Unity plugin is named after the public device door package; the
     // primary input stays Ably.PubSub.Core.dll (its public API survives the merge)
     // and the real Ably.PubSub.Device.dll is one of the merged, exclude-protected inputs.
-    // The path is defined once, in paths.cake, so the build output, the packaging
-    // guard and the release pre-flight cannot drift.
+    // The path is defined once, in paths.cake, so the build output and the Unity
+    // packaging guard cannot drift.
     var outputDll = paths.UnityPluginDll;
     
     // Delete existing output DLL if it exists

@@ -152,8 +152,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA16b/token-string-from-callback-1
-        // DEVIATION: see deviations.md
-        [DeviationFact("RSA8d", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RSA16b")]
         public async Task RSA16b_TokenStringFromCallback()
         {

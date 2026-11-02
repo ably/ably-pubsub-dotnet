@@ -140,12 +140,11 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Integration
         public async Task RSA8_AuthCallbackJwt()
         {
             // Setup
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
-            Func<TokenParams, Task<object>> authCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(
+            Func<TokenParams, Task<object>> authCallback = tokenParams => Task.FromResult<object>(GenerateJwt(
                 ExtractKeyName(ApiKey),
                 ExtractKeySecret(ApiKey),
                 clientId: tokenParams?.ClientId,
-                ttl: tokenParams?.Ttl ?? TimeSpan.FromMilliseconds(3600000))));
+                ttl: tokenParams?.Ttl ?? TimeSpan.FromMilliseconds(3600000)));
 
             var channelName = "test-RSA8-jwt-callback-" + RandomId();
             var client = Rest(new ClientOptions { AuthCallback = authCallback });
@@ -188,23 +187,22 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Integration
             // Track how many times the callback is invoked
             var callbackCount = 0;
 
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             Func<TokenParams, Task<object>> authCallback = tokenParams =>
             {
                 if (Interlocked.Increment(ref callbackCount) == 1)
                 {
                     // First call: return an already-expired JWT (expired 5 seconds ago)
-                    return Task.FromResult<object>(new TokenDetails(GenerateJwt(
+                    return Task.FromResult<object>(GenerateJwt(
                         ExtractKeyName(ApiKey),
                         ExtractKeySecret(ApiKey),
-                        expiresAt: DateTimeOffset.UtcNow.AddSeconds(-5))));
+                        expiresAt: DateTimeOffset.UtcNow.AddSeconds(-5)));
                 }
 
                 // Subsequent calls: return a valid JWT
-                return Task.FromResult<object>(new TokenDetails(GenerateJwt(
+                return Task.FromResult<object>(GenerateJwt(
                     ExtractKeyName(ApiKey),
                     ExtractKeySecret(ApiKey),
-                    ttl: TimeSpan.FromMilliseconds(3600000))));
+                    ttl: TimeSpan.FromMilliseconds(3600000)));
             };
 
             var channelName = "test-RSC10-renewal-" + RandomId();

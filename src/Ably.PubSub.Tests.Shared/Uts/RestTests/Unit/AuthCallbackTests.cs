@@ -78,8 +78,7 @@ namespace Ably.PubSub.Tests.Uts.RestTests.Unit
         }
 
         // UTS: rest/unit/RSA8d/callback-returns-jwt-1
-        // DEVIATION: see deviations.md
-        [DeviationFact("RSA8d", Timeout = UtsTestTimeouts.DefaultTestTimeoutMs)]
+        [UtsFact]
         [Trait("spec", "RSA8d")]
         public async Task RSA8d_CallbackReturnsJwt()
         {

@@ -707,15 +707,6 @@ Either way, the entry's draft fix says what the spec should change.
 - **Test impact:** `TokenDetailsTests.RSA16d_NullAfterInvalidation`, env-gated.
 - **Status:** open bug.
 
-### RSA8d / RSA4f — a token string returned by authCallback is parsed as a TokenRequest
-
-- **Spec point:** RSA8d, RSA4f (tests `rest/unit/RSA8d/callback-returns-jwt-1`, `rest/unit/RSA16b/token-string-from-callback-1`).
-- **What the features spec says:** `(RSA8d)` "... expects either a token string, a `TokenDetails` object or a `TokenRequest` object to be returned"; `(RSA4f)` the object is invalid only if "neither a `String`, `JsonObject`, `TokenRequest` object, nor `TokenDetails` object".
-- **What the SDK does:** the request fails with 80019 whose cause is a `JsonReaderException` ("AuthCallback returned a string which can't be converted to TokenRequest").
-- **Root cause:** `AblyAuth.RequestTokenAsync` sends a returned `string` through `GetTokenRequest`, which deserialises it as `TokenRequest` JSON, so a raw token or JWT never works (`rest-mapping.md` section 9).
-- **Test impact:** `AuthCallbackTests.RSA8d_CallbackReturnsJwt`, `TokenDetailsTests.RSA16b_TokenStringFromCallback`, env-gated.
-- **Status:** open bug.
-
 ### RSA8c — an authUrl JSON TokenDetails without `issued` is treated as a TokenRequest
 
 - **Spec point:** RSA8c (tests `rest/unit/RSA4/authurl-triggers-token-3`, `rest/unit/RSA8c/authurl-invoked-for-auth-0`, `rest/unit/RSA4b/renewal-via-authurl-2`).
@@ -1070,17 +1061,8 @@ Either way, the entry's draft fix says what the spec should change.
 - **Spec point:** RSA16, RSA16a–RSA16d (`uts/rest/unit/auth/token_details.md` and the RSA10g / RSA10j reads in `authorize.md`).
 - **What the spec says:** `(RSA16)` "`Auth#tokenDetails`: ... `(RSA16a)` Holds a `TokenDetails` representing the token currently in use by the library, if any".
 - **What the SDK does:** the public `Auth#tokenDetails` accessor the spec names is absent (`IAblyAuth` has no `TokenDetails`); the same value lives in the internal `AblyAuth.CurrentToken` (`rest-mapping.md` section 8, Missing APIs). `TokenDetails.Expires` / `Issued` are non-nullable `DateTimeOffset`, so "null" is asserted as `DateTimeOffset.MinValue`.
-- **Test impact:** the tests read `((AblyAuth)client.Auth).CurrentToken` (a private helper in `TokenDetailsTests`), marked `// DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken` at each test's first read: `TokenDetailsTests.RSA16a_TokenFromCallback`, `RSA16a_TokenFromRequestToken`, `RSA16b_TokenStringInOptions`, `RSA16c_SetOnInstantiation`, `RSA16c_UpdatedAfterAuthorize`, `RSA16c_UpdatedAfter40142Renewal`, `RSA16d_NullWithBasicAuth`, `RSA16d_NullBeforeTokenObtained`, `RSA16a_PreservedAcrossRequests`, `RSA16a_ReflectsCapability` (plus the gated `RSA16b_TokenStringFromCallback` and `RSA16d_NullAfterInvalidation`), and `AuthorizeTests.RSA10g_AuthorizeUpdatesTokenDetails`, `RSA10j_AuthorizeReplacesExistingToken`.
+- **Test impact:** the tests read `((AblyAuth)client.Auth).CurrentToken` (a private helper in `TokenDetailsTests`), marked `// DEVIATION: Auth#tokenDetails absent; using internal AblyAuth.CurrentToken` at each test's first read: `TokenDetailsTests.RSA16a_TokenFromCallback`, `RSA16a_TokenFromRequestToken`, `RSA16b_TokenStringInOptions`, `RSA16c_SetOnInstantiation`, `RSA16c_UpdatedAfterAuthorize`, `RSA16c_UpdatedAfter40142Renewal`, `RSA16d_NullWithBasicAuth`, `RSA16d_NullBeforeTokenObtained`, `RSA16a_PreservedAcrossRequests`, `RSA16a_ReflectsCapability` (plus `RSA16b_TokenStringFromCallback` and the gated `RSA16d_NullAfterInvalidation`), and `AuthorizeTests.RSA10g_AuthorizeUpdatesTokenDetails`, `RSA10j_AuthorizeReplacesExistingToken`.
 - **Status:** open: public `Auth#tokenDetails` accessor not implemented.
-
-### RTL10b — `untilAttach` is not a public option of `RealtimeChannel#history`: tests call the internal `RealtimeChannel.AddUntilAttachParameter`
-
-- **Spec point:** RTL10b. Tests (`ChannelHistoryTests`, 2): `realtime/unit/RTL10b/adds-from-serial-0`, `RTL10b/errors-when-not-attached-1`.
-- **What the spec says:** `(RTL10b)` "Additionally supports the param `untilAttach`, which if true, will only retrieve messages prior to the moment that the channel was attached ... passing the querystring param `fromSerial` with the `RealtimeChannel#properties.attachSerial` ... If the `untilAttach` param is specified when the channel is not attached, it results in an error."
-- **What the SDK does:** the public `untilAttach` param of `IRealtimeChannel.HistoryAsync` is absent (presence history has it). The internal `RealtimeChannel.AddUntilAttachParameter(query)` adds `fromSerial` = the attach serial and throws an `AblyException` when the channel is not ATTACHED, which is the RTL10b behaviour. A public `PaginatedRequestParams.ExtraParameters["fromSerial"]` would bypass the attach-serial lookup and the not-attached error, so it is not used.
-- **Test impact:** both tests call `((RealtimeChannel)channel).AddUntilAttachParameter(query)` and then `HistoryAsync(query)`, marked `// DEVIATION: RealtimeChannel#history(untilAttach) absent; using internal RealtimeChannel.AddUntilAttachParameter + HistoryAsync(query)`. The `RealtimeChannelOptions(attachOnSubscribe: false)` setup is dropped (see the TB4 entry under Missing SDK Public API / Features).
-- **Other SDKs:** ably-java and ably-cocoa both support `untilAttach` on channel history.
-- **Status:** open: public `untilAttach` param of `RealtimeChannel#history` not implemented.
 
 ### MOP2 — `MessageOperation#toJson` is not public: tests assert the operation in the request the SDK sends
 

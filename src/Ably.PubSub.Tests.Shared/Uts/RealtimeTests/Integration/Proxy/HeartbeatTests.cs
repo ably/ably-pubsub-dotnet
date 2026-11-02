@@ -56,10 +56,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
             var keyName = ExtractKeyName(ApiKey);
             var keySecret = ExtractKeySecret(ApiKey);
 
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             var client = ProxyRealtime(session, new ClientOptions
             {
-                AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret))),
+                AuthCallback = tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret)),
                 AutoConnect = false,
             });
 

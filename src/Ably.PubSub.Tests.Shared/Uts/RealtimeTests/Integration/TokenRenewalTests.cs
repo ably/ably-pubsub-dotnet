@@ -44,7 +44,6 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
             var keySecret = ExtractKeySecret(ApiKey);
             var callbackCount = 0;
 
-            // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
             var client = Realtime(new ClientOptions
             {
                 AuthCallback = tokenParams =>
@@ -52,11 +51,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
                     if (Interlocked.Increment(ref callbackCount) == 1)
                     {
                         // First token: very short TTL (5 seconds)
-                        return Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret, TimeSpan.FromMilliseconds(5000))));
+                        return Task.FromResult<object>(GenerateJwt(keyName, keySecret, TimeSpan.FromMilliseconds(5000)));
                     }
 
                     // Subsequent tokens: long TTL
-                    return Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret, TimeSpan.FromMilliseconds(3600000))));
+                    return Task.FromResult<object>(GenerateJwt(keyName, keySecret, TimeSpan.FromMilliseconds(3600000)));
                 },
                 AutoConnect = false,
             });

@@ -35,12 +35,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration
         }
 
         // The spec's auth_callback: a long-lived JWT, optionally for a clientId
-        // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
         private Func<TokenParams, Task<object>> JwtCallback(string clientId = null)
         {
             var keyName = ExtractKeyName(ApiKey);
             var keySecret = ExtractKeySecret(ApiKey);
-            return tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret, TimeSpan.FromMilliseconds(3600000), clientId)));
+            return tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret, TimeSpan.FromMilliseconds(3600000), clientId));
         }
 
         // UTS: realtime/integration/RTC8a/in-band-reauth-connected-0

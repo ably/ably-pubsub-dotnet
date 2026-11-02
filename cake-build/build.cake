@@ -8,7 +8,7 @@
 #load "tasks/build.cake"
 #load "tasks/test.cake"
 #load "tasks/package.cake"
-#load "tasks/release.cake"
+#load "tasks/package-consumption.cake"
 
 ///////////////////////////////////////////////////////////////////////////////
 // ARGUMENTS

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- An end-user device app consuming Ably.PubSub.Device. Shared settings: ../Directory.Build.props. -->
+  <ItemGroup>
+    <PackageReference Include="Ably.PubSub.Device" Version="[$(AblyPackageVersion)]" />
+  </ItemGroup>
+
+</Project>

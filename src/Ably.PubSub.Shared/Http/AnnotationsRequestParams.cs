@@ -4,9 +4,8 @@ using System.Net;
 namespace Ably.PubSub
 {
     /// <summary>
-    /// Parameters for <see cref="Http.RestAnnotations.GetAsync(string, AnnotationsRequestParams)"/> (RSAN3a).
+    /// Parameters for <see cref="Http.HttpAnnotations.GetAsync(string, AnnotationsRequestParams)"/> (RSAN3a).
     /// Every parameter is sent in the querystring (RSAN3b).
-    /// Experimental: the annotations API may change.
     /// </summary>
     public class AnnotationsRequestParams
     {

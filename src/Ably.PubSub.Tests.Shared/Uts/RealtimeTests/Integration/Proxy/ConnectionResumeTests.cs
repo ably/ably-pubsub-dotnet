@@ -3,7 +3,7 @@
 // at ably/specification@f787470c7e7ea362cbe43e6839529979630800fb
 // Tier: proxy
 // Unit spec: uts/realtime/unit/connection/connection_failures_test.md, uts/realtime/unit/connection/connection_recovery_test.md
-// Disclosures: infra stand-in: one sandbox app per collection, not per spec file (SandboxAppFixture); JWT authCallbacks return TokenDetails (a string return is read as a TokenRequest, RSA8d); recorded state changes replace AWAIT_STATE for states the connection may leave again at once
+// Disclosures: infra stand-in: one sandbox app per collection, not per spec file (SandboxAppFixture); recorded state changes replace AWAIT_STATE for states the connection may leave again at once
 
 using System;
 using System.Collections.Generic;
@@ -39,12 +39,11 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Integration.Proxy
         }
 
         // The specs' authCallback: (params) => RETURN generate_jwt(keyName: key_name, keySecret: key_secret)
-        // NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails
         private Func<TokenParams, Task<object>> JwtAuthCallback()
         {
             var keyName = ExtractKeyName(ApiKey);
             var keySecret = ExtractKeySecret(ApiKey);
-            return tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(keyName, keySecret)));
+            return tokenParams => Task.FromResult<object>(GenerateJwt(keyName, keySecret));
         }
 
         // A frame match with the proxy's 1-based occurrence "count" (ProxyRules has no count parameter for frames).

@@ -107,12 +107,20 @@ The `proxy` tier downloads the pinned uts-proxy itself (Linux and macOS); on Win
 
 `Ably.PubSub.Core`, `Ably.PubSub.Device` and `Ably.PubSub.Server` are packed and
 released together at one version, and each door package pins the core at exactly
-that version. The `Package` target enforces that; see
-`cake-build/tasks/release.cake`.
+that version: every nuspec takes `$version$` from `--version`, and every door
+dependency group pins `[$version$]`. `PackagingSpecs` (in the unit tests) asserts
+that contract from the nuspec files on every PR.
 
-> **Cake reserves `--version` for itself**, so release arguments have to go after
+> **Cake reserves `--version` for itself**, so packaging arguments have to go after
 > a `--` separator: `./build.sh -- --target=Package --version=2.0.0`. `package.cmd`
-> already does this for you.
+> already does this for you. `Package` fails if no `--version` is given.
+
+Releases are packaged by the `Package ably` GitHub workflow
+(`.github/workflows/package.yml`), dispatched by hand with a `version` input. It
+runs `Package` and `Test.PackageConsumption.NoPack` on Windows and `UnityPackage`
+on Ubuntu, and uploads the three `.nupkg` files and the `.unitypackage` as one
+`output-package` artifact. Nothing is published: the release engineer pushes the
+packages to nuget.org by hand, following the release process in `CONTRIBUTING.md`.
 
 ### package.cmd
 
@@ -127,9 +135,20 @@ that version. The `Package` target enforces that; see
 
 Above command creates `Ably.PubSub.Core.2.0.0.nupkg`,
 `Ably.PubSub.Device.2.0.0.nupkg` and `Ably.PubSub.Server.2.0.0.nupkg` at root,
-from the nuspec list in `cake-build/tasks/package.cake`
-(`_Package_Create_NuGet`), which is packed core-first to match the publish order.
-Add `--packageOutput=<dir>` to pack somewhere other than the repository root.
+from the package set at the top of `cake-build/tasks/package.cake`
+(`nugetPackageSet`), which is packed core-first to match the manual publish order.
+`package.cmd` takes only the version. To pack somewhere other than the repository
+root, run the target directly with `--packageOutput`, e.g.
+`.\build.cmd -- --target=Package --version=2.0.0 --packageOutput=packages` (or
+`./build.sh` with the same arguments on Unix with Mono); a relative path is
+resolved against the repository root.
+
+After the pack, `Package` runs `_Package_Verify_NuGet`, which opens each produced
+`.nupkg` and asserts its version and that every dependency group of both door
+packages pins `Ably.PubSub.Core` as exactly `[<version>]`. That is the one part of
+the contract the source nuspecs cannot prove: it depends on the packer substituting
+`$version$` inside the dependency's version attribute. To check packages that are
+already packed: `./build.sh -- --target=Package.Verify --version=2.0.0 --packageOutput=<dir>`.
 
 During release process, these packages are hosted on
 [nuget.org/packages/Ably.PubSub.Server](https://www.nuget.org/packages/Ably.PubSub.Server),
@@ -148,48 +167,56 @@ Above command creates `ably.pubsub.2.0.0.unitypackage` at root. The merged
 plugin assembly it packages is produced separately by
 `./unity-plugins-updater.sh 2.0.0`, which needs Mono (for ILRepack).
 
-## Release Targets
+## Package-Consumption Test
 
-These are the release guards. They are wired into `Package` - `_Release_Preflight`
-before the build, `_Release_Verify_Files` between the build and the pack, and
-`_Release_Verify_Packages` after it - so an ordinary `Package` run already
-enforces all of them. They are also public targets so they can be run alone.
-
-### Release.Preflight
+### Test.PackageConsumption
 
 ```bash
-./build.sh -- --target=Release.Preflight --version=2.0.0
+./build.sh -- --target=Test.PackageConsumption --version=2.0.0 --packageOutput=<dir>
 ```
 
-Source-only, no build, no pack, no network. Asserts that:
+Installs the packed packages into small apps the way a customer does, so problems
+that exist only in the shipped `.nupkg` files fail here rather than in a customer's
+app. The unit tests can't catch these, because they use project references, which
+skip NuGet's per-framework asset selection and the Package-only signing. For example,
+a .NET Framework app gets the Device `netstandard2.0` asset paired with the Core
+`net46` asset.
 
-- the `--version` input equals all three attributes in `src/CommonAssemblyInfo.cs`
-  and equals `unity/Assets/Ably/version.txt`;
-- `nuget/` holds *exactly* `ably.pubsub.core.nuspec`, `ably.pubsub.device.nuspec`
-  and `ably.pubsub.server.nuspec`, with the matching `<id>`s, each taking its
-  version from `$version$`;
-- every dependency group of both door nuspecs pins `Ably.PubSub.Core` as
-  `[$version$]` - the exact range, not a minimum;
-- nothing depends on `ably.io` or the 1.x push satellites.
+The target runs `Package`, then:
 
-Because it demands the 2.0 nuspec set, it also refuses a 1.x checkout outright,
-which is what makes `publish.yml` safe to keep on the default branch.
+1. copies the apps in `tests/PackageConsumption` (`DeviceApp`, `ServerApp`) to
+   `test-results/package-consumption`;
+2. restores them through a generated `nuget.config` that takes `Ably.PubSub.*` only
+   from the packed `.nupkg` files (package source mapping) and everything else from
+   nuget.org, into a private global packages folder;
+3. builds each app for every target framework in the matrix (`net462`, `net48`,
+   `net6.0`, `net7.0`);
+4. asserts from `obj/project.assets.json` which `lib/<tfm>` asset of each Ably
+   package NuGet selected, and that the packages came from the local folder;
+5. runs each app. The .NET Framework apps run on the .NET Framework CLR on Windows
+   and on Mono elsewhere. Each app creates clients through its door and calls into
+   the core: a channel lookup, a REST request and a realtime connection attempt.
+   It also checks the side flag in the `Ably-Agent` header.
 
-### Release.VerifyPackages
+The checks run offline: no credentials, REST requests go to a stub handler and the
+realtime connection targets a closed localhost port.
 
-```bash
-./build.sh -- --target=Release.VerifyPackages --version=2.0.0 --packageOutput=<dir>
-```
+The expected asset pair for each app and framework is set in one place, the matrix
+at the top of `cake-build/tasks/package-consumption.cake`. If the package layout
+changes, update that matrix. A row naming a `lib/<tfm>` that the nuspec doesn't
+declare fails the run.
 
-Post-pack. Opens each produced `.nupkg` and asserts its id, its version, one
-`lib/<tfm>` assembly for every target the nuspec declares, and - the one that
-cannot be checked from source - that the packed door dependency is literally
-`[<version>]`, proving the `$version$` token substituted inside the dependency's
-version attribute.
+`Test.PackageConsumption.NoPack` runs the same steps against packages that are
+already in `--packageOutput`, without packing. The `package.yml` workflow runs it
+on Windows against the packages it has just packed, the ones the release engineer
+downloads.
 
-The `release-dry-run` GitHub workflow runs the pre-flight, a full `Package` and
-this target on every pull request. `publish.yml` runs the same three and then
-pushes.
+The full `Test.PackageConsumption` runs on every PR in two workflows: the Windows
+(NetFramework) workflow, where the .NET Framework apps run on the .NET Framework
+CLR, and the macOS (Mono) workflow, where they run on Mono.
+
+On macOS/Linux, `Package` needs Mono: it builds the `net46` heads with Mono MSBuild
+and the other target frameworks with the .NET SDK.
 
 ## Advanced Options
 

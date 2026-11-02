@@ -319,10 +319,9 @@ namespace Ably.PubSub.Tests.Uts.RealtimeTests.Unit
             });
             InstallMock(mockWs);
 
-            // NOTE: a string return is read as a TokenRequest (RSA8d), so the token string is wrapped in TokenDetails to test the 128KiB rule itself
             var client = Realtime(new ClientOptions
             {
-                AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(oversizedToken)),
+                AuthCallback = tokenParams => Task.FromResult<object>(oversizedToken),
                 AutoConnect = false,
             });
 

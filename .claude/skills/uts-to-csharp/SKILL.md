@@ -1416,18 +1416,15 @@ The proxy serves plain ws (`Tls = false`) and basic (key) auth is TLS-only, so a
 use the sandbox key; the base wires `SandboxTokenCallback(apiKey)`, which fetches a real `TokenDetails`
 over TLS. Disclose it in the header: `// Disclosures: token auth via SandboxTokenCallback (basic auth needs TLS; the proxy hop is plain)`.
 
-**A spec callback that returns a JWT** (`generate_jwt(…)`, `callback(null, jwt)`): the SDK reads a
-**string** callback result as `TokenRequest` JSON (error 80019), so return a `TokenDetails`:
+**A spec callback that returns a JWT** (`generate_jwt(…)`, `callback(null, jwt)`): return the string as
+the spec does; the SDK accepts a token string or JWT from `AuthCallback` (RSA8d, RSA4f):
 
 ```csharp
-AuthCallback = tokenParams => Task.FromResult<object>(new TokenDetails(GenerateJwt(ExtractKeyName(ApiKey), ExtractKeySecret(ApiKey))))
+AuthCallback = tokenParams => Task.FromResult<object>(GenerateJwt(ExtractKeyName(ApiKey), ExtractKeySecret(ApiKey)))
 ```
 
-with `// NOTE: a string return is read as a TokenRequest (RSA8d); wrapped in TokenDetails`. Keep the string
-form only in a test whose subject is RSA8d.
-
 **Counting callbacks:** when the spec's callback counts **and returns its own token**, hand-write it over
-several lines (`Interlocked.Increment(ref authCalls); return Task.FromResult<object>(new TokenDetails(GenerateJwt(…)));`);
+several lines (`Interlocked.Increment(ref authCalls); return Task.FromResult<object>(GenerateJwt(…));`);
 use `SandboxTokenCallback(onInvoked: _ => Interlocked.Increment(ref authCalls))` only when the spec's
 callback returns a sandbox token. Read the counter with `Volatile.Read`. The callback runs before the AUTH
 frame is sent, so after polling a client-side count, poll the proxy log for the frame

@@ -41,7 +41,7 @@ SDK facts: `Defaults.ProtocolVersion` is `"6"` (sent as `X-Ably-Version`); `Stat
 | `Rest` / `RestClient` | `PubSubHttpClient` (internal constructors; public type) | Built only by the base factories (§2), never `PubSubServer` or the Device door |
 | `RestChannel` | `IHttpChannel` (what `Channels.Get` returns) and the public class `HttpChannel` behind it | Members not on the interface (`Options` setter) need a cast to `HttpChannel` |
 | `RestPresence` | `IPresence`, implemented explicitly by `HttpChannel` (`channel.Presence` returns the channel itself) | Call through `channel.Presence`, never on the channel |
-| `RestAnnotations` | `RestAnnotations` (`channel.Annotations`) | |
+| `RestAnnotations` | `HttpAnnotations` (`channel.Annotations`; renamed from the spec's `RestAnnotations` like the other REST to HTTP renames) | |
 | `Auth` | `IAblyAuth` (`client.Auth`); the implementation `AblyAuth` is internal | `IAblyAuth` lacks `tokenDetails` and `revokeTokens` (§8) |
 | `ErrorInfo` / `AblyException` | `ErrorInfo` (data) and `AblyException` (thrown, `.ErrorInfo`) | `AblyException.Message` is `ErrorInfo.ToString()`, not the error message (§7) |
 | `PaginatedResult` | `PaginatedResult<T>` | |
@@ -71,7 +71,7 @@ Options are PascalCase properties; every duration is a `TimeSpan` (spec values a
 | `key` | `Key` | `string`. `new ClientOptions("k")` also parses a key or, without `:`, a token |
 | `token` | `Token` | `string` |
 | `tokenDetails` | `TokenDetails` | `TokenDetails` |
-| `authCallback: (params) => …` | `AuthCallback = async tokenParams => …` | `Func<TokenParams, Task<object>>`; return a `TokenDetails`, a `TokenRequest`, or a string (§9, RSA8d) |
+| `authCallback: (params) => …` | `AuthCallback = async tokenParams => …` | `Func<TokenParams, Task<object>>`; return a `TokenDetails`, a `TokenRequest`, or a token string or JWT (RSA8d) |
 | `authUrl` | `AuthUrl = new Uri("…")` | `Uri` |
 | `authMethod: "POST"` | `AuthMethod = HttpMethod.Post` | `HttpMethod`; default `HttpMethod.Get` |
 | `authHeaders`, `authParams` | `AuthHeaders`, `AuthParams` | `Dictionary<string, string>` (initialised empty) |
@@ -341,8 +341,6 @@ The SDK replaced `environment`, `restHost`, `realtimeHost` and `fallbackHostsUse
 
 Predictions read from the SDK source, **not yet run**. They are non-binding: translate faithfully, and let evaluate mode decide; record a deviation only if the run shows it, with the features-spec quote.
 
-> **RSA8d, token string from `authCallback`.** A `string` return is parsed as a `TokenRequest` JSON (`AblyAuth.RequestTokenAsync`, `GetTokenRequest`), so `RETURN "eyJ…"` fails. Deviation candidate (RSA8d: "expects either a token string, a TokenDetails object or a TokenRequest object"). Evaluate mode decides; record only if the run shows it.
-
 > **RSC7c, `addRequestIds`.** `request_id` is added with `AblyRequest.AddHeaders`, so it travels as an HTTP header, not the `request_id` query parameter RSC7c requires. Evaluate mode decides; record only if the run shows it.
 
 > **HP7, `errorMessage`.** `HttpPaginatedResponse` fills `ErrorMessage` from the `X-Ably-Errorcode` header (it reads the error-code header twice); HP7 says `X-Ably-Errormessage`. Evaluate mode decides; record only if the run shows it.
@@ -512,7 +510,7 @@ Mechanical rewrites, in order:
 | Area | Symbols |
 |---|---|
 | Client | `PubSubHttpClient` (`Channels`, `Auth`, `Push`, `Device`, `TimeAsync`, `StatsAsync`, `Request`, `RequestV2`, `CanConnectToAbly`), `ClientOptions`, `AuthOptions` |
-| Channels | `HttpChannels` (`Get`, `Exists`, `Release`), `IHttpChannel` / `HttpChannel` (`PublishAsync`, `HistoryAsync`, `GetMessageAsync`, `GetMessageVersionsAsync`, `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync`, `StatusAsync`, `Options`, `Presence`, `Annotations`, `Push`), `IPresence` (`GetAsync`, `HistoryAsync`), `RestAnnotations` |
+| Channels | `HttpChannels` (`Get`, `Exists`, `Release`), `IHttpChannel` / `HttpChannel` (`PublishAsync`, `HistoryAsync`, `GetMessageAsync`, `GetMessageVersionsAsync`, `UpdateMessageAsync`, `DeleteMessageAsync`, `AppendMessageAsync`, `StatusAsync`, `Options`, `Presence`, `Annotations`, `Push`), `IPresence` (`GetAsync`, `HistoryAsync`), `HttpAnnotations` |
 | Auth | `IAblyAuth` (`ClientId`, `AuthorizeAsync`, `RequestTokenAsync`, `CreateTokenRequestAsync`), `TokenDetails`, `TokenParams`, `TokenRequest`, `Capability` |
 | Errors and results | `ErrorInfo`, `AblyException`, `Result` / `Result<T>`, `PaginatedResult<T>`, `HttpPaginatedResponse`, `PaginatedRequestParams`, `StatsRequestParams` |
 | Data types | `Message`, `MessageExtras`, `MessageOperation`, `MessageVersion`, `MessageAnnotations`, `PresenceMessage`, `Annotation`, `PublishResult`, `UpdateDeleteResult`, `ChannelDetails`, `Stats` |
