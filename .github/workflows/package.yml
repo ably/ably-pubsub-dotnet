@@ -53,6 +53,37 @@ jobs:
       - name: Download cake tool
         run: dotnet tool restore
 
+      # Package stamps src/CommonAssemblyInfo.cs with the input, so compare the input with the
+      # committed version files first. The packages, the Unity package and the plugin inside it
+      # must all carry the version the release PR committed.
+      - name: Check the version input against the committed version
+        run: |
+          $errors = @()
+          $numeric = $env:VERSION.Split('-')[0]
+          $assemblyInfo = Get-Content -Raw src/CommonAssemblyInfo.cs
+          foreach ($check in @(
+              @('AssemblyVersion', $numeric),
+              @('AssemblyFileVersion', $numeric),
+              @('AssemblyInformationalVersion', $env:VERSION))) {
+            $match = [regex]::Match($assemblyInfo, $check[0] + '\("([^"]*)"\)')
+            if (-not $match.Success -or $match.Groups[1].Value -ne $check[1]) {
+              $errors += "src/CommonAssemblyInfo.cs $($check[0]) is '$($match.Groups[1].Value)', expected '$($check[1])'."
+            }
+          }
+          $unityVersion = (Get-Content -Raw unity/Assets/Ably/version.txt).Trim()
+          if ($unityVersion -ne $env:VERSION) {
+            $errors += "unity/Assets/Ably/version.txt is '$unityVersion', expected '$env:VERSION'."
+          }
+          $pluginVersion = (Get-Item unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll).VersionInfo.ProductVersion
+          if (($pluginVersion -split '\+')[0] -ne $env:VERSION) {
+            $errors += "The Unity plugin unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll has ProductVersion '$pluginVersion', expected '$env:VERSION'. Regenerate it with ./unity-plugins-updater.sh."
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host "::error::$_" }
+            throw "The version input '$env:VERSION' does not match the committed version. Bump and commit the version files in the release PR, then package that commit."
+          }
+          Write-Host "src/CommonAssemblyInfo.cs, unity/Assets/Ably/version.txt and the Unity plugin are all at $env:VERSION."
+
       - name: Package
         run: ./package.cmd $env:VERSION
 
