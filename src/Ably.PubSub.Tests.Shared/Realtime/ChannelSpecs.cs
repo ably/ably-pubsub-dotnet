@@ -2001,6 +2001,62 @@ namespace Ably.PubSub.Tests.Realtime
                 published.Encoding.Should().BeNullOrEmpty();
             }
 
+            [Fact]
+            public async Task RestChannel_ShouldBeReusedWhileTheOptionsAreUnchanged()
+            {
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var channel = (RealtimeChannel)await GetAttachedChannel(client, new ChannelOptions(Crypto.GetDefaultParams()));
+
+                var restChannel = channel.RestChannel;
+                await channel.HistoryAsync();
+                await channel.Presence.HistoryAsync();
+
+                channel.RestChannel.Should().BeSameAs(restChannel);
+                restChannel.Should().NotBeSameAs(client.HttpClient.Channels.Get("test"));
+            }
+
+            [Theory]
+            [InlineData("SetOptions")]
+            [InlineData("ChannelsGet")]
+            [Trait("spec", "RTL16")]
+            [Trait("spec", "RTS3c")]
+            public async Task Retrieval_AfterTheChannelOptionsChange_ShouldDecodeWithTheNewOptions(string update)
+            {
+                var first = new ChannelOptions(Crypto.GetDefaultParams());
+                var second = new ChannelOptions(Crypto.GetDefaultParams());
+                var serverOptions = first;
+                var client = await GetConnectedClient(handleRequestFunc: request =>
+                {
+                    // The server's copy is encrypted with whichever key the channel uses at the time.
+                    var message = new Message("n", "secret") { Serial = Serial };
+                    var presenceMessage = new PresenceMessage(PresenceAction.Enter, "client", "secret");
+                    MessageHandler.EncodePayloads(serverOptions.ToDecodingContext(), new IMessage[] { message, presenceMessage });
+                    return new AblyResponse
+                    {
+                        TextResponse = request.Url.EndsWith("/presence/history") ? JsonHelper.Serialize(new[] { presenceMessage })
+                            : request.Url.EndsWith("/messages") ? JsonHelper.Serialize(new[] { message })
+                            : JsonHelper.Serialize(message),
+                    }.ToTask();
+                });
+                var channel = await GetAttachedChannel(client, first);
+                (await channel.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+
+                serverOptions = second;
+                if (update == "SetOptions")
+                {
+                    channel.SetOptions(second);
+                }
+                else
+                {
+                    client.Channels.Get("test", second).Should().BeSameAs(channel);
+                }
+
+                channel.Options.Should().BeSameAs(second);
+                (await channel.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+                (await channel.Presence.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+                (await channel.GetMessageAsync(Serial)).Data.Should().Be("secret");
+            }
+
             private static Task<AblyResponse> Respond(AblyRequest request)
             {
                 string response;
