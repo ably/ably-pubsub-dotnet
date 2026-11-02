@@ -58,10 +58,12 @@ namespace Ably.PubSub.Realtime
 
         private Connection Connection => RealtimeClient.Connection;
 
-        // The REST channel of the same name carrying this channel's options, so that payloads of the
-        // messages, presence messages and annotations it retrieves (history included) are decoded
-        // (and decrypted) as the realtime ones are.
-        internal IHttpChannel RestChannel => RealtimeClient.HttpClient.Channels.Get(Name, Options);
+        // A REST channel of the same name carrying this channel's current options, so that payloads of
+        // the messages, presence messages and annotations it retrieves (history included) are decoded
+        // (and decrypted) as the realtime ones are. It is a new instance each time, not the one in
+        // HttpClient.Channels: getting that one with options would replace the options the app set on
+        // it (RSN3c), e.g. drop its cipher so that a later REST publish goes out unencrypted.
+        internal IHttpChannel RestChannel => new HttpChannel(RealtimeClient.HttpClient, Name, Options);
 
         internal ChannelAwaiter AttachedAwaiter { get; }
 
