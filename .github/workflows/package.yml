@@ -1,0 +1,184 @@
+# ============================================================================
+# PACKAGING WORKFLOW - Uses Cake Build System
+# ============================================================================
+# Builds the NuGet packages and the Unity package for a release. It publishes
+# nothing: the release engineer downloads the artifacts and pushes them to
+# nuget.org by hand, following the release process in CONTRIBUTING.md.
+#
+# To package a release:
+# 1. Go to Actions tab → Package ably workflow (or `gh workflow run package.yml`)
+# 2. Click "Run workflow", pick the release branch and enter the version
+#    (e.g. 2.0.1), which must be the version committed on that branch
+# 3. Download the `output-package` artifact. It holds exactly:
+#    - Ably.PubSub.Core.<version>.nupkg
+#    - Ably.PubSub.Device.<version>.nupkg
+#    - Ably.PubSub.Server.<version>.nupkg
+#    - ably.pubsub.<version>.unitypackage
+# ============================================================================
+
+name: Package ably
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Ably version, e.g. 2.0.1 (must equal src/CommonAssemblyInfo.cs on the chosen branch)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  package-library:
+    # Windows: the core and server packages carry a lib/net46 asset built by an
+    # old-style MSBuild head, and Windows runs the .NET Framework apps of the
+    # package-install test on the real .NET Framework CLR.
+    runs-on: windows-2022
+    env:
+      DOTNET_NOLOGO: true
+      VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            3.1.426
+            6.0.428
+            7.0.410
+
+      - name: Download cake tool
+        run: dotnet tool restore
+
+      # Package stamps src/CommonAssemblyInfo.cs with the input, so compare the input with the
+      # committed version files first. The packages, the Unity package and the plugin inside it
+      # must all carry the version the release PR committed.
+      - name: Check the version input against the committed version
+        run: |
+          $errors = @()
+          $numeric = $env:VERSION.Split('-')[0]
+          $assemblyInfo = Get-Content -Raw src/CommonAssemblyInfo.cs
+          foreach ($check in @(
+              @('AssemblyVersion', $numeric),
+              @('AssemblyFileVersion', $numeric),
+              @('AssemblyInformationalVersion', $env:VERSION))) {
+            $match = [regex]::Match($assemblyInfo, $check[0] + '\("([^"]*)"\)')
+            if (-not $match.Success -or $match.Groups[1].Value -ne $check[1]) {
+              $errors += "src/CommonAssemblyInfo.cs $($check[0]) is '$($match.Groups[1].Value)', expected '$($check[1])'."
+            }
+          }
+          $unityVersion = (Get-Content -Raw unity/Assets/Ably/version.txt).Trim()
+          if ($unityVersion -ne $env:VERSION) {
+            $errors += "unity/Assets/Ably/version.txt is '$unityVersion', expected '$env:VERSION'."
+          }
+          $pluginVersion = (Get-Item unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll).VersionInfo.ProductVersion
+          if (($pluginVersion -split '\+')[0] -ne $env:VERSION) {
+            $errors += "The Unity plugin unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll has ProductVersion '$pluginVersion', expected '$env:VERSION'. Regenerate it with ./unity-plugins-updater.sh."
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host "::error::$_" }
+            throw "The version input '$env:VERSION' does not match the committed version. Bump and commit the version files in the release PR, then package that commit."
+          }
+          Write-Host "src/CommonAssemblyInfo.cs, unity/Assets/Ably/version.txt and the Unity plugin are all at $env:VERSION."
+
+      - name: Package
+        run: ./package.cmd $env:VERSION
+
+      # Installs the packed packages into small .NET Framework (net462, net48) and .NET
+      # (net6.0, net7.0) apps the way a customer would, asserts which lib/<tfm> asset of each
+      # package NuGet selected, and runs the apps (on the .NET Framework CLR here). These are
+      # the exact files the release engineer downloads. Offline: no credentials.
+      # The matrix lives in cake-build/tasks/package-consumption.cake.
+      - name: Package-install test on the packed packages
+        run: ./build.cmd -- --target=Test.PackageConsumption.NoPack "--version=$env:VERSION"
+
+      - name: Archive package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ably-package
+          path: |
+            ${{ github.workspace }}/*.nupkg
+          if-no-files-found: error
+
+  package-unity:
+    runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: 'recursive'
+          persist-credentials: false
+
+      # unity-packager v1.0.0 targets netcoreapp2.0, so it needs the 2.1 runtime.
+      - name: Download dotnet framework
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: |
+            2.1.818
+            6.0.428
+
+      - name: Download cake tool
+        run: dotnet tool restore
+
+      # Zips the committed unity/Assets/Ably tree, including the merged plugin that
+      # ./unity-plugins-updater.sh regenerated in the release PR. It does not rebuild it.
+      - name: Package Unity
+        run: ./package-unity.sh "$VERSION"
+
+      # The Cake task only warns if the packager fails, so the missing file is the failure.
+      - name: Archive Unity package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ably-unity-package
+          path: |
+            ${{ github.workspace }}/*.unitypackage
+          if-no-files-found: error
+
+  merge-artifacts:
+    runs-on: ubuntu-22.04
+    needs: [package-library, package-unity]
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      - name: Merge artifacts into single directory
+        run: |
+          set -euo pipefail
+          mkdir -p output-package
+
+          find artifacts/ably-package -name "*.nupkg" -exec cp {} output-package/ \;
+          find artifacts/ably-unity-package -name "*.unitypackage" -exec cp {} output-package/ \;
+
+          # Exactly the three NuGet packages and the Unity package, at the requested version.
+          expected="$(printf '%s\n' \
+            "Ably.PubSub.Core.$VERSION.nupkg" \
+            "Ably.PubSub.Device.$VERSION.nupkg" \
+            "Ably.PubSub.Server.$VERSION.nupkg" \
+            "ably.pubsub.$VERSION.unitypackage" | LC_ALL=C sort)"
+          actual="$(ls -1 output-package | LC_ALL=C sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "Error: output-package does not hold exactly the expected files."
+            echo "Expected:"
+            echo "$expected"
+            echo "Found:"
+            echo "$actual"
+            exit 1
+          fi
+
+          echo "Merged artifact contents (SHA-256), to compare with the downloaded files:"
+          (cd output-package && sha256sum *)
+
+      - name: Upload merged artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: output-package
+          path: output-package/
+          if-no-files-found: error
