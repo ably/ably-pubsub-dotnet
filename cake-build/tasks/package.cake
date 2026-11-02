@@ -79,6 +79,15 @@ public List<string> VerifyPackedNuGetPackages(DirectoryPath packageDirectory, st
             {
                 nuspec = System.Xml.Linq.XDocument.Load(stream);
             }
+
+            // Neither door ships a .NET Framework asset: a .NET Framework app gets the door's
+            // netstandard2.0 asset with the core's net46 one, which Test.PackageConsumption runs.
+            if (packageId != corePackageId)
+            {
+                errors.AddRange(archive.Entries
+                    .Where(e => e.FullName.StartsWith("lib/net4", StringComparison.OrdinalIgnoreCase))
+                    .Select(e => $"{nupkg.GetFilename()} contains {e.FullName}; the door packages carry no .NET Framework lib asset."));
+            }
         }
 
         var metadata = nuspec.Root.Elements().Single(e => e.Name.LocalName == "metadata");
@@ -102,6 +111,11 @@ public List<string> VerifyPackedNuGetPackages(DirectoryPath packageDirectory, st
         foreach (var group in groups)
         {
             var targetFramework = (string)group.Attribute("targetFramework") ?? "(any)";
+            if (targetFramework.StartsWith(".NETFramework", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add($"{nupkg.GetFilename()} has a {targetFramework} dependency group; the door packages have no .NET Framework asset.");
+            }
+
             var pins = group.Elements()
                 .Where(e => e.Name.LocalName == "dependency" &&
                             string.Equals((string)e.Attribute("id"), corePackageId, StringComparison.OrdinalIgnoreCase))

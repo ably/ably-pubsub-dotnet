@@ -149,6 +149,40 @@ namespace Ably.PubSub.Tests.PubSub
 
         [Fact]
         [Trait("spec", "packaging")]
+        public void DoorNuspecs_ShipTheSameTargetFrameworks_WithNoNetFrameworkAsset()
+        {
+            // A .NET Framework app gets each door's netstandard2.0 asset with the core's net46 one
+            // (run end to end by Test.PackageConsumption), so neither door has a net46 head. The
+            // lib folders and the dependency groups name the same frameworks in both doors.
+            var expected = new[] { "net6.0", "net7.0", "netstandard2.0" };
+
+            foreach (var nuspecName in DoorNuspecs)
+            {
+                var document = XDocument.Load(Path.Combine(NuspecDirectory(), nuspecName));
+
+                var libFolders = document.Descendants()
+                    .Where(e => e.Name.LocalName == "file")
+                    .Select(e => Regex.Match((string)e.Attribute("target") ?? string.Empty, @"^lib[\\/]([^\\/]+)"))
+                    .Where(m => m.Success)
+                    .Select(m => m.Groups[1].Value)
+                    .Distinct()
+                    .OrderBy(f => f, StringComparer.Ordinal)
+                    .ToArray();
+
+                var groups = Metadata(nuspecName)
+                    .Descendants()
+                    .Where(e => e.Name.LocalName == "group")
+                    .Select(e => (string)e.Attribute("targetFramework"))
+                    .OrderBy(f => f, StringComparer.Ordinal)
+                    .ToArray();
+
+                libFolders.Should().Equal(expected, $"{nuspecName} ships lib/<tfm> assets for these frameworks only");
+                groups.Should().Equal(expected, $"{nuspecName} declares a dependency group for each lib/<tfm> it ships");
+            }
+        }
+
+        [Fact]
+        [Trait("spec", "packaging")]
         public void TheTwoVersionFiles_Agree()
         {
             var assemblyInfo = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "CommonAssemblyInfo.cs"));

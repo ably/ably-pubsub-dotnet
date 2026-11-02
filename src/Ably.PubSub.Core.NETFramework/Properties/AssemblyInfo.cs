@@ -13,10 +13,9 @@ using System.Runtime.InteropServices;
 #if !PACKAGE
 [assembly: InternalsVisibleTo("Ably.PubSub.Tests.NETFramework")]
 
-// The door assemblies construct the core clients through their internal constructors: the net46
-// Server door head (which compiles the shared PubSubServer.cs against this core) and the
-// netstandard2.0 Device door, which NuGet pairs with this net46 core in a .NET Framework app
-// because the Device package has no net46 asset. Outside Package builds nothing is signed
+// The door assemblies construct the core clients through their internal constructors. Neither
+// door package has a net46 asset, so in a .NET Framework app NuGet pairs the netstandard2.0
+// Device or Server door with this net46 core. Outside Package builds nothing is signed
 // (signing is Package-conditional, in lockstep across the core and the doors), so the grants are
 // keyless here.
 [assembly: InternalsVisibleTo("Ably.PubSub.Device")]
