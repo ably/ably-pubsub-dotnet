@@ -11,7 +11,11 @@ namespace Ably.PubSub
     public class AuthOptions
     {
         /// <summary>
-        /// The callback used to get a new <see cref="Ably.PubSub.TokenDetails"/> or <see cref="Ably.PubSub.TokenRequest"/>.
+        /// The callback used to get new authentication credentials. It may return one of:
+        /// a <see cref="Ably.PubSub.TokenDetails"/>;
+        /// a <see cref="Ably.PubSub.TokenRequest"/>;
+        /// a JSON string of a <see cref="Ably.PubSub.TokenRequest"/> (for example the result of <c>Auth.CreateTokenRequestAsync</c>) or of a <see cref="Ably.PubSub.TokenDetails"/>;
+        /// or a token string (an Ably token or a JWT).
         /// AuthCallback is used by internally by <see cref="Ably.PubSub.AblyAuth"/>.RequestTokenAsync.
         /// <para>
         /// The callback is bounded by <see cref="ClientOptions.RealtimeRequestTimeout"/> per RSA4c,

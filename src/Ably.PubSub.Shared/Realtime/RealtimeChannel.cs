@@ -58,10 +58,9 @@ namespace Ably.PubSub.Realtime
 
         private Connection Connection => RealtimeClient.Connection;
 
-        internal IHttpChannel HttpChannel => RealtimeClient.HttpClient.Channels.Get(Name);
-
         // The REST channel of the same name carrying this channel's options, so that payloads of the
-        // messages and annotations it retrieves are decoded (and decrypted) as the realtime ones are.
+        // messages, presence messages and annotations it retrieves (history included) are decoded
+        // (and decrypted) as the realtime ones are.
         internal IHttpChannel RestChannel => RealtimeClient.HttpClient.Channels.Get(Name, Options);
 
         internal ChannelAwaiter AttachedAwaiter { get; }
@@ -112,7 +111,7 @@ namespace Ably.PubSub.Realtime
             {
                 if (_pushChannel is null)
                 {
-                    Logger.Warning("The current device is does not support or is not configured for Push notifications.");
+                    Logger.Warning($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
                     return null;
                 }
 
@@ -590,13 +589,35 @@ namespace Ably.PubSub.Realtime
         public Task<PaginatedResult<Message>> HistoryAsync()
         {
             var query = new PaginatedRequestParams();
-            return HttpChannel.HistoryAsync(query);
+            return RestChannel.HistoryAsync(query);
+        }
+
+        public Task<PaginatedResult<Message>> HistoryAsync(bool untilAttach)
+        {
+            var query = new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                query = WithUntilAttachParameter(query); // RTL10b
+            }
+
+            return RestChannel.HistoryAsync(query);
         }
 
         public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query)
         {
             query = query ?? new PaginatedRequestParams();
-            return HttpChannel.HistoryAsync(query);
+            return RestChannel.HistoryAsync(query);
+        }
+
+        public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query, bool untilAttach)
+        {
+            query = query ?? new PaginatedRequestParams();
+            if (untilAttach)
+            {
+                query = WithUntilAttachParameter(query); // RTL10b
+            }
+
+            return RestChannel.HistoryAsync(query);
         }
 
         public Task<Message> GetMessageAsync(string serial)
@@ -641,14 +662,31 @@ namespace Ably.PubSub.Realtime
             InternalStateChanged = null;
         }
 
-        internal void AddUntilAttachParameter(PaginatedRequestParams query)
+        // RTL10b. Returns a copy carrying fromSerial, so the caller's query - which may be reused, or be
+        // the shared PaginatedRequestParams.Empty - is left unchanged.
+        internal PaginatedRequestParams WithUntilAttachParameter(PaginatedRequestParams query)
         {
             if (State != ChannelState.Attached)
             {
                 throw new AblyException("Channel is not attached. Cannot use untilAttach parameter");
             }
 
-            query.ExtraParameters.Add("fromSerial", Properties.AttachSerial);
+            var result = new PaginatedRequestParams
+            {
+                HttpMethod = query.HttpMethod,
+                Headers = query.Headers,
+                Body = query.Body,
+                Path = query.Path,
+                Start = query.Start,
+                End = query.End,
+                Limit = query.Limit,
+                Direction = query.Direction,
+                ExtraParameters = query.ExtraParameters != null
+                    ? new Dictionary<string, string>(query.ExtraParameters)
+                    : new Dictionary<string, string>(),
+            };
+            result.ExtraParameters["fromSerial"] = Properties.AttachSerial;
+            return result;
         }
 
         private void EnsureCanPublish()

@@ -1,7 +1,7 @@
 namespace Ably.PubSub
 {
     /// <summary>
-    /// The action of an <see cref="Annotation"/> (TAN2b). Experimental: the annotations API may change.
+    /// The action of an <see cref="Annotation"/> (TAN2b).
     /// </summary>
     public enum AnnotationAction
     {

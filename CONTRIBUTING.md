@@ -16,25 +16,28 @@
 
 ## Working from source
 
-If you want to incorporate `ably-dotnet` into your project from source (perhaps to use a specific development branch) the simplest way to do so is to add references to the relevant ably-dotnet projects. The following steps are specific to Visual Studio 2019, but the principal should transfer to other IDEs
+If you want to incorporate the SDK into your project from source (perhaps to use a specific development branch) the simplest way to do so is to add references to the relevant projects from this repository. The following steps are specific to Visual Studio 2019, but the principle should transfer to other IDEs.
 
-1. Clone this repository to your local system (`git clone --recurse-submodules https://github.com/ably/ably-dotnet.git`)
-2. Open the solution you want to reference ably-dotnet from
+1. Clone this repository to your local system (`git clone --recurse-submodules https://github.com/ably/ably-pubsub-dotnet.git`)
+2. Open the solution you want to reference the SDK from
 3. In Solution Explorer right click the root node (it will be labelled Solution 'YourSolutionName')
 4. Select Add > Existing Project from the context menu
-5. Browse to the ably-dotnet repository and add ably-dotnet\src\Ably.PubSub.Shared\Ably.PubSub.Shared.shproj
-6. Browse to the ably-dotnet repository and add the project that corresponds to your target platform, so if you are targeting .NET Framework (AKA Classic .NET) you would add ably-dotnet\src\Ably.PubSub.Core.NETFramework\Ably.PubSub.Core.NETFramework.csproj, and for .NET / .NET Standard you would add ably-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj.
-7. In any project that you want to use `ably-dotnet` you need to add a project reference, to do so:
+5. Browse to the ably-pubsub-dotnet repository and add ably-pubsub-dotnet\src\Ably.PubSub.Shared\Ably.PubSub.Shared.shproj
+6. Add the projects for the side your code runs on. The client constructors are internal, so clients are created through the door's `PubSubServer` or `PubSubDevice` factories.
+    - A server app on .NET Framework: add ably-pubsub-dotnet\src\Ably.PubSub.Core.NETFramework\Ably.PubSub.Core.NETFramework.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Server.NETFramework\Ably.PubSub.Server.NETFramework.csproj.
+    - Any other server app: add ably-pubsub-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Server\Ably.PubSub.Server.csproj.
+    - A device app, on any target framework including .NET Framework: add ably-pubsub-dotnet\src\Ably.PubSub.Core\Ably.PubSub.Core.csproj and ably-pubsub-dotnet\src\Ably.PubSub.Device\Ably.PubSub.Device.csproj.
+7. In any project that you want to use the SDK in, you need to add a project reference to the door project, to do so:
     1. Find your project in Solution Explorer and expand the tree so that the Dependencies node is visible
     2. Right click Dependencies and select Add Reference
-    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to Ably.PubSub.Core.NETFramework (or Ably.PubSub.Core, whichever you added) and click OK.
+    3. In the dialogue that opens you should see a list of the projects in your solution. Check the box next to the door project you added (Ably.PubSub.Server, Ably.PubSub.Server.NETFramework or Ably.PubSub.Device) and click OK.
 
 ## Spec
 
 The dotnet library follows the Ably [Features spec](https://docs.ably.com/client-lib-development-guide/features/). To ensure it is easier to look up whether a spec item has been implemented or not; we add a Trait attribute to tests that implement parts of the spec. The convention is to add `[Trait("spec", "spec tag")]` to unit tests.
 
 To get a list of all spec items that appear in the tests you can run a script located in the tools directory.
-You need to have .NET Core 3.1 installed. It works on Mac, Linux and Windows. Run `dotnet fsi tools/list-test-categories.fsx`. It will produce a `results.csv` file which will include all spec items, which file it was found and on what line.
+You need a .NET SDK, 6.0 or later, installed. It works on Mac, Linux and Windows. Run `dotnet fsi tools/list-test-categories.fsx`. It will produce a `results.csv` file which will include all spec items, which file it was found and on what line.
 
 ## Development, Debugging and Testing
 
@@ -58,7 +61,7 @@ _More detail to follow around this._
 
 #### Debugging Tip: Enable break on exception throw
 
-A technique that has proved extremely successful when it comes to tracking down sporadic communication failures is to enable ‘break on throw’ in your debugger. The fact is that the exception handling logic in the Ably .NET SDK exhibits overly generous catch clauses which tend to catch too broad a set of exception types. These then tend to be processed as ‘something went wrong’ (i.e. we lose valuable and actionable recovery context) or are swallowed and ignored, on the basis that retry logic will, eventually, make everything good. If the retries subsequently fail to reestablish the invariants then you will commonly see `NullReferenceExceptions` as the code higher up makes assumptions about what state the object graph is in. In general if you see a `NullReferenceException` it is worth hunting down its source and precipitating conditions since it’s likely being used now as some kind of flow-of-control signal that triggers retry logic.
+To track down sporadic communication problems, enable ‘break on throw’ in your debugger. The SDK catches many exceptions internally (logging them or retrying the operation), so they don't reach the caller; breaking when they are thrown shows where they start. If you see a `NullReferenceException`, trace it back to its source and the conditions that led to it.
 
 #### Debugging Tip: Debug and Release execution traces can differ
 
@@ -76,11 +79,11 @@ Testing takes place primarily via GitHub Actions based infrastructure, here Wind
 
 At the present time it is possible for tests to transition from green to red with no code changes on the part of the SDK team. There are two reasons for this:
 
-1. **Unexpected changes to the sandbox**: These tend to occur when the sandbox either evolves ahead of the Ably API specification or improves its conformance to an existing specification point which then subsequently exposes a weak implementation on the client side, in this case within the Ably .NET SDK.
+1. **Unexpected changes to the sandbox**: These tend to occur when the sandbox either evolves ahead of the Ably API specification or improves its conformance to an existing specification point, which a client-side test then detects as a difference.
 
 2. **Uncontrolled dependency evolution**: At the present time the majority of the 3rd party Ably .NET dependencies have open dependency requirements which is to say we specify a minimum but not a maximum or even discrete list of versions against which we certify and support conformance. For example, if the Newtonsoft Json .NET library is updated it will be used by our next build and may contribute to test failures.
 
-When one or more Ably .NET test failures is observed it is worth checking against another Ably client SDK with similar capabilities to see if it is also suffering from similar failures. This is aided somewhat by the fact that tests are decorated (the specifics vary depending on the SDK) with metadata that points to the Ably Specification point the test was originally intended to verify conformance for. So, for example if it is observed that the Channel Presence tests appear to be failing for .NET then check to see if the Ably Go SDK is showing failures in the same area. It is not always enough to just check to see if the Ably Go SDK happens to be gree as this just means it was green at the time the last pull request was created, updated or merged.
+When one or more Ably .NET test failures is observed it is worth checking against another Ably client SDK with similar capabilities to see if it is also suffering from similar failures. This is aided somewhat by the fact that tests are decorated (the specifics vary depending on the SDK) with metadata that points to the Ably Specification point the test was originally intended to verify conformance for. So, for example if it is observed that the Channel Presence tests appear to be failing for .NET then check to see if the Ably Go SDK is showing failures in the same area. It is not always enough to just check to see if the Ably Go SDK happens to be green as this just means it was green at the time the last pull request was created, updated or merged.
 
 As touched upon above, the recommended hardware for replicating cross platform test failures is at least an Intel based MacBook Pro. Ideally the developer should have access to both Intel and Apple Silicon (ARM64) hardware. ARM based CLR implementations are not a 1:1 substitute for older, more mature Intel based implementations at least at the current time. You need both and will observe behavioral differences in test execution when comparing one platform against the other.
 

@@ -29,12 +29,12 @@ namespace Ably.PubSub
         PresenceSubscribe,
 
         /// <summary>
-        /// AnnotationPublish mode (TR3w). Allows the attached channel to publish annotations. Experimental.
+        /// AnnotationPublish mode (TR3w). Allows the attached channel to publish annotations.
         /// </summary>
         AnnotationPublish,
 
         /// <summary>
-        /// AnnotationSubscribe mode (TR3x). Allows the attached channel to subscribe to annotations. Experimental.
+        /// AnnotationSubscribe mode (TR3x). Allows the attached channel to subscribe to annotations.
         /// </summary>
         AnnotationSubscribe,
 
