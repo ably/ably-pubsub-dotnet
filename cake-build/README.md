@@ -118,8 +118,11 @@ Above command creates `Ably.PubSub.Core.2.0.0.nupkg`,
 `Ably.PubSub.Device.2.0.0.nupkg` and `Ably.PubSub.Server.2.0.0.nupkg` at root,
 from the package set at the top of `cake-build/tasks/package.cake`
 (`nugetPackageSet`), which is packed core-first to match the manual publish order.
-Add `--packageOutput=<dir>` to pack somewhere other than the repository root; a
-relative path is resolved against the repository root.
+`package.cmd` takes only the version. To pack somewhere other than the repository
+root, run the target directly with `--packageOutput`, e.g.
+`.\build.cmd -- --target=Package --version=2.0.0 --packageOutput=packages` (or
+`./build.sh` with the same arguments on Unix with Mono); a relative path is
+resolved against the repository root.
 
 After the pack, `Package` runs `_Package_Verify_NuGet`, which opens each produced
 `.nupkg` and asserts its version and that every dependency group of both door
