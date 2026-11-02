@@ -116,7 +116,7 @@ namespace Ably.PubSub.Realtime.Workflow
                         while (true)
                         {
                             QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("PubSubRealtimeClient.HeartbeatMonitor()"));
-                            await Task.Delay(Client.Options.HeartbeatMonitorDelay, monitorToken);
+                            await Client.Options.TimerScheduler.Delay(TimeSpan.FromMilliseconds(Client.Options.HeartbeatMonitorDelay), monitorToken);
                         }
                     }
                     catch (OperationCanceledException)
@@ -217,7 +217,7 @@ namespace Ably.PubSub.Realtime.Workflow
         }
 
         private void DelayCommandHandler(TimeSpan delay, RealtimeCommand cmd) =>
-            Task.Delay(delay).ContinueWith(_ => QueueCommand(cmd));
+            Client.Options.TimerScheduler.Delay(delay).ContinueWith(_ => QueueCommand(cmd));
 
         internal async Task<IEnumerable<RealtimeCommand>> ProcessCommand(RealtimeCommand command)
         {
@@ -581,6 +581,22 @@ namespace Ably.PubSub.Realtime.Workflow
                     // If it's an error or has been closed we want to do something about it
                     if (cmd.TransportState == TransportState.Closed || cmd.Exception != null)
                     {
+                        // A server that sends ERROR, DISCONNECTED or CONNECTED and then closes the
+                        // transport puts the message and the close in the queue back to back. The
+                        // state handles the message by queueing a command, which lands behind the
+                        // close, so the close would be handled in the state the message was meant
+                        // to leave: a fatal ERROR would first cause a disconnect and an instant
+                        // reconnect, and then FAILED would be followed by CONNECTING (RTN14g,
+                        // RTN15h3, RTN27h). One hop behind the commands queued so far restores the
+                        // order in which the transport delivered them. ably-java gets the same order by
+                        // deciding the ERROR's target state inline, on the transport thread, so its
+                        // FAILED request is queued ahead of anything the close produces.
+                        if (cmd.Deferred == false)
+                        {
+                            QueueCommand(cmd.Defer().TriggeredBy(cmd));
+                            return EmptyCommand.Instance;
+                        }
+
                         switch (State.Connection.State)
                         {
                             case ConnectionState.Closing:
@@ -876,7 +892,7 @@ namespace Ably.PubSub.Realtime.Workflow
                             var connectingHost = await ChooseHostForNextAttempt();
                             SetNewHostInState(connectingHost);
 
-                            var connectingState = new ConnectionConnectingState(ConnectionManager, Logger);
+                            var connectingState = new ConnectionConnectingState(ConnectionManager, new CountdownTimer("Connecting state timer", Logger, Client.Options.TimerScheduler), Logger);
                             SetState(connectingState);
 
                             if (cmd.RetryAuth)
@@ -940,9 +956,14 @@ namespace Ably.PubSub.Realtime.Workflow
                         {
                             if (cmd.Error.IsTokenError && Auth.TokenRenewable == false)
                             {
-                                var newError = ErrorInfo.NonRenewableToken;
-                                newError.Message += $" Original: {cmd.Error.Message} ({cmd.Error.Code})";
-                                return newError;
+                                // A copy: NonRenewableToken is process wide, so appending to it
+                                // would leak this connection's message into every later client.
+                                var nonRenewable = ErrorInfo.NonRenewableToken;
+                                return new ErrorInfo(
+                                    nonRenewable.Message + $" Original: {cmd.Error.Message} ({cmd.Error.Code})",
+                                    nonRenewable.Code,
+                                    nonRenewable.StatusCode,
+                                    nonRenewable.Href);
                             }
 
                             return cmd.Error;
@@ -969,7 +990,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
                         var retryInstantly = CheckInstantRetryFlag();
 
-                        var disconnectedState = new ConnectionDisconnectedState(ConnectionManager, cmd.Error, Logger)
+                        var disconnectedState = new ConnectionDisconnectedState(ConnectionManager, cmd.Error, new CountdownTimer("Disconnected state timer", Logger, Client.Options.TimerScheduler), Logger)
                         {
                             RetryInstantly = retryInstantly,
                             Exception = cmd.Exception,
@@ -1076,7 +1097,7 @@ namespace Ably.PubSub.Realtime.Workflow
                         var transport = ConnectionManager.Transport;
                         var connectedTransport = transport?.State == TransportState.Connected;
 
-                        var closingState = new ConnectionClosingState(ConnectionManager, connectedTransport, Logger);
+                        var closingState = new ConnectionClosingState(ConnectionManager, null, connectedTransport, new CountdownTimer("Closing state timer", Logger, Client.Options.TimerScheduler), Logger);
                         State.Connection.ClearKeyAndId(); // RTN8d, RTN9d - before the emit
                         SetState(closingState);
 
@@ -1091,7 +1112,7 @@ namespace Ably.PubSub.Realtime.Workflow
 
                     case SetSuspendedStateCommand cmd:
 
-                        var suspendedState = new ConnectionSuspendedState(ConnectionManager, cmd.Error, Logger);
+                        var suspendedState = new ConnectionSuspendedState(ConnectionManager, cmd.Error, new CountdownTimer("Suspended state timer", Logger, Client.Options.TimerScheduler), Logger);
 
                         // RTN7e and the teardown - see the note on the FAILED case.
                         try

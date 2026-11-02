@@ -444,6 +444,65 @@ namespace Ably.PubSub.Tests.Realtime
             error.ErrorInfo.Cause.Message.Should().Be("the underlying cause");
         }
 
+        [Fact]
+        [Trait("spec", "RTC8c")]
+        public async Task WhenNotConnected_AuthorizeShouldWaitForTheConnectionToBeConnected()
+        {
+            // RTC8c, RTC8b1 - authorize from INITIALIZED initiates a connection attempt and completes
+            // only once the connection is CONNECTED.
+            var client = GetClientWithFakeTransport(opts =>
+            {
+                opts.AutoConnect = false;
+                opts.AuthCallback = _ => Task.FromResult<object>(new TokenDetails("new-token") { Expires = TestHelpers.Now().AddDays(1) });
+            });
+
+            var authorize = client.Auth.AuthorizeAsync();
+
+            await client.WaitForState(ConnectionState.Connecting);
+            await Task.Delay(100);
+            authorize.IsCompleted.Should().BeFalse("the connection is not CONNECTED yet");
+
+            client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+
+            var token = await authorize;
+            token.Token.Should().Be("new-token");
+            client.Connection.State.Should().Be(ConnectionState.Connected);
+        }
+
+        [Fact]
+        [Trait("spec", "RSA4b")]
+        public async Task WhenNotConnected_RestRequestRetriedAfterTokenError_ShouldNotWaitForTheRealtimeConnection()
+        {
+            // RSA4b - a REST request answered with a token error is retried once with a new token.
+            // Getting that token must not wait for the realtime connection (RTC8b1 is authorize()'s
+            // contract, not the REST retry's), which here never reaches CONNECTED.
+            var tokenErrorSent = 0;
+            var client = GetClientWithFakeTransport(
+                opts =>
+                {
+                    opts.AutoConnect = false;
+                    opts.RealtimeRequestTimeout = TimeSpan.FromMinutes(1);
+                    opts.AuthCallback = _ => Task.FromResult<object>(new TokenDetails("new-token") { Expires = TestHelpers.Now().AddDays(1) });
+                },
+                request =>
+                {
+                    if (request.Url.Contains("/stats") && Interlocked.Exchange(ref tokenErrorSent, 1) == 0)
+                    {
+                        throw new AblyException(new ErrorInfo("Token expired", 40142, HttpStatusCode.Unauthorized));
+                    }
+
+                    return "[]".ToAblyResponse();
+                });
+
+            var stats = client.StatsAsync();
+            var completed = await Task.WhenAny(stats, Task.Delay(TimeSpan.FromSeconds(10)));
+
+            completed.Should().BeSameAs(stats, "the retried request does not wait for the realtime connection");
+            await stats;
+            tokenErrorSent.Should().Be(1);
+            client.Connection.State.Should().NotBe(ConnectionState.Connected);
+        }
+
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]

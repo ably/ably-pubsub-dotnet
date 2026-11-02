@@ -22,13 +22,13 @@ namespace Ably.PubSub.Realtime
         private readonly object _lock = new object();
         private readonly Action _onTimeout;
 
-        public ChannelAwaiter(IRealtimeChannel channel, ChannelState awaitedState, ILogger logger = null, Action onTimeout = null)
+        public ChannelAwaiter(IRealtimeChannel channel, ChannelState awaitedState, ILogger logger = null, Action onTimeout = null, ITimerScheduler scheduler = null)
         {
             Logger = logger ?? DefaultLogger.LoggerInstance;
             _name = $"#{channel.Name}:{awaitedState} awaiter";
             _channel = channel as RealtimeChannel;
             _awaitedState = awaitedState;
-            _timer = new CountdownTimer(_name + " timer", logger);
+            _timer = new CountdownTimer(_name + " timer", logger, scheduler);
             _onTimeout = onTimeout;
             AttachListener();
         }

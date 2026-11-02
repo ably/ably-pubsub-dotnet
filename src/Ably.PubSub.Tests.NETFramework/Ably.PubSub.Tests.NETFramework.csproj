@@ -144,6 +144,10 @@
       <Project>{2d265650-b1ec-4f8d-b043-a2e3dcc23fd8}</Project>
       <Name>Ably.PubSub.Core.NETFramework</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\lib\delta-codec\IO.Ably.DeltaCodec\IO.Ably.DeltaCodec.csproj">
+      <Project>{412deb5f-7936-4027-8bf8-977f23d465ed}</Project>
+      <Name>IO.Ably.DeltaCodec</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\Ably.PubSub.Tests.Shared\Ably.PubSub.Tests.Shared.projitems" Label="Shared" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

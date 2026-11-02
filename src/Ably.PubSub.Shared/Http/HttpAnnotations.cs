@@ -77,13 +77,13 @@ namespace Ably.PubSub.Http
         /// Retrieves the annotations of the message with the given serial (RSAN3).
         /// </summary>
         /// <param name="messageSerial">the serial of the annotated message (RSAN3a).</param>
-        /// <param name="query">optional query parameters (RSAN3a).</param>
+        /// <param name="query">optional query parameters, all sent in the querystring (RSAN3a, RSAN3b).</param>
         /// <returns>The first page of decoded <see cref="Annotation"/> objects (RSAN3c).</returns>
         public Task<PaginatedResult<Annotation>> GetAsync(string messageSerial, AnnotationsRequestParams query = null)
         {
             query = query ?? new AnnotationsRequestParams();
             query.Validate();
-            return GetPageAsync(messageSerial, GetFirstPageParameters(query));
+            return GetPageAsync(messageSerial, query.GetParameters());
         }
 
         /// <summary>
@@ -180,12 +180,6 @@ namespace Ably.PubSub.Http
             request.AddQueryParameters(queryParameters);
 
             return _ablyRest.ExecutePaginatedRequest(request, next => GetPageAsync(messageSerial, GetNextPageParameters(next)));
-        }
-
-        // Annotation queries take a limit only (RSAN3a), so the default of 100 is stated explicitly.
-        private static IEnumerable<KeyValuePair<string, string>> GetFirstPageParameters(AnnotationsRequestParams query)
-        {
-            yield return new KeyValuePair<string, string>("limit", (query.Limit ?? Defaults.QueryLimit).ToString());
         }
 
         // The query returned by Ably for the next page is replayed as it was received, without the history defaults.
