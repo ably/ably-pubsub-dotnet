@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       DOTNET_NOLOGO: true
 
