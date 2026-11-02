@@ -11,7 +11,6 @@ namespace Ably.PubSub.Http
     /// Publishes, deletes and retrieves the annotations of messages on a channel over HTTP, using
     /// Ably's REST API (RSL10). Accessed through <see cref="IHttpChannel.Annotations"/>.
     /// The specification calls this class RestAnnotations (RSAN); it follows the SDK's REST to HTTP renaming.
-    /// Experimental: the annotations API may change.
     /// </summary>
     public class HttpAnnotations
     {

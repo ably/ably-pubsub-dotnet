@@ -137,7 +137,6 @@ namespace Ably.PubSub.Http
 
         /// <summary>
         /// Publishes, deletes and retrieves annotations of the messages on this channel (RSL10).
-        /// Experimental: the annotations API may change.
         /// </summary>
         HttpAnnotations Annotations { get; }
 
@@ -146,7 +145,7 @@ namespace Ably.PubSub.Http
         /// <see cref="PushChannel"/>.
         /// </summary>
         /// <remarks>
-        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>; it is reserved for a future release.
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>.
         /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
         /// </remarks>
         PushChannel Push { get; }

@@ -41,7 +41,6 @@ namespace Ably.PubSub.Realtime
 
         /// <summary>
         /// Publishes, deletes, retrieves and subscribes to the annotations of the messages on this channel (RTL26).
-        /// Experimental: the annotations API may change.
         /// </summary>
         RealtimeAnnotations Annotations { get; }
 
@@ -65,7 +64,7 @@ namespace Ably.PubSub.Realtime
         /// <see cref="PushChannel"/>.
         /// </summary>
         /// <remarks>
-        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>; it is reserved for a future release.
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this is always <c>null</c>.
         /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
         /// </remarks>
         PushChannel Push { get; }

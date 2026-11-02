@@ -21,9 +21,9 @@ namespace Ably.PubSub.Device
     /// deliberately no device HTTP door.
     /// </para>
     /// <para>
-    /// The API-key overload is kept on purpose: per PDR-091, device-side API keys stay allowed
-    /// at launch and enforcement is server-side. Token authentication remains the recommended
-    /// scheme for anything the end user holds.
+    /// The API-key overload is kept on purpose: per PDR-091, a device-side client may
+    /// authenticate with an API key. Token authentication is the recommended scheme for
+    /// anything the end user holds.
     /// </para>
     /// <para>
     /// <c>Push.Admin</c> is available on the device client, but push administration (publishing
