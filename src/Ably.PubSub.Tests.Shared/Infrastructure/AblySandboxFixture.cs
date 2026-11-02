@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -15,18 +16,45 @@ namespace Ably.PubSub.Tests
         /// <summary>Channels in this namespace (mutable:*) have mutable messages enabled.</summary>
         public const string MutableMessagesNamespace = "mutable";
 
-        private static readonly Dictionary<string, TestEnvironmentSettings> Settings = new Dictionary<string, TestEnvironmentSettings>();
+        // One provisioning task per endpoint, created atomically. xunit.runner.json sets
+        // parallelizeTestCollections, and the sandbox is reached from several collections at once -
+        // ChannelSubscriptionsTests declares none at all, so it gets its own - which meant
+        // concurrent writes to a plain Dictionary. That can leave the indexer returning null for a
+        // key ContainsKey has just accepted, and the caller dereferences it: SandboxSpecs
+        // .GetRestClient throws NullReferenceException on the settings it was handed. The await
+        // between the check and the write also let two collections provision an app each.
+        //
+        // Lazy over a ConcurrentDictionary gives one Initialise per endpoint however many
+        // callers race, and hands every one of them the same task.
+        private static readonly ConcurrentDictionary<string, Lazy<Task<TestEnvironmentSettings>>> Settings =
+            new ConcurrentDictionary<string, Lazy<Task<TestEnvironmentSettings>>>();
 
         public static async Task<TestEnvironmentSettings> GetSettings(string endpoint = null)
         {
             endpoint = endpoint ?? TestEnvironmentSettings.DefaultEndpoint;
-            if (Settings.ContainsKey(endpoint))
-            {
-                return Settings[endpoint];
-            }
 
-            Settings[endpoint] = await Initialise(endpoint);
-            return Settings[endpoint];
+            var provisioning = Settings.GetOrAdd(
+                endpoint,
+                ep => new Lazy<Task<TestEnvironmentSettings>>(() => Initialise(ep)));
+
+            try
+            {
+                return await provisioning.Value;
+            }
+            catch
+            {
+                // A failure must not be what gets cached. The Dictionary this replaced assigned only
+                // on success, so a provisioning attempt that threw was retried by whoever asked
+                // next; holding the faulted task instead would fail every remaining sandbox test in
+                // the run with the same exception.
+                //
+                // Removed by key and value together, so a caller that has already raced in a
+                // replacement keeps it - ConcurrentDictionary's ICollection.Remove compares both,
+                // and the value comparison is reference equality on this exact Lazy.
+                ((ICollection<KeyValuePair<string, Lazy<Task<TestEnvironmentSettings>>>>)Settings)
+                    .Remove(new KeyValuePair<string, Lazy<Task<TestEnvironmentSettings>>>(endpoint, provisioning));
+                throw;
+            }
         }
 
         private static async Task<TestEnvironmentSettings> Initialise(string endpoint = null)
