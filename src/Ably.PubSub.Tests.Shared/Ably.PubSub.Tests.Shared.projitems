@@ -23,6 +23,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)CapabilityTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CipherParamsTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ClientOptionsTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CoreDoorAccessTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerializers\MessageDataConverterTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CustomSerializers\MessageExtrasConverterTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DataRequestQueryParseTests.cs" />
