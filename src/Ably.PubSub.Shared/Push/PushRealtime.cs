@@ -8,6 +8,15 @@ namespace Ably.PubSub.Push
     /// </summary>
     public sealed class PushRealtime : IDisposable
     {
+        /// <summary>Where users can request device push-receive support for 2.x.</summary>
+        internal const string DevicePushFeatureRequestUrl = "https://github.com/ably/ably-pubsub-dotnet/issues/1360";
+
+        /// <summary>The message used when the unavailable device push-receive API is called.</summary>
+        internal const string DevicePushNotAvailableMessage =
+            "Device push notifications (push activation/deactivation) are not available in Ably Pub/Sub 2.0. "
+            + "To request this feature, comment on " + DevicePushFeatureRequestUrl + ". "
+            + "Push administration remains available via Push.Admin.";
+
         private readonly PubSubHttpClient _restClient;
         private readonly ILogger _logger;
 
@@ -61,11 +70,15 @@ namespace Ably.PubSub.Push
         /// <summary>
         /// Start the push notification device registration process.
         /// </summary>
+        /// <remarks>
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this always throws an <see cref="AblyException"/>;
+        /// it is reserved for a future release. To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+        /// </remarks>
         public void Activate()
         {
             if (StateMachine is null)
             {
-                throw new AblyException("Realtime push is not enabled. Please initialise Ably by calling (AblyAndroidMobileDevice / AblyAppleMobileDevice).Initialize() before calling `Activate`");
+                throw new AblyException(DevicePushNotAvailableMessage);
             }
 
             _ = StateMachine.HandleEvent(new ActivationStateMachine.CalledActivate());
@@ -74,11 +87,15 @@ namespace Ably.PubSub.Push
         /// <summary>
         /// Starts the push notification device de-registration process.
         /// </summary>
+        /// <remarks>
+        /// Device push-receive is not available in Ably Pub/Sub 2.0, so this always throws an <see cref="AblyException"/>;
+        /// it is reserved for a future release. To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+        /// </remarks>
         public void Deactivate()
         {
             if (StateMachine is null)
             {
-                throw new AblyException("Realtime push is not enabled. Please initialise Ably by calling (AblyAndroidMobileDevice / AblyAppleMobileDevice).Initialize() before calling `Deactivate`");
+                throw new AblyException(DevicePushNotAvailableMessage);
             }
 
             _ = StateMachine.HandleEvent(new ActivationStateMachine.CalledDeactivate());

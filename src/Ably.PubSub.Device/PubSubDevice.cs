@@ -25,6 +25,14 @@ namespace Ably.PubSub.Device
     /// at launch and enforcement is server-side. Token authentication remains the recommended
     /// scheme for anything the end user holds.
     /// </para>
+    /// <para>
+    /// <c>Push.Admin</c> is available on the device client, but push administration (publishing
+    /// pushes, and managing device registrations and channel subscriptions) is intended for
+    /// server-side use. It needs the <c>push-admin</c> capability, which Ably enforces
+    /// server-side. Device push-receive is not available in 2.0: <c>Push.Activate()</c> and
+    /// <c>Push.Deactivate()</c> throw, and <c>Device</c> and channel <c>Push</c> are <c>null</c>.
+    /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+    /// </para>
     /// </summary>
     public static class PubSubDevice
     {

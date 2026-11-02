@@ -7,6 +7,10 @@ namespace Ably.PubSub.Push
     /// like subscribing and unsubscribing to push notification,
     /// narrowed to a specific channel.
     /// </summary>
+    /// <remarks>
+    /// Device push-receive is not available in Ably Pub/Sub 2.0; this type is reserved for a future release.
+    /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+    /// </remarks>
     public class PushChannel
     {
         private readonly PubSubHttpClient _rest;

@@ -863,8 +863,8 @@ namespace Ably.PubSub.Tests
             public async Task WhenAuthCallbackReturnsAnObjectThatIsNotTokenRequestOrTokenDetails_ThrowsAblyException()
             {
                 string serializedTokenRequest = await new PubSubHttpClient("fake.key:fakeid").Auth.CreateTokenRequestAsync();
-                // do not throw exceptions for valid values in authCallback
-                var objects = new object[] { new TokenDetails(), new TokenRequest(), serializedTokenRequest };
+                // do not throw exceptions for valid values in authCallback (RSA8d: a token string, e.g. a JWT, is valid)
+                var objects = new object[] { new TokenDetails(), new TokenRequest(), serializedTokenRequest, "jwtToken" };
                 foreach (var obj in objects)
                 {
                     var exception = await Record.ExceptionAsync(async () => await GetClient(_ => Task.FromResult(obj)).StatsAsync());
@@ -872,7 +872,7 @@ namespace Ably.PubSub.Tests
                 }
 
                 // throw exceptions for invalid values in authCallback
-                objects = new[] { new object(), string.Empty, new Uri("http://test"), "jwtToken" };
+                objects = new[] { new object(), string.Empty, new Uri("http://test"), "{not a token request" };
                 foreach (var obj in objects)
                 {
                     await Assert.ThrowsAsync<AblyException>(() =>

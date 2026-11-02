@@ -8,6 +8,10 @@ namespace Ably.PubSub.Push
     /// <summary>
     /// LocalDevice represents the current state of the device in respect of it being a target for push notifications.
     /// </summary>
+    /// <remarks>
+    /// Device push-receive is not available in Ably Pub/Sub 2.0; this type is reserved for a future release.
+    /// To request the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+    /// </remarks>
     public class LocalDevice : DeviceDetails
     {
         private const string JsonTokenTypeParameterName = "transportType";
@@ -137,7 +141,7 @@ namespace Ably.PubSub.Push
             if (mobileDevice is null)
             {
                 throw new AblyException(
-                    "Cannot initialise LocalDevice instance before initialising the MobileDevice class. For Android call AndroidMobileDevice.Initialise() and for iOS call AppleMobileDevice.Initialise()");
+                    $"Cannot initialise LocalDevice: device push notifications are not available in Ably Pub/Sub 2.0. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
             }
 
             switch (Instance)

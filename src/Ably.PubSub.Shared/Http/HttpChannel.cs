@@ -24,7 +24,7 @@ namespace Ably.PubSub.Http
         private readonly string _basePath;
         private ChannelOptions _options;
         private readonly PushChannel _pushChannel;
-        private readonly RestAnnotations _annotations;
+        private readonly HttpAnnotations _annotations;
 
         internal HttpChannel(PubSubHttpClient ablyRest, string name, ChannelOptions options, IMobileDevice mobileDevice = null)
         {
@@ -32,7 +32,7 @@ namespace Ably.PubSub.Http
             _ablyRest = ablyRest;
             _options = options;
             _basePath = $"/channels/{name.EncodeUriPart()}";
-            _annotations = new RestAnnotations(ablyRest, this, _basePath);
+            _annotations = new HttpAnnotations(ablyRest, this, _basePath);
 
             if (mobileDevice != null)
             {
@@ -59,7 +59,7 @@ namespace Ably.PubSub.Http
             {
                 if (_pushChannel is null)
                 {
-                    _ablyRest.Logger.Debug("The current device is not configured for push notifications.");
+                    _ablyRest.Logger.Debug($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
                     return null;
                 }
 
@@ -71,7 +71,7 @@ namespace Ably.PubSub.Http
         public IPresence Presence => this;
 
         /// <inheritdoc/>
-        public RestAnnotations Annotations => _annotations;
+        public HttpAnnotations Annotations => _annotations;
 
         /// <inheritdoc/>
         public Task<PublishResult> PublishAsync(string name, object data, string clientId = null)

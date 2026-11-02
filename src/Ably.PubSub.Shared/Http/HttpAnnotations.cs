@@ -8,17 +8,18 @@ using Ably.PubSub.Encryption;
 namespace Ably.PubSub.Http
 {
     /// <summary>
-    /// Publishes, deletes and retrieves the annotations of messages on a channel over REST (RSL10).
-    /// Accessed through <see cref="IHttpChannel.Annotations"/>.
+    /// Publishes, deletes and retrieves the annotations of messages on a channel over HTTP, using
+    /// Ably's REST API (RSL10). Accessed through <see cref="IHttpChannel.Annotations"/>.
+    /// The specification calls this class RestAnnotations (RSAN); it follows the SDK's REST to HTTP renaming.
     /// Experimental: the annotations API may change.
     /// </summary>
-    public class RestAnnotations
+    public class HttpAnnotations
     {
         private readonly PubSubHttpClient _ablyRest;
         private readonly HttpChannel _channel;
         private readonly string _basePath;
 
-        internal RestAnnotations(PubSubHttpClient ablyRest, HttpChannel channel, string basePath)
+        internal HttpAnnotations(PubSubHttpClient ablyRest, HttpChannel channel, string basePath)
         {
             _ablyRest = ablyRest;
             _channel = channel;

@@ -142,7 +142,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Http\AnnotationsRequestParams.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\HttpChannel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Http\IHttpChannel.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Http\RestAnnotations.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Http\HttpAnnotations.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Result.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Statistics.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TokenDetails.cs" />
