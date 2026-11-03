@@ -26,8 +26,7 @@ Unity).
 
 ## Installation
 
-Use exactly one of `Ably.PubSub.Server` or `Ably.PubSub.Device` in an app. Never reference
-`Ably.PubSub.Core` directly. Both packages bring in the matching version.
+Use exactly one of `Ably.PubSub.Server` or `Ably.PubSub.Device` in an app.
 
 ### Server
 
@@ -95,11 +94,7 @@ await http.Channels.Get("test-channel").PublishAsync("test-event", "hello world"
 ```
 
 > [!IMPORTANT]
-> Clients from `PubSubServer` declare themselves as servers. Authenticate them with an API key. A
-> server client that must use a token needs an Ably JWT signed with your API key. The JWT must carry
-> the `x-ably-clientType` claim set to `server`. Ably rejects any other token, such as an Ably Token
-> or a JWT without the claim, with error 40167. See
-> [Server clients and token authentication](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#server-clients-and-token-authentication).
+> Server clients must authenticate with an API key. To use a token instead, see [Server clients and token authentication](https://ably.com/docs/auth/token#server-token-auth).
 
 Your server also issues the tokens that devices authenticate with. Return a token request from
 the endpoint your devices use as their `AuthUrl`:
