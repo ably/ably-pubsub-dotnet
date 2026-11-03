@@ -96,36 +96,44 @@ await http.Channels.Get("test-channel").PublishAsync("test-event", "hello world"
 > [!IMPORTANT]
 > Server clients must authenticate with an API key. To use a token instead, see [Server clients and token authentication](https://ably.com/docs/auth/token#server-token-auth).
 
-Your server also issues the tokens that devices authenticate with. Return a token request from
-the endpoint your devices use as their `AuthUrl`:
+The following endpoint issues token requests. Devices set `AuthUrl` to its URL, for example
+`https://your-server.example.com/ably-auth`:
 
 ```csharp
 using System;
 using Ably.PubSub;
 using Ably.PubSub.Server;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 
 var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
 PubSubHttpClient http = PubSubServer.CreateHttpClient(ablyApiKey);
 
-// Authenticate the caller first. Grant only the operations this user needs.
-var capability = new Capability("{\"test-channel\":[\"publish\",\"subscribe\",\"history\"]}");
+var app = WebApplication.CreateBuilder(args).Build();
 
-string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams
+app.MapGet("/ably-auth", async () =>
 {
-    ClientId = "me", // the authenticated user's ID
-    Capability = capability, // without it, the token gets all of the API key's capabilities
+    // Authenticate the caller first. Grant only the operations this user needs.
+    var userId = "me"; // the signed-in user's ID, from your session
+    var capability = new Capability("{\"test-channel\":[\"publish\",\"subscribe\",\"history\"]}");
+
+    string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams
+    {
+        ClientId = userId,
+        Capability = capability, // without it, the token gets all of the API key's capabilities
+    });
+    return Results.Content(tokenRequest, "application/json");
 });
 
-// Return this JSON unchanged, with the content type application/json.
-Console.WriteLine(tokenRequest);
+app.Run();
 ```
 
 See [token authentication](https://ably.com/docs/auth/token) for how devices use it.
 
 ### Device
 
-Authenticate a device with tokens issued by your own server, through `AuthUrl` or `AuthCallback`.
-Never embed an API key in an app that runs on an end-user device.
+Authenticate a device with tokens issued by your own server, such as the endpoint above, through
+`AuthUrl` or `AuthCallback`. Never embed an API key in an app that runs on an end-user device.
 
 ```csharp
 using System;
