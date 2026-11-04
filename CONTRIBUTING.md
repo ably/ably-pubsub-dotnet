@@ -98,22 +98,123 @@ Integration tests run against the `nonprod:sandbox` endpoint by default. To run 
 
 ## Release process
 
-This library uses [semantic versioning](http://semver.org/). `Ably.PubSub.Core`, `Ably.PubSub.Device` and `Ably.PubSub.Server` are always released together, at one version. For each release, the following needs to be done:
+This library uses [semantic versioning](http://semver.org/). `Ably.PubSub.Core`, `Ably.PubSub.Device` and `Ably.PubSub.Server` are always released together, at one version, and both door packages pin the core at exactly that version.
 
-1. Create a branch for the release, named like release/2.0.1 (where 2.0.1 is the new version number).
-2. Replace all references of the current version number with the new version number and commit the changes (files are `src/CommonAssemblyInfo.cs`, `unity/Assets/Ably/version.txt` and the `PackageReference` examples in `README.md`).
-3. Run `./unity-plugins-updater.sh 2.0.1` (linux/mac) / `.\unity-plugins-updater.cmd 2.0.1` (windows) at root and commit the generated `.dll` file.
-4. Run [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator) to automate the update of the [CHANGELOG](./CHANGELOG.md). This may require some manual intervention, both in terms of how the command is run and how the change log file is modified. Your mileage may vary:
-    - The command you will need to run will look something like this: `github_changelog_generator -u ably -p ably-pubsub-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Generate a token in [GitHub personal access token settings](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
-    - Using the command above, `--output delta.md` writes changes made after `--since-tag` to a new file.
-    - The contents of that new file (`delta.md`) then need to be manually inserted at the top of the `CHANGELOG.md`, changing the "Unreleased" heading and linking with the current version numbers.
-    - Also ensure that the "Full Changelog" link points to the new version tag instead of the `HEAD`.
-5. Commit this change: `git add CHANGELOG.md && git commit -m "Update change log."`.
-6. Push the branch and create a release PR (ensure you include an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers) and gain approvals for it, then merge that to `main`.
-7. Go to [Github Actions tab](https://github.com/ably/ably-pubsub-dotnet/actions), click on [Package ably](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/package.yml) workflow at the left nav-bar. On the right corner, click on `Run workflow`, choose the `main` branch and enter the new version number as the `version` input.
-    - When the workflow run succeeds, download the generated artifact named `output-package` at the end of the run.
-    - `output-package` artifact is a zip with 4 files => `Ably.PubSub.Core.2.0.1.nupkg`, `Ably.PubSub.Device.2.0.1.nupkg`, `Ably.PubSub.Server.2.0.1.nupkg` and `ably.pubsub.2.0.1.unitypackage`.
-8. Extract `output-package`, open bash/powershell in the same folder and push the packages one at a time, `Ably.PubSub.Core` first: `dotnet nuget push Ably.PubSub.Core.2.0.1.nupkg --api-key GENERATED_API_KEY_FROM_NUGET_ACCOUNT --source https://api.nuget.org/v3/index.json`. Once `Ably.PubSub.Core` 2.0.1 is listed on [nuget.org](https://www.nuget.org/packages/Ably.PubSub.Core), push `Ably.PubSub.Device.2.0.1.nupkg` and then `Ably.PubSub.Server.2.0.1.nupkg` the same way. Don't push with a wildcard such as `Ably.PubSub.*.nupkg`: `Ably.PubSub.Device` and `Ably.PubSub.Server` depend on that exact core version, so the core must be published first. (More information on publishing nuget package can be found [here](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli#publish-with-the-net-cli-or-nuget-cli))
-9. Add a tag to the new `main` head commit and push to origin such as `git tag 2.0.1 && git push origin 2.0.1`
-10. Visit [https://github.com/ably/ably-pubsub-dotnet/tags](https://github.com/ably/ably-pubsub-dotnet/tags) and `Add release notes` for the release including links to the changelog entry, upload `ably.pubsub.2.0.1.unitypackage` as a file to the latest release note.
-11. Create the entry on the [Ably Changelog](https://changelog.ably.com/) (via [headwayapp](https://headwayapp.co/)).
+A release has two parts: a release PR that sets the version, then the [Release](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/release.yml) workflow, which publishes the packages to nuget.org, tags the release and creates the GitHub release. The examples below release 2.0.1.
+
+### Prepare the release PR
+
+1. Create a branch named like `release/2.0.1`.
+2. Set the new version in `src/CommonAssemblyInfo.cs` (`AssemblyVersion`, `AssemblyFileVersion` and `AssemblyInformationalVersion`) and in `unity/Assets/Ably/version.txt`. For a prerelease such as `2.0.1-rc.1`, `AssemblyVersion` and `AssemblyFileVersion` take `2.0.1`; `AssemblyInformationalVersion` and `version.txt` take `2.0.1-rc.1`. Commit the changes.
+3. Regenerate the Unity plugin from the repository root: `./unity-plugins-updater.sh 2.0.1` on macOS or Linux, or `.\unity-plugins-updater.cmd 2.0.1` on Windows. Commit the generated `unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll`.
+4. Update the [CHANGELOG](./CHANGELOG.md) with [`github_changelog_generator`](https://github.com/github-changelog-generator/github-changelog-generator). This may need some manual work:
+    - Run something like `github_changelog_generator -u ably -p ably-pubsub-dotnet --since-tag 2.0.0 --output delta.md --token $GITHUB_TOKEN_WITH_REPO_ACCESS`. Create the token in [GitHub personal access token settings](https://github.com/settings/tokens/new?description=GitHub%20Changelog%20Generator%20token).
+    - `--output delta.md` writes the changes since `--since-tag` to a new file. Insert its contents at the top of `CHANGELOG.md`, and replace the "Unreleased" heading and links with the new version.
+    - Point the "Full Changelog" link at the new version tag instead of `HEAD`.
+    - The heading must read `## [2.0.1](https://github.com/ably/ably-pubsub-dotnet/tree/2.0.1) (yyyy-mm-dd)`, dated with the intended release date. The section must not be empty: it becomes the GitHub release notes.
+5. Commit the changelog: `git add CHANGELOG.md && git commit -m "Update change log."`.
+6. Check the branch locally. This needs the .NET SDK and Cake, as for any build (see [Cake build scripts](./cake-build/README.md)):
+
+    ```bash
+    dotnet tool restore
+    dotnet cake cake-build/release.cake -- --target=Release.Preflight --version=2.0.1
+    ```
+
+    It runs the release workflow's pre-checks: the version format, the top CHANGELOG entry, and that 2.0.1 isn't on nuget.org, tagged or released yet. Fix anything it reports. "Release targets" in the [Cake build scripts](./cake-build/README.md#release-targets) README describes the options.
+7. Push the branch and open the release PR. Add an SDK Team Engineering Lead and the SDK Team Product Manager as reviewers. Once it's approved, merge it to `main`.
+
+### Publish
+
+The Release workflow runs only on `main`. Its `publish` job waits for a reviewer of the `nuget` environment to approve it, so make sure one is available.
+
+1. Do a dry run. Go to the [Release](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/release.yml) workflow in the Actions tab, click `Run workflow`, choose `main`, enter the version and leave `dry_run` ("Check, pack and test only. Push nothing, create no tag or release.") ticked. Or use the GitHub CLI:
+
+    ```bash
+    gh workflow run release.yml --ref main -f version=2.0.1 -f dry_run=true
+    ```
+
+    It runs the same pre-checks, then packs with the [Package ably](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/package.yml) workflow, which checks the version files and the Unity plugin and runs the package-install test. Then it checks the contents of the `.unitypackage`. Nothing is pushed.
+2. Open the dry run's summary. It lists `Ably.PubSub.Core.2.0.1.nupkg`, `Ably.PubSub.Device.2.0.1.nupkg`, `Ably.PubSub.Server.2.0.1.nupkg` and `ably.pubsub.2.0.1.unitypackage` with their SHA-256 values, and shows the release notes. Check them.
+3. Start the real run, with `dry_run` unticked:
+
+    ```bash
+    gh workflow run release.yml --ref main -f version=2.0.1 -f dry_run=false
+    ```
+
+    It repeats the checks and the packing, then the `publish` job waits for approval.
+4. Ask a reviewer of the `nuget` environment to approve the run (see "Approving a release"). You can't approve a run you started.
+5. Once approved, the workflow:
+    - pushes `Ably.PubSub.Core`, waits until nuget.org serves it, then pushes `Ably.PubSub.Device` and `Ably.PubSub.Server`;
+    - creates the annotated tag `2.0.1` on the released commit;
+    - creates the GitHub release, with the CHANGELOG section as its notes and `ably.pubsub.2.0.1.unitypackage` attached. A version with a prerelease suffix, such as `2.0.1-rc.1`, is marked as a prerelease.
+
+### Approving a release
+
+Only the reviewers of the `nuget` environment can approve, and not for a run they started. Before approving:
+
+1. Check the run was started on `main`, with the version the release PR intended, and with `dry_run` off.
+2. Check a dry run of the same version on the same commit passed. Its summary lists the three `.nupkg` files and the `.unitypackage` with SHA-256 values.
+3. Look at CI on the commit (the checks on the merge commit on `main`). The release workflow doesn't gate on CI, because some suites are flaky: the sandbox integration tests and the UTS `proxy` job can fail for reasons unrelated to the release. A known flaky failure isn't a reason to stop. A real regression or a failing build is: reject the deployment and fix `main` first.
+4. Approve the `nuget` deployment from the run's page ("Review deployments").
+
+### After the release
+
+1. Check that [Ably.PubSub.Core](https://www.nuget.org/packages/Ably.PubSub.Core), [Ably.PubSub.Device](https://www.nuget.org/packages/Ably.PubSub.Device) and [Ably.PubSub.Server](https://www.nuget.org/packages/Ably.PubSub.Server) show 2.0.1 on nuget.org, and that the [GitHub release](https://github.com/ably/ably-pubsub-dotnet/releases) has the notes and the `.unitypackage`.
+2. Create the entry on the [Ably Changelog](https://changelog.ably.com/) (via [headwayapp](https://headwayapp.co/)).
+
+### If something goes wrong
+
+If the `publish` job fails, its run summary lists the next steps too. What to do depends on where the run stopped:
+
+| Where it stopped | What to do |
+|---|---|
+| Before the approval (pre-checks, packing, the summary) | Nothing was published. Fix the problem on `main` with a PR, then start a new run. |
+| At a `NuGet/login` step (401 or 400) | Nothing was published. Check the `NUGET_USER` secret of the `nuget` environment (the nuget.org username of the person who created the "Ably PubSub" Trusted Publishing policy, not `ably-realtime`), that the policy is active, and the environment name. Then use **Re-run failed jobs** on the same run. |
+| After `Ably.PubSub.Core` was pushed (the wait, or the door pushes) | Use **Re-run failed jobs** on the same run. GitHub allows it for 30 days and up to 50 times, and it may ask for approval again. The Core push is skipped as a duplicate, then the doors go out. Don't start a new run: its pre-checks refuse a version that is already partly on nuget.org. |
+| `Ably.PubSub.Core` never appears on nuget.org | It probably failed nuget.org validation, and a re-run would time out again. Check the package on nuget.org and the owner's email. The version can't be reused, so release the next patch version with a new release PR. The doors were never pushed. |
+| At the tag or GitHub release step | The packages are published. Use **Re-run failed jobs**. A tag already on the released commit is reused, the `.unitypackage` is uploaded only if the release lacks it, and a leftover draft release is published. |
+| The tag exists on another commit | Only possible if `main` was force-moved. Delete the release and the tag (`gh release delete 2.0.1 --cleanup-tag --yes`, or `git push origin :refs/tags/2.0.1`), then re-run the `github-release` job. |
+| The run can't be re-run (for example, a bug in the workflow itself) | Finish the release by hand, as in "Manual fallback": push the packages that are missing, then create the tag and the release. |
+| A published version is bad | See "Withdrawing a version". |
+
+### Manual fallback
+
+Use this only when the Release workflow can't be used.
+
+1. Get the packages. Download the `output-package` artifact of the release run, or run the [Package ably](https://github.com/ably/ably-pubsub-dotnet/actions/workflows/package.yml) workflow on `main` with the version and download its `output-package`. It holds `Ably.PubSub.Core.2.0.1.nupkg`, `Ably.PubSub.Device.2.0.1.nupkg`, `Ably.PubSub.Server.2.0.1.nupkg` and `ably.pubsub.2.0.1.unitypackage`.
+2. Create a nuget.org API key for this release only: package owner `ably-realtime`, the "Push only new package versions" scope, glob `Ably.PubSub.*`, and the shortest expiry. nuget.org limits new keys to 30 days, so create a fresh one each time. Delete it when you are done.
+3. Push the packages one at a time, `Ably.PubSub.Core` first:
+
+    ```bash
+    dotnet nuget push Ably.PubSub.Core.2.0.1.nupkg --api-key YOUR_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+    ```
+
+    Once `Ably.PubSub.Core` 2.0.1 is listed on [nuget.org](https://www.nuget.org/packages/Ably.PubSub.Core), push `Ably.PubSub.Device.2.0.1.nupkg` and then `Ably.PubSub.Server.2.0.1.nupkg` the same way. Don't push with a wildcard such as `Ably.PubSub.*.nupkg`: the door packages depend on that exact core version, so the core must be published first. See [publishing with the .NET CLI](https://learn.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli#publish-with-the-net-cli-or-nuget-cli) for details.
+4. Create an annotated tag on the released commit and push it:
+
+    ```bash
+    git tag -a 2.0.1 -m "Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server 2.0.1" <commit>
+    git push origin 2.0.1
+    ```
+
+5. Create the GitHub release with the CHANGELOG section as its notes and the Unity package attached. From the repository root, take `release-notes.md` from the release run's `release-notes` artifact, or write it with the first command below:
+
+    ```bash
+    dotnet cake cake-build/release.cake -- --target=Release.Notes --version=2.0.1 --output=release-notes.md
+    gh release create 2.0.1 <path-to-output-package>/ably.pubsub.2.0.1.unitypackage --verify-tag --title 2.0.1 --notes-file release-notes.md
+    ```
+
+### Withdrawing a version
+
+nuget.org never deletes a package, and a version number can't be reused. To withdraw a bad version:
+
+1. Unlist `Ably.PubSub.Server` and `Ably.PubSub.Device` first, then `Ably.PubSub.Core`, so that no door is ever resolvable without its pinned core. Use the "Listing" tab of each package on nuget.org, or:
+
+    ```bash
+    dotnet nuget delete <package-id> 2.0.1 --source https://api.nuget.org/v3/index.json --api-key YOUR_API_KEY --non-interactive
+    ```
+
+    On nuget.org this unlists the version. The key needs the "Unlist package" scope, which the Trusted Publishing policy doesn't grant: create a short-lived key as in "Manual fallback", with that scope instead of push.
+2. Optionally deprecate the version on nuget.org.
+3. Release a fixed patch version.
+4. Keep the tag and the GitHub release, and edit the release notes to say that the version is withdrawn.

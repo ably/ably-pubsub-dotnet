@@ -1,17 +1,19 @@
 # ============================================================================
-# RELEASE: checks and packs Ably.PubSub.Core, .Device and .Server for release.
-# Publishing isn't part of this workflow yet.
+# RELEASE: publishes Ably.PubSub.Core, .Device and .Server to nuget.org, then
+# tags the release and creates the GitHub release with the .unitypackage.
 #
 #   gh workflow run release.yml --ref main -f version=2.0.1 -f dry_run=true
 #   gh workflow run release.yml --ref main -f version=2.0.1 -f dry_run=false
 #
 # Don't break:
 # - The file name. nuget.org Trusted Publishing trusts only release.yml, and only
-#   a NuGet/login in this file (the publish job, added later) in environment `nuget`.
+#   a NuGet/login in this file, in a job with environment `nuget`.
 # - The `version` input's name. package.yml, called by `pack`, reads
 #   github.event.inputs.version.
 #
 # The checks are in cake-build/release.cake ("Release targets" in cake-build/README.md).
+# If a run fails, see "If something goes wrong" in CONTRIBUTING.md: usually "Re-run
+# failed jobs" on the same run.
 # ============================================================================
 
 name: Release
@@ -143,13 +145,163 @@ jobs:
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Until the publish job exists, say so, so a green REAL run isn't taken for a release.
-      - name: Warn that nothing was published
-        if: ${{ !inputs.dry_run }}
-        run: |
-          msg="Publishing isn't part of release.yml yet: this dry_run=false run pushed nothing to nuget.org and created no tag or GitHub release."
-          echo "::warning::$msg"
-          printf '\n**Warning:** %s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Check the Unity package contents
         run: dotnet cake cake-build/release.cake -- --target=Release.VerifyUnityPackage "--version=$VERSION" "--unityPackage=output-package/ably.pubsub.$VERSION.unitypackage"
+
+  # The only job that can get a NuGet key: no checkout, no repository code.
+  publish:
+    needs: [prechecks, pack, plan]
+    if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Must match the policy. Its required reviewers approve before the job starts.
+    environment: nuget
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: output-package
+          path: output-package
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 8.0.x
+
+      # NUGET_USER: the nuget.org username of the policy's creator, not ably-realtime.
+      - name: NuGet login for Core (OIDC -> short-lived API key)
+        id: login-core
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      # The doors pin Core exactly, so Core goes first. --skip-duplicate makes re-runs safe.
+      - name: Push Ably.PubSub.Core
+        env:
+          NUGET_API_KEY: ${{ steps.login-core.outputs.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "output-package/Ably.PubSub.Core.$VERSION.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      # A door can't be restored until nuget.org serves its exact Core version.
+      - name: Wait for Ably.PubSub.Core on nuget.org
+        run: |
+          url="https://api.nuget.org/v3-flatcontainer/ably.pubsub.core/index.json"
+          deadline=$((SECONDS + 30*60))
+          until curl -fsS --max-time 30 "$url" 2>/dev/null | jq -e --arg v "${VERSION,,}" '.versions | index($v)' >/dev/null; do
+            if (( SECONDS >= deadline )); then
+              echo "::error::Ably.PubSub.Core $VERSION isn't on nuget.org after 30 minutes. Nothing else was pushed. Check its validation status on nuget.org, then use 'Re-run failed jobs': the Core push is skipped and the doors go out."
+              exit 1
+            fi
+            echo "Waiting for Ably.PubSub.Core $VERSION ..."; sleep 20
+          done
+          echo "Ably.PubSub.Core $VERSION is available."
+
+      # A fresh key: the first lasts an hour and may expire during the wait.
+      - name: NuGet login for the doors
+        id: login-doors
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push Ably.PubSub.Device and Ably.PubSub.Server
+        env:
+          NUGET_API_KEY: ${{ steps.login-doors.outputs.NUGET_API_KEY }}
+        run: |
+          for id in Ably.PubSub.Device Ably.PubSub.Server; do
+            dotnet nuget push "output-package/$id.$VERSION.nupkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+      - name: Wait for the doors on nuget.org (warning only)
+        run: |
+          deadline=$((SECONDS + 15*60))
+          for id in ably.pubsub.device ably.pubsub.server; do
+            until curl -fsS --max-time 30 "https://api.nuget.org/v3-flatcontainer/$id/index.json" 2>/dev/null \
+              | jq -e --arg v "${VERSION,,}" '.versions | index($v)' >/dev/null; do
+              if (( SECONDS >= deadline )); then
+                echo "::warning::$id $VERSION not yet visible on nuget.org; check later."; break
+              fi
+              sleep 20
+            done
+          done
+
+      - name: Recovery notes
+        if: ${{ failure() || cancelled() }}
+        run: |
+          {
+            echo "### Publishing $VERSION failed"
+            echo "- Use **Re-run failed jobs** on this run. Every push uses --skip-duplicate, so packages already on nuget.org are skipped."
+            echo "- Don't dispatch a new run for $VERSION: the pre-checks refuse a version that is already partly on nuget.org."
+            echo "- To abandon $VERSION, unlist Ably.PubSub.Server and Ably.PubSub.Device first, then Ably.PubSub.Core. See \"Withdrawing a version\" in CONTRIBUTING.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Has a write token, so no checkout: it works from the run's artifacts only.
+  github-release:
+    needs: publish
+    if: ${{ !inputs.dry_run && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: output-package
+          path: output-package
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-notes
+          path: release-notes
+
+      - name: Create the annotated tag
+        run: |
+          set -euo pipefail
+          remote="$GITHUB_SERVER_URL/$GH_REPO.git"
+          # The ^{} line is the commit an annotated tag points at; a lightweight tag only has the plain line.
+          existing=$(git ls-remote "$remote" "refs/tags/$VERSION^{}" | cut -f1)
+          [ -n "$existing" ] || existing=$(git ls-remote "$remote" "refs/tags/$VERSION" | cut -f1)
+          if [ -n "$existing" ]; then
+            if [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag $VERSION exists at $existing, not at the released commit $GITHUB_SHA."; exit 1
+            fi
+            echo "Tag $VERSION already points at $GITHUB_SHA."; exit 0
+          fi
+          tag_object=$(gh api "repos/$GH_REPO/git/tags" \
+            -f tag="$VERSION" -f object="$GITHUB_SHA" -f type=commit \
+            -f message="Ably.PubSub.Core, Ably.PubSub.Device and Ably.PubSub.Server $VERSION" \
+            -f 'tagger[name]=github-actions[bot]' \
+            -f 'tagger[email]=41898282+github-actions[bot]@users.noreply.github.com' \
+            -f "tagger[date]=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --jq .sha)
+          gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$VERSION" -f sha="$tag_object" >/dev/null
+          echo "Created annotated tag $VERSION -> $GITHUB_SHA"
+
+      # No --clobber: a re-run uploads only a missing asset, which also suits immutable releases.
+      - name: Create the GitHub release and attach the Unity package
+        run: |
+          set -euo pipefail
+          name="ably.pubsub.$VERSION.unitypackage"
+          asset="output-package/$name"
+          flags=()
+          case "$VERSION" in *-*) flags+=(--prerelease --latest=false) ;; esac
+          if gh release view "$VERSION" --json isDraft,assets > release.json 2>/dev/null; then
+            if ! jq -e --arg n "$name" '[.assets[].name] | index($n)' release.json >/dev/null; then
+              gh release upload "$VERSION" "$asset"
+            fi
+            if [ "$(jq -r .isDraft release.json)" = true ]; then
+              gh release edit "$VERSION" --draft=false "${flags[@]}"
+            fi
+            echo "Release $VERSION already existed; it now has $name and is published."
+          else
+            gh release create "$VERSION" "$asset" --verify-tag --title "$VERSION" \
+              --notes-file release-notes/release-notes.md "${flags[@]}"
+          fi
