@@ -119,8 +119,11 @@ Releases are packaged by the `Package ably` GitHub workflow
 (`.github/workflows/package.yml`), dispatched by hand with a `version` input. It
 runs `Package` and `Test.PackageConsumption.NoPack` on Windows and `UnityPackage`
 on Ubuntu, and uploads the three `.nupkg` files and the `.unitypackage` as one
-`output-package` artifact. Nothing is published: the release engineer pushes the
-packages to nuget.org by hand, following the release process in `CONTRIBUTING.md`.
+`output-package` artifact. It publishes nothing itself. The `Release` workflow
+(`.github/workflows/release.yml`) calls it to pack a release, then publishes those
+same packages to nuget.org, tags the release and creates the GitHub release. A
+hand push of `package.yml`'s artifact is the manual fallback. Both are described
+in the release process in `CONTRIBUTING.md`.
 
 ### package.cmd
 
