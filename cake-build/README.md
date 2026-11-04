@@ -218,6 +218,39 @@ CLR, and the macOS (Mono) workflow, where they run on Mono.
 On macOS/Linux, `Package` needs Mono: it builds the core's `net46` head with Mono
 MSBuild and the other target frameworks with the .NET SDK.
 
+## Release targets
+
+`cake-build/release.cake` holds the checks and the release notes that the release
+workflow (`.github/workflows/release.yml`) runs. It is a separate script, not part
+of `build.cake`: it builds nothing, needs only the .NET SDK and Cake from
+"Prerequisites", and runs on any OS. Run it from the repository root, with the
+arguments after `--`:
+
+```bash
+dotnet tool restore
+dotnet cake cake-build/release.cake -- --target=Release.Preflight --version=2.0.1
+```
+
+- `Release.Preflight` checks that the version is `MAJOR.MINOR.PATCH[-prerelease]`,
+  that the top `CHANGELOG.md` entry is
+  `## [<version>](https://github.com/ably/ably-pubsub-dotnet/tree/<version>) (yyyy-mm-dd)`
+  with a non-empty section, and that the version isn't on nuget.org (for any of
+  the three package IDs) and has no tag or GitHub release yet. `--dryRun=true`
+  reports the "already released" problems as warnings instead of failing. Run it
+  on the release branch before opening the release PR. It calls the nuget.org and
+  GitHub APIs; set `GITHUB_TOKEN` if GitHub rate-limits unauthenticated calls.
+- `Release.VerifyUnityPackage` checks that a `.unitypackage` holds
+  `Assets/Ably/Plugins/Ably.PubSub.Device.dll` and an `Assets/Ably/version.txt`
+  that reads the version. Pass the file with `--unityPackage=<file>`; the default
+  is `ably.pubsub.<version>.unitypackage` at the repository root, where
+  `./package-unity.sh` writes it.
+- `Release.Notes` writes the version's `CHANGELOG.md` section, without its heading
+  and "Full Changelog" line, to `--output=<file>` (default `release-notes.md`).
+  The workflow uses it as the GitHub release notes.
+
+`--changelog=<file>` points the targets at another `CHANGELOG.md`. Relative paths
+are resolved against the repository root.
+
 ## Advanced Options
 
 ### Build with specific configuration
