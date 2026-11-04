@@ -14,48 +14,24 @@ and use message history and presence, from servers and from applications on end-
 The SDK is published as two packages, one for each side of the connection. You choose the package
 by where your code runs, and create your client through that package's entry point.
 
-| Package | Use it for | Entry point | Platforms |
-|---------|------------|-------------|-----------|
-| [`Ably.PubSub.Server`](https://www.nuget.org/packages/Ably.PubSub.Server) | Servers and other trusted backend environments | `PubSubServer.CreateRealtimeClient`, `PubSubServer.CreateHttpClient` | .NET, .NET Framework, Mono |
-| [`Ably.PubSub.Device`](https://www.nuget.org/packages/Ably.PubSub.Device) | Applications on end-user devices | `PubSubDevice.CreateClient` | .NET, .NET Framework, Mono, .NET for Android and iOS, MAUI, Unity |
-
-### Choosing a package
-
-| Your code runs in | Package | Create clients with |
-|-------------------|---------|---------------------|
-| An ASP.NET Core app, a worker service, an Azure host, a console job or any other backend you operate | `Ably.PubSub.Server` | `PubSubServer.CreateRealtimeClient(...)` or `PubSubServer.CreateHttpClient(...)` |
-| A desktop app (WPF, WinForms), a MAUI or .NET for Android/iOS app, a Unity game, or any other client the end user holds | `Ably.PubSub.Device` | `PubSubDevice.CreateClient(...)` |
-
-Choose by where the code runs, not by which Ably features you use: both packages expose the whole
-`Ably.PubSub` API. The device package has a single entry point; for HTTP-only calls on a device,
-use the client's `HttpClient` property, as shown in the device quick start below.
+| Package | Use it for | Entry point |
+|---------|------------|-------------|
+| [`Ably.PubSub.Server`](https://www.nuget.org/packages/Ably.PubSub.Server) | Servers and other trusted backend environments | `PubSubServer.CreateRealtimeClient`, `PubSubServer.CreateHttpClient` |
+| [`Ably.PubSub.Device`](https://www.nuget.org/packages/Ably.PubSub.Device) | Applications on end-user devices, including desktop apps | `PubSubDevice.CreateClient` |
 
 ## Requirements
 
-| Platform | Requirement |
-|----------|-------------|
-| .NET | .NET 6.0 or later. Both packages ship `net6.0` and `net7.0` builds; later .NET versions use the `net7.0` build. |
-| .NET Framework | 4.6.2 or later, or Mono. |
-| .NET for Android, .NET for iOS, MAUI | With `Ably.PubSub.Device`. See "MAUI and assembly trimming" under Platform notes. |
-| Xamarin and other .NET Standard 2.0 runtimes | Through the `netstandard2.0` build of either package. |
-| Unity | 2019.x or later, with the API Compatibility Level set to .NET Standard 2.0. See "Unity" under Platform notes. |
+.NET Standard 2.0 or later (.NET 6 or later, .NET Framework 4.6.2 or later, Mono, Xamarin and
+Unity).
 
 ## Installation
 
-Use exactly one of `Ably.PubSub.Server` or `Ably.PubSub.Device` in an app. Never reference
-`Ably.PubSub.Core` directly: it is the shared implementation, and both packages bring in the
-matching version for you.
+Use exactly one of `Ably.PubSub.Server` or `Ably.PubSub.Device` in an app.
 
 ### Server
 
 ```shell
 dotnet add package Ably.PubSub.Server
-```
-
-Or add a package reference to your project file:
-
-```xml
-<PackageReference Include="Ably.PubSub.Server" Version="2.0.0" />
 ```
 
 ### Device
@@ -64,44 +40,18 @@ Or add a package reference to your project file:
 dotnet add package Ably.PubSub.Device
 ```
 
-Or add a package reference to your project file:
-
-```xml
-<PackageReference Include="Ably.PubSub.Device" Version="2.0.0" />
-```
-
 ### Unity
 
-Unity projects install the `.unitypackage` attached to each
-[GitHub release](https://github.com/ably/ably-pubsub-dotnet/releases/latest) instead of a NuGet
-package. See "Unity" under Platform notes.
-
-### Migrating from 1.x
-
-Version 2 replaces the `ably.io` package with these two packages and moves the root namespace from
-`IO.Ably` to `Ably.PubSub`. Remove `ably.io`, add the package for your side, change each
-`using IO.Ably...;` to `using Ably.PubSub...;` (`IO.Ably.Rest` becomes `Ably.PubSub.Http`), and
-replace `new AblyRealtime(...)` and `new AblyRest(...)` with the entry points above. They return
-`PubSubRealtimeClient` and `PubSubHttpClient`.
-
-```shell
-dotnet remove package ably.io
-dotnet add package Ably.PubSub.Server   # or Ably.PubSub.Device
-```
-
-Other changes that can affect a running app:
-[`Endpoint` replaces `Environment`, `RestHost` and `RealtimeHost`](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#choose-the-host-with-endpoint),
-[publish methods return a `PublishResult`](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#publish-results-and-new-message-apis),
-[releasing a channel that isn't detached throws](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#release-a-realtime-channel-only-once-it-is-detached),
-and [device push-receive is not available](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications).
-See [UPDATING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md) for the full list.
+Unity projects use a `.unitypackage` instead. See "Unity" under Platform notes.
 
 ## Quick start
 
 ### Server
 
-Use an API key on a server. The following program connects, subscribes to a channel, publishes a
-message to it and waits for the message to arrive.
+Use an API key on a server. The samples read it from the `ABLY_API_KEY` environment variable; set it
+to an API key from your [Ably dashboard](https://ably.com/accounts/any/apps/any/app_keys). The
+following code connects, subscribes to a channel, publishes a message to it and waits for the
+message to arrive.
 
 ```csharp
 using System;
@@ -110,12 +60,10 @@ using Ably.PubSub;
 using Ably.PubSub.Realtime;
 using Ably.PubSub.Server;
 
-PubSubRealtimeClient realtime = PubSubServer.CreateRealtimeClient("xxxxxx.yyyyyy:zzzzzzzz");
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
+PubSubRealtimeClient realtime = PubSubServer.CreateRealtimeClient(ablyApiKey);
 
-realtime.Connection.On(ConnectionEvent.Connected, _ => Console.WriteLine("Connected to Ably"));
-
-// Subscribing attaches the channel. Publishing while the client is still
-// connecting queues the message until the connection is established.
+// Subscribing attaches the channel. A message published while connecting is queued.
 IRealtimeChannel channel = realtime.Channels.Get("test-channel");
 var received = new TaskCompletionSource<Message>();
 channel.Subscribe(msg => received.TrySetResult(msg));
@@ -133,68 +81,59 @@ Console.WriteLine($"Received: {message.Data}");
 realtime.Close();
 ```
 
-To publish and read history over HTTP without a realtime connection, create an HTTP client
-instead. Publishing returns a `PublishResult` with the serial of each message:
+To publish over HTTP without a realtime connection, create an HTTP client instead:
 
 ```csharp
 using System;
 using Ably.PubSub;
-using Ably.PubSub.Http;
 using Ably.PubSub.Server;
 
-PubSubHttpClient http = PubSubServer.CreateHttpClient("xxxxxx.yyyyyy:zzzzzzzz");
-IHttpChannel channel = http.Channels.Get("test-channel");
-
-PublishResult published = await channel.PublishAsync("test-event", "hello world");
-Console.WriteLine($"Published, serials: {string.Join(", ", published.Serials)}");
-
-PaginatedResult<Message> history = await channel.HistoryAsync();
-foreach (Message message in history.Items)
-{
-    Console.WriteLine($"{message.Name}: {message.Data}");
-}
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
+PubSubHttpClient http = PubSubServer.CreateHttpClient(ablyApiKey);
+await http.Channels.Get("test-channel").PublishAsync("test-event", "hello world");
 ```
 
-Your server also issues the tokens that devices authenticate with. Return a token request from
-the endpoint your devices use as their `AuthUrl`:
+> [!IMPORTANT]
+> Server clients must authenticate with an API key. To use a token instead, see [Server clients and token authentication](https://ably.com/docs/auth/token#server-token-auth).
+
+The following endpoint issues token requests. Devices set `AuthUrl` to its URL, for example
+`https://your-server.example.com/ably-auth`:
 
 ```csharp
 using System;
 using Ably.PubSub;
 using Ably.PubSub.Server;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 
-PubSubHttpClient http = PubSubServer.CreateHttpClient("xxxxxx.yyyyyy:zzzzzzzz");
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
+PubSubHttpClient http = PubSubServer.CreateHttpClient(ablyApiKey);
 
-// Authenticate the caller first, then issue a token request for that user only,
-// granting only the operations the user needs.
-var capability = new Capability("{\"test-channel\":[\"publish\",\"subscribe\",\"history\"]}");
+var app = WebApplication.CreateBuilder(args).Build();
 
-string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams
+app.MapGet("/ably-auth", async () =>
 {
-    ClientId = "me", // the authenticated user's ID
-    Capability = capability, // without it, the token gets all of the API key's capabilities
+    // Authenticate the caller first. Grant only the operations this user needs.
+    var userId = "me"; // the signed-in user's ID, from your session
+    var capability = new Capability("{\"test-channel\":[\"publish\",\"subscribe\",\"history\"]}");
+
+    string tokenRequest = await http.Auth.CreateTokenRequestAsync(new TokenParams
+    {
+        ClientId = userId,
+        Capability = capability, // without it, the token gets all of the API key's capabilities
+    });
+    return Results.Content(tokenRequest, "application/json");
 });
 
-// Return this JSON unchanged, with the content type application/json. A text/plain
-// response is treated as a token string.
-Console.WriteLine(tokenRequest);
+app.Run();
 ```
 
-In an ASP.NET Core minimal API, for example, return it with
-`Results.Content(tokenRequest, "application/json")`. To work with it as a `TokenRequest` object, use
-`JsonHelper.Deserialize<TokenRequest>(tokenRequest)`. See
-[token authentication](https://ably.com/docs/auth/token) for how devices use it.
-
-> **Important:** clients from `PubSubServer` declare themselves as servers. Authenticate them with
-> an API key. Token authentication works only with a token that carries the signed
-> `x-ably-clientType=server` claim (a JWT); with any other token, Ably rejects the connection or
-> request with error 40167. Clients from `PubSubDevice` are not affected. See
-> [Server clients and token authentication](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#server-clients-and-token-authentication).
+See [token authentication](https://ably.com/docs/auth/token) for how devices use it.
 
 ### Device
 
-Authenticate a device with tokens issued by your own server, through `AuthUrl` or `AuthCallback`.
-Never embed an API key in an app that runs on an end-user device.
+Authenticate a device with tokens issued by your own server, such as the endpoint above, through
+`AuthUrl` or `AuthCallback`. Never embed an API key in an app that runs on an end-user device.
 
 ```csharp
 using System;
@@ -228,78 +167,62 @@ realtime.Close();
 ```
 
 To get tokens from your own code instead of a URL, set `AuthCallback`. It can return a token
-string, a `TokenDetails`, or a token request, including the serialized request from
-`Auth.CreateTokenRequestAsync`:
+string, a `TokenDetails`, a `TokenRequest` or the JSON from `Auth.CreateTokenRequestAsync`.
 
-```csharp
-PubSubRealtimeClient realtime = PubSubDevice.CreateClient(options =>
-{
-    options.AuthCallback = async tokenParams =>
-    {
-        // Ask your server for a token request, token details or token string.
-        return await RequestTokenFromYourServerAsync(tokenParams); // your function
-    };
-    options.ClientId = "me";
-});
-```
+The device package has no separate HTTP entry point. For HTTP calls only, set `AutoConnect = false`
+and use the client's `HttpClient`.
 
-The device package has no separate HTTP entry point. For HTTP calls only, create the client
-without connecting and use its `HttpClient`:
+## Migrating from 1.x
 
-```csharp
-using System;
-using Ably.PubSub;
-using Ably.PubSub.Device;
+Version 2.0 splits the `ably.io` package in two and creates clients with factory methods.
 
-PubSubRealtimeClient client = PubSubDevice.CreateClient(options =>
-{
-    options.AuthUrl = new Uri("https://your-server.example.com/ably-auth");
-    options.AutoConnect = false; // HTTP calls only; call client.Connect() to go realtime
-});
+| | 1.x | 2.0 |
+|---|---|---|
+| Package | `ably.io` | `Ably.PubSub.Server` or `Ably.PubSub.Device` |
+| Namespace | `IO.Ably`, `IO.Ably.Rest` | `Ably.PubSub`, `Ably.PubSub.Http` |
+| Realtime client | `new AblyRealtime(...)` | `PubSubServer.CreateRealtimeClient(...)` or `PubSubDevice.CreateClient(...)` |
+| HTTP client | `new AblyRest(...)` | `PubSubServer.CreateHttpClient(...)`, or a device client's `HttpClient` |
 
-PaginatedResult<Message> history = await client.HttpClient.Channels.Get("test-channel").HistoryAsync();
-foreach (Message message in history.Items)
-{
-    Console.WriteLine($"{message.Name}: {message.Data}");
-}
-```
+See [UPDATING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md) for all other
+changes.
 
 ## Common configuration
 
-Every entry point accepts an API key, a `ClientOptions` object, or an `Action<ClientOptions>`
-that configures one.
+Every entry point accepts an API key or token string, a `ClientOptions` object or an
+`Action<ClientOptions>`.
 
 ### Endpoint
 
-`Endpoint` selects the Ably host for both HTTP requests and the realtime connection. It replaces
-the 1.x `Environment`, `RestHost` and `RealtimeHost` options.
+`Endpoint` selects the Ably host for HTTP requests and the realtime connection. It replaces the
+1.x `Environment`, `RestHost` and `RealtimeHost` options.
 
 ```csharp
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
 PubSubRealtimeClient realtime = PubSubServer.CreateRealtimeClient(options =>
 {
-    options.Key = "xxxxxx.yyyyyy:zzzzzzzz";
+    options.Key = ablyApiKey;
     options.Endpoint = "nonprod:sandbox";
 });
 ```
 
-Never put a port in `Endpoint`: `localhost:8080` is not a hostname and does not resolve. Set the
-port with `TlsPort` instead, or with `Port` when TLS is off (`Tls = false`, which needs token
-authentication). See
-[Choose the host with `Endpoint`](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#choose-the-host-with-endpoint)
-for how each value resolves.
+- Never put a port in `Endpoint`: `localhost:8080` is not a hostname and does not resolve.
+- Set the port with `TlsPort`, or with `Port` when TLS is off.
+- With TLS off (`Tls = false`), use token authentication.
+
+See [UPDATING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#choose-the-host-with-endpoint)
+for how the old options map to `Endpoint`.
 
 ### Proxy
 
-The SDK uses your runtime's default proxy settings, for both HTTP requests and the realtime
-connection. On .NET, these are
-[`HttpClient.DefaultProxy`](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.defaultproxy),
-which comes from the `HTTPS_PROXY` and `HTTP_PROXY` environment variables or from the system proxy
-settings. On .NET Framework, they come from the system proxy settings and your app's configuration.
+The SDK uses your runtime's default proxy settings for HTTP requests and the realtime connection.
+On .NET, these come from
+[`HttpClient.DefaultProxy`](https://learn.microsoft.com/en-us/dotnet/api/system.net.http.httpclient.defaultproxy).
 
-To set a proxy in code, pass your own `HttpClient`. It applies to HTTP requests only; the
-realtime connection still uses the default proxy settings.
+To set a proxy in code, pass your own `HttpClient`. It applies to HTTP requests only. The realtime
+connection still uses the default proxy settings.
 
 ```csharp
+using System;
 using System.Net;
 using System.Net.Http;
 using Ably.PubSub;
@@ -311,29 +234,28 @@ var handler = new HttpClientHandler
     UseProxy = true,
 };
 
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
 PubSubHttpClient http = PubSubServer.CreateHttpClient(options =>
 {
-    options.Key = "xxxxxx.yyyyyy:zzzzzzzz";
+    options.Key = ablyApiKey;
     options.HttpClient = new HttpClient(handler);
 });
 ```
 
-If the proxy needs authentication, set `WebProxy.Credentials`.
-
 ### Logging
 
-`LogLevel` sets what the SDK logs: `LogLevel.Debug` (the most verbose), `Warning` (the default),
-`Error` or `None`. The SDK writes log lines to the `ILoggerSink` you set as `LogHandler`; without
-one, log lines aren't written anywhere. This works the same way as in 1.x.
+Set `LogLevel` to `LogLevel.Debug`, `Warning` (the default), `Error` or `None`. The SDK writes log
+lines to the `ILoggerSink` you set as `LogHandler`. Without one, log lines are not written anywhere.
 
 ```csharp
 using System;
 using Ably.PubSub;
 using Ably.PubSub.Server;
 
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
 PubSubRealtimeClient realtime = PubSubServer.CreateRealtimeClient(options =>
 {
-    options.Key = "xxxxxx.yyyyyy:zzzzzzzz";
+    options.Key = ablyApiKey;
     options.LogLevel = LogLevel.Debug;
     options.LogHandler = new ConsoleLogSink();
 });
@@ -347,19 +269,21 @@ class ConsoleLogSink : ILoggerSink
 }
 ```
 
-All clients in a process share one logger. Each client you create applies its `LogLevel`, and its
-`LogHandler` if set, to that shared logger, so give every client the same logging options.
+All clients in a process share one logger, so give every client the same logging options.
 
 ## Platform notes
 
 ### Unity
 
 Download `ably.pubsub.<version>.unitypackage` from the
-[latest GitHub release](https://github.com/ably/ably-pubsub-dotnet/releases/latest) and import it
-with **Assets > Import Package > Custom Package**. The package bundles `Ably.PubSub.Device`, so
-create clients with `PubSubDevice.CreateClient(...)`. Set `ClientOptions.CustomContext` to run
-callbacks on the main thread. WebGL builds are not supported. See the
-[Unity README](https://github.com/ably/ably-pubsub-dotnet/blob/main/unity/README.md).
+[latest GitHub release](https://github.com/ably/ably-pubsub-dotnet/releases/latest). Import it with
+**Assets > Import Package > Custom Package**.
+
+- Use Unity 2019.x or later, with the API Compatibility Level set to .NET Standard 2.0.
+- The package bundles `Ably.PubSub.Device`. Create clients with `PubSubDevice.CreateClient(...)`.
+- Set `ClientOptions.CustomContext` to run callbacks on the main thread.
+
+See the [Unity README](https://github.com/ably/ably-pubsub-dotnet/blob/main/unity/README.md).
 
 ### MAUI and assembly trimming
 
@@ -374,43 +298,36 @@ adding this to your `.csproj`:
 
 ### .NET Framework
 
-Both packages run on .NET Framework 4.6.2 or later. For high-throughput use on .NET Framework,
-for example messages larger than 50 KB, set the WebSocket send and receive buffers to the
-64 KB maximum:
+On .NET Framework, for messages larger than 50 KB, set both WebSocket buffers to the 64 KB maximum:
 
 ```csharp
+using System;
 using Ably.PubSub;
 using Ably.PubSub.Server;
 using Ably.PubSub.Transport;
 
-var maxBufferSize = 64 * 1024;
-
-var options = new ClientOptions("xxxxxx.yyyyyy:zzzzzzzz")
+var ablyApiKey = Environment.GetEnvironmentVariable("ABLY_API_KEY");
+var options = new ClientOptions(ablyApiKey)
 {
     TransportFactory = new MsWebSocketTransport.TransportFactory(new MsWebSocketOptions
     {
-        SendBufferInBytes = maxBufferSize,
-        ReceiveBufferInBytes = maxBufferSize,
+        SendBufferInBytes = 64 * 1024,
+        ReceiveBufferInBytes = 64 * 1024,
     }),
 };
 
 PubSubRealtimeClient realtime = PubSubServer.CreateRealtimeClient(options);
 ```
 
-In a device app, set the same `TransportFactory` on the `ClientOptions` you pass to
-`PubSubDevice.CreateClient`.
-
 ## Known limitations
 
-- Device push-receive (activating a device for push notifications on Android or iOS) is not
-  available in 2.0. The API stays public: `Push.Activate()` and `Push.Deactivate()` throw an
-  `AblyException`, and the client's `Device` and a channel's `Push` are `null`. To request the
-  feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360. See
+- Device push-receive (push activation on Android or iOS) is not available. `Push.Activate()`
+  throws an `AblyException`. See
   [Push notifications](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications).
-- Push administration (`Push.Admin`) is available on clients from both `Ably.PubSub.Device` and
-  `Ably.PubSub.Server`. It is intended for server-side use and needs the `push-admin` capability,
-  so use it from a backend built on `Ably.PubSub.Server`.
-- Unity WebGL builds are not supported (https://github.com/ably/ably-pubsub-dotnet/issues/1211).
+  To request the feature, comment on [issue 1360](https://github.com/ably/ably-pubsub-dotnet/issues/1360).
+- Push administration (`Push.Admin`) needs the `push-admin` capability. Use it from a backend
+  built on `Ably.PubSub.Server`.
+- Unity WebGL builds are not supported ([issue 1211](https://github.com/ably/ably-pubsub-dotnet/issues/1211)).
 
 ## Further reading
 
@@ -419,14 +336,11 @@ In a device app, set the same `TransportFactory` on the `ClientOptions` you pass
 - [Token authentication](https://ably.com/docs/auth/token)
 - [UPDATING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md): migrating from 1.x
 - [CHANGELOG.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/CHANGELOG.md): release notes; all Ably releases are listed on [changelog.ably.com](https://changelog.ably.com)
-- [Unity README](https://github.com/ably/ably-pubsub-dotnet/blob/main/unity/README.md): using the SDK in Unity
 
 ## Contributing
 
 Read [CONTRIBUTING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/CONTRIBUTING.md)
-before contributing; it also describes the release process. The build uses Cake: run
-`./build.sh --target=Build.NetStandard` (or `build.cmd` on Windows) to build and lint before you
-push.
+before contributing; it also describes the release process.
 
 ## Support, feedback and troubleshooting
 
