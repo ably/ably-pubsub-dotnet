@@ -23,6 +23,7 @@ namespace Ably.PubSub.Push
         {
             _restClient = restClient;
             _logger = logger;
+            FcmTopics = new PushAdminFcmTopics(restClient);
         }
 
         private ClientOptions Options => _restClient.Options;
@@ -36,6 +37,11 @@ namespace Ably.PubSub.Push
         /// Exposes device registrations apis.
         /// </summary>
         public IDeviceRegistrations DeviceRegistrations => this;
+
+        /// <summary>
+        /// Exposes FCM topics apis, for subscribing devices to FCM topics and publishing to them.
+        /// </summary>
+        public PushAdminFcmTopics FcmTopics { get; }
 
         /// <summary>
         /// Register a new device
