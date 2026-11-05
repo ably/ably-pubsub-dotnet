@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 using Newtonsoft.Json.Linq;
@@ -47,11 +46,7 @@ namespace Ably.PubSub.Push
         /// </summary>
         /// <param name="clientId">The ID of the client whose devices to subscribe.</param>
         /// <returns>Task.</returns>
-        public Task SubscribeClientAsync(string clientId)
-        {
-            PushAdminFcmTopics.RequireNonEmpty(clientId, nameof(clientId));
-            return _topics.PostSubscriptionsAsync(Name, new JObject { ["clientId"] = clientId });
-        }
+        public Task SubscribeClientAsync(string clientId) => _topics.SubscribeClientAsync(Name, clientId);
 
         /// <summary>
         /// Requests that every FCM device subscribed to push notifications on any of the given channels
@@ -61,16 +56,7 @@ namespace Ably.PubSub.Push
         /// </summary>
         /// <param name="channels">The names of the channels whose subscribed devices to subscribe.</param>
         /// <returns>Task.</returns>
-        public Task SubscribeChannelsAsync(IEnumerable<string> channels)
-        {
-            var channelList = channels?.ToList();
-            if (channelList is null || channelList.Count == 0 || channelList.Any(c => c.IsEmpty()))
-            {
-                throw new AblyException("Please provide at least one channel, and no empty channel names.", ErrorCodes.BadRequest);
-            }
-
-            return _topics.PostSubscriptionsAsync(Name, new JObject { ["channels"] = new JArray(channelList) });
-        }
+        public Task SubscribeChannelsAsync(IEnumerable<string> channels) => _topics.SubscribeChannelsAsync(Name, channels);
 
         /// <summary>
         /// Requests that every FCM device registered for a clientId is unsubscribed from the topic.

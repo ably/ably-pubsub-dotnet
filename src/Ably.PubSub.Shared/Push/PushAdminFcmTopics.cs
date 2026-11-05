@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using Newtonsoft.Json.Linq;
@@ -26,6 +28,8 @@ namespace Ably.PubSub.Push
     {
         private const string BasePath = "/push/fcmTopics";
 
+        private static readonly Regex TopicNamePattern = new Regex("^[a-zA-Z0-9\\-_.~%]{1,900}$", RegexOptions.Compiled);
+
         private readonly PubSubHttpClient _restClient;
 
         internal PushAdminFcmTopics(PubSubHttpClient restClient)
@@ -36,13 +40,16 @@ namespace Ably.PubSub.Push
         /// <summary>
         /// Returns a <see cref="PushAdminFcmTopic"/> for managing subscriptions to, and publishing to, the named topic.
         /// </summary>
-        /// <param name="topic">The FCM topic name.</param>
+        /// <param name="topic">The FCM topic name, matching <c>[a-zA-Z0-9-_.~%]{1,900}</c>.</param>
         /// <returns>A <see cref="PushAdminFcmTopic"/>.</returns>
+        /// <exception cref="AblyException">The topic name is empty or does not match the allowed pattern.</exception>
         public PushAdminFcmTopic Get(string topic)
         {
-            if (topic.IsEmpty())
+            if (topic.IsEmpty() || !TopicNamePattern.IsMatch(topic))
             {
-                throw new AblyException("Please provide a non-empty FCM topic name.", ErrorCodes.BadRequest);
+                throw new AblyException(
+                    $"Invalid FCM topic name '{topic}'. Topic names must match [a-zA-Z0-9-_.~%]{{1,900}}; do not include a '/topics/' prefix.",
+                    ErrorCodes.BadRequest);
             }
 
             return new PushAdminFcmTopic(this, topic);
@@ -60,33 +67,28 @@ namespace Ably.PubSub.Push
 
             var request = _restClient.CreateGetRequest(BasePath);
             request.AddQueryParameters(new[] { new KeyValuePair<string, string>("deviceId", deviceId) });
-            AddDeviceAuthenticationIfLocal(request, deviceId);
+            PushAdmin.AddDeviceAuthenticationIfLocal(request, _restClient.Device, deviceId);
 
             return await _restClient.ExecuteRequest<List<string>>(request) ?? new List<string>();
         }
 
         /// <summary>
         /// Sends a push notification to every device subscribed to an FCM topic.
-        /// <para>
-        /// The payload carries FCM message fields (<c>data</c>, <c>notification</c>, <c>android</c>),
-        /// which are passed through to FCM; Ably sets the topic itself. <c>android.priority</c> defaults
-        /// to <c>high</c>. FCM requires every value in <c>data</c> to be a string.
-        /// </para>
+        /// Equivalent to <c>Get(topic).PublishAsync(payload)</c>; see
+        /// <see cref="PushAdminFcmTopic.PublishAsync(JObject)"/> for the payload format.
         /// </summary>
         /// <param name="topic">The FCM topic name.</param>
         /// <param name="payload">The FCM message fields.</param>
         /// <returns>The FCM message ID.</returns>
-        public Task<string> PublishAsync(string topic, JObject payload) => Get(topic).PublishAsync(payload);
-
-        internal static string TopicPath(string topic) => $"{BasePath}/{topic.EncodeUriPart()}";
+        public async Task<string> PublishAsync(string topic, JObject payload) =>
+            await Get(topic).PublishAsync(payload);
 
         internal async Task SubscribeDeviceAsync(string topic, string deviceId)
         {
             RequireNonEmpty(deviceId, nameof(deviceId));
 
             var request = _restClient.CreatePostRequest(DeviceSubscriptionPath(topic, deviceId));
-            AddDeviceAuthenticationIfLocal(request, deviceId);
-            _ = await _restClient.ExecuteRequest(request);
+            await ExecuteAdminRequest(request, deviceId);
         }
 
         internal async Task UnsubscribeDeviceAsync(string topic, string deviceId)
@@ -94,24 +96,40 @@ namespace Ably.PubSub.Push
             RequireNonEmpty(deviceId, nameof(deviceId));
 
             var request = _restClient.CreateRequest(DeviceSubscriptionPath(topic, deviceId), HttpMethod.Delete);
-            AddDeviceAuthenticationIfLocal(request, deviceId);
-            _ = await _restClient.ExecuteRequest(request);
+            await ExecuteAdminRequest(request, deviceId);
         }
 
-        internal async Task PostSubscriptionsAsync(string topic, JObject body)
+        internal async Task SubscribeClientAsync(string topic, string clientId)
         {
-            var request = _restClient.CreatePostRequest($"{TopicPath(topic)}/subscriptions");
-            request.PostData = body;
-            _ = await _restClient.ExecuteRequest(request);
+            RequireNonEmpty(clientId, nameof(clientId));
+
+            await PostSubscriptionsAsync(topic, new JObject { ["clientId"] = clientId });
+        }
+
+        internal async Task SubscribeChannelsAsync(string topic, IEnumerable<string> channels)
+        {
+            var channelList = channels?.ToList();
+            if (channelList is null || channelList.Count == 0)
+            {
+                throw new AblyException("Please provide at least one channel.", ErrorCodes.BadRequest);
+            }
+
+            var emptyIndex = channelList.FindIndex(c => c.IsEmpty());
+            if (emptyIndex >= 0)
+            {
+                throw new AblyException($"Channel name at index {emptyIndex} is null or empty.", ErrorCodes.BadRequest);
+            }
+
+            await PostSubscriptionsAsync(topic, new JObject { ["channels"] = new JArray(channelList) });
         }
 
         internal async Task UnsubscribeClientAsync(string topic, string clientId)
         {
             RequireNonEmpty(clientId, nameof(clientId));
 
-            var request = _restClient.CreateRequest($"{TopicPath(topic)}/subscriptions", HttpMethod.Delete);
+            var request = _restClient.CreateRequest(SubscriptionsPath(topic), HttpMethod.Delete);
             request.AddQueryParameters(new[] { new KeyValuePair<string, string>("clientId", clientId) });
-            _ = await _restClient.ExecuteRequest(request);
+            await ExecuteAdminRequest(request);
         }
 
         internal async Task<string> PublishToTopicAsync(string topic, JObject payload)
@@ -122,14 +140,16 @@ namespace Ably.PubSub.Push
             }
 
             var request = _restClient.CreatePostRequest($"{TopicPath(topic)}/messages");
+            PushAdmin.AddFullWaitIfNecessary(request, _restClient.Options);
             request.PostData = payload;
 
-            // The response is {"topic": ..., "messageId": ...}.
-            var response = await _restClient.ExecuteRequest<Dictionary<string, string>>(request);
-            return response != null && response.TryGetValue("messageId", out var messageId) ? messageId : null;
+            // The response is {"topic": ..., "messageId": ...}. Parse it loosely so that extra or
+            // non-string fields can't turn an already-sent push into an exception (and a duplicate on retry).
+            var response = await _restClient.ExecuteRequest<JObject>(request);
+            return (response?["messageId"] as JValue)?.Value?.ToString();
         }
 
-        internal static void RequireNonEmpty(string value, string name)
+        private static void RequireNonEmpty(string value, string name)
         {
             if (value.IsEmpty())
             {
@@ -137,16 +157,25 @@ namespace Ably.PubSub.Push
             }
         }
 
-        private static string DeviceSubscriptionPath(string topic, string deviceId) =>
-            $"{TopicPath(topic)}/subscriptions/{deviceId.EncodeUriPart()}";
+        private static string TopicPath(string topic) => $"{BasePath}/{topic.EncodeUriPart()}";
 
-        private void AddDeviceAuthenticationIfLocal(AblyRequest request, string deviceId)
+        private static string SubscriptionsPath(string topic) => $"{TopicPath(topic)}/subscriptions";
+
+        private static string DeviceSubscriptionPath(string topic, string deviceId) =>
+            $"{SubscriptionsPath(topic)}/{deviceId.EncodeUriPart()}";
+
+        private async Task PostSubscriptionsAsync(string topic, JObject body)
         {
-            var localDevice = _restClient.Device;
-            if (localDevice != null && localDevice.Id == deviceId)
-            {
-                PushAdmin.AddDeviceAuthenticationToRequest(request, localDevice);
-            }
+            var request = _restClient.CreatePostRequest(SubscriptionsPath(topic));
+            request.PostData = body;
+            await ExecuteAdminRequest(request);
+        }
+
+        private async Task ExecuteAdminRequest(AblyRequest request, string deviceId = null)
+        {
+            PushAdmin.AddFullWaitIfNecessary(request, _restClient.Options);
+            PushAdmin.AddDeviceAuthenticationIfLocal(request, _restClient.Device, deviceId);
+            _ = await _restClient.ExecuteRequest(request);
         }
     }
 }

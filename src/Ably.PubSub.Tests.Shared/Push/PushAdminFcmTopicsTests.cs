@@ -130,5 +130,72 @@ namespace Ably.PubSub.Tests.Push
 
             _requests.Should().BeEmpty();
         }
+
+        [Fact]
+        public void Get_WithInvalidTopicName_ShouldThrow()
+        {
+            var fcmTopics = FcmTopics();
+
+            Assert.Throws<AblyException>(() => fcmTopics.Get("/topics/news"));
+            Assert.Throws<AblyException>(() => fcmTopics.Get("has space"));
+            Assert.Throws<AblyException>(() => fcmTopics.Get(new string('a', 901)));
+            fcmTopics.Get(new string('a', 900)).Name.Should().HaveLength(900);
+        }
+
+        [Fact]
+        public async Task InvalidArguments_ShouldFaultTheTaskRatherThanThrowSynchronously()
+        {
+            var fcmTopics = FcmTopics();
+            var topic = fcmTopics.Get("t");
+
+            var tasks = new List<Task>
+            {
+                topic.SubscribeClientAsync(string.Empty),
+                topic.SubscribeChannelsAsync(new string[0]),
+                topic.SubscribeChannelsAsync(new[] { "a", null }),
+                topic.UnsubscribeClientAsync(null),
+                topic.PublishAsync(null),
+                fcmTopics.PublishAsync("/topics/t", new JObject { ["data"] = new JObject() }),
+            };
+
+            foreach (var task in tasks)
+            {
+                await Assert.ThrowsAsync<AblyException>(() => task);
+            }
+
+            _requests.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task Publish_WithNonStringResponseFields_ShouldStillReturnMessageId()
+        {
+            var messageId = await FcmTopics("{\"topic\":\"t\",\"messageId\":\"m1\",\"fcm\":{\"a\":1},\"count\":3}")
+                .PublishAsync("t", new JObject { ["data"] = new JObject { ["k"] = "v" } });
+
+            messageId.Should().Be("m1");
+        }
+
+        [Fact]
+        public async Task WithPushAdminFullWait_ShouldAddFullWaitToMutatingRequests()
+        {
+            var rest = GetRestClient(
+                request =>
+                {
+                    _requests.Add(request);
+                    return Task.FromResult(new AblyResponse { StatusCode = HttpStatusCode.OK, TextResponse = "{}" });
+                },
+                options => options.PushAdminFullWait = true);
+            var topic = rest.Push.Admin.FcmTopics.Get("t");
+
+            await topic.SubscribeAsync("device-1");
+            await topic.UnsubscribeAsync("device-1");
+            await topic.SubscribeClientAsync("client-1");
+            await topic.SubscribeChannelsAsync(new[] { "c" });
+            await topic.UnsubscribeClientAsync("client-1");
+            await topic.PublishAsync(new JObject { ["data"] = new JObject { ["k"] = "v" } });
+
+            _requests.Should().HaveCount(6);
+            _requests.Should().OnlyContain(r => r.QueryParameters.ContainsKey("fullWait") && r.QueryParameters["fullWait"] == "true");
+        }
     }
 }
