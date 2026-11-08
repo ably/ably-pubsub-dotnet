@@ -3,12 +3,12 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>netcoreapp3.1</TargetFramework>
-        <CodeAnalysisRuleSet>..\..\src\IO.Ably.ruleset</CodeAnalysisRuleSet>
+        <CodeAnalysisRuleSet>..\..\src\Ably.PubSub.ruleset</CodeAnalysisRuleSet>
         <LangVersion>9</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\IO.Ably.NETStandard20\IO.Ably.NETStandard20.csproj" />
+      <ProjectReference Include="..\..\src\Ably.PubSub.Server\Ably.PubSub.Server.csproj" />
         <PackageReference Include="StyleCop.Analyzers" Version="1.1.118">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

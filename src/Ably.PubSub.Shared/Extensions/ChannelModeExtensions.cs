@@ -1,0 +1,80 @@
+using System.Collections.Generic;
+
+using Ably.PubSub.Types;
+
+namespace Ably.PubSub
+{
+    /// <summary>
+    /// Helper methods when dealing with Channel Models.
+    /// </summary>
+    internal static class ChannelModeExtensions
+    {
+        public static ProtocolMessage.Flag? ToFlag(this ChannelMode mode)
+        {
+            switch (mode)
+            {
+                case ChannelMode.Presence:
+                    return ProtocolMessage.Flag.Presence;
+                case ChannelMode.Publish:
+                    return ProtocolMessage.Flag.Publish;
+                case ChannelMode.Subscribe:
+                    return ProtocolMessage.Flag.Subscribe;
+                case ChannelMode.PresenceSubscribe:
+                    return ProtocolMessage.Flag.PresenceSubscribe;
+                case ChannelMode.AnnotationPublish:
+                    return ProtocolMessage.Flag.AnnotationPublish;
+                case ChannelMode.AnnotationSubscribe:
+                    return ProtocolMessage.Flag.AnnotationSubscribe;
+                case ChannelMode.ObjectSubscribe:
+                    return ProtocolMessage.Flag.ObjectSubscribe;
+                case ChannelMode.ObjectPublish:
+                    return ProtocolMessage.Flag.ObjectPublish;
+                default:
+                    return null;
+            }
+        }
+
+        public static IEnumerable<ChannelMode> FromFlag(this ProtocolMessage.Flag flag)
+        {
+            if (flag.HasFlag(ProtocolMessage.Flag.Presence))
+            {
+                yield return ChannelMode.Presence;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.Publish))
+            {
+                yield return ChannelMode.Publish;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.Subscribe))
+            {
+                yield return ChannelMode.Subscribe;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.PresenceSubscribe))
+            {
+                yield return ChannelMode.PresenceSubscribe;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.AnnotationPublish))
+            {
+                yield return ChannelMode.AnnotationPublish;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.AnnotationSubscribe))
+            {
+                yield return ChannelMode.AnnotationSubscribe;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.ObjectSubscribe))
+            {
+                yield return ChannelMode.ObjectSubscribe;
+            }
+
+            if (flag.HasFlag(ProtocolMessage.Flag.ObjectPublish))
+            {
+                yield return ChannelMode.ObjectPublish;
+            }
+        }
+    }
+}

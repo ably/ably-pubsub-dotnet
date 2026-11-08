@@ -12,7 +12,7 @@ Migrated from FAKE (F#) to Cake (C#) to:
 ## Prerequisites
 - .NET SDK 6.0+ (for building)
 - Cake.Tool (installed via `dotnet tool restore`)
-- NuGet CLI (for package creation)
+- NuGet CLI (for package creation; Windows or Mono)
 
 ## Getting Started
 
@@ -26,7 +26,7 @@ Running `.\build.cmd` (Windows) or `./build.sh` (Unix/macOS) will start the buil
 ## Build Commands
 
 ### Build NetFramework
-We have a dedicated NetFramework project targeting .NET Framework 4.6+.
+`src/Ably.PubSub.Core.NETFramework` targets .NET Framework 4.6.2.
 
 **Windows:**
 ```cmd
@@ -34,7 +34,7 @@ We have a dedicated NetFramework project targeting .NET Framework 4.6+.
 ```
 
 ### Build NetStandard
-NetStandard currently supports explicit targets for netstandard2.0, net6.0 and net7.0.
+`src/Ably.PubSub.Core` targets netstandard2.0, net6.0 and net7.0.
 
 **Windows:**
 ```cmd
@@ -44,14 +44,6 @@ NetStandard currently supports explicit targets for netstandard2.0, net6.0 and n
 **Unix/macOS:**
 ```bash
 ./build.sh --target=Build.NetStandard
-```
-
-### Build Xamarin
-We have a Xamarin solution targeting Android and iOS.
-
-**Unix/macOS:**
-```bash
-./build.sh --target=Build.Xamarin
 ```
 
 ## Test Commands
@@ -92,44 +84,139 @@ Additional `--framework` flag can be supplied to test for target framework `net6
 ./build.sh --target=Test.NetStandard.Unit --framework=net7.0  # Run tests for .NET 7.0 runtime
 ```
 
+### Test UTS
+
+UTS tests carry `[Trait("uts", "unit|integration|proxy")]` and run only from these targets; the
+unit and integration targets above exclude them. Pick one tier with `--uts-tier`. There is no
+`.WithRetry` variant: a failing test fails the target, and so does a run that selects zero tests.
+
+```bash
+./build.sh --target=Test.NetStandard.Uts --framework=net6.0 --uts-tier=unit  # All UTS tests of a tier (generated + infra)
+./build.sh --target=Test.NetStandard.UtsInfra --framework=net6.0 --uts-tier=unit  # Infra self-tests: the tier's plus the common ones
+```
+```cmd
+.\build.cmd --target=Test.NetFramework.Uts --uts-tier=unit
+.\build.cmd --target=Test.NetFramework.UtsInfra --uts-tier=unit
+```
+
+The `integration` and `proxy` tiers use the Ably sandbox (`ABLY_ENDPOINT`, default `nonprod:sandbox`).
+The `proxy` tier downloads the pinned uts-proxy itself (Linux and macOS); on Windows set
+`UTS_PROXY_LOCAL_PATH` to a locally built binary, otherwise the proxy tests fail.
+
 ## Create NuGet Packages
 
-Currently, we have two scripts to generate NuGet packages:
+`Ably.PubSub.Core`, `Ably.PubSub.Device` and `Ably.PubSub.Server` are packed and
+released together at one version, and each door package pins the core at exactly
+that version: every nuspec takes `$version$` from `--version`, and every door
+dependency group pins `[$version$]`. `PackagingSpecs` (in the unit tests) asserts
+that contract from the nuspec files on every PR.
 
-### 1. package.cmd
+> **Cake reserves `--version` for itself**, so packaging arguments have to go after
+> a `--` separator: `./build.sh -- --target=Package --version=2.0.0`. `package.cmd`
+> already does this for you. `Package` fails if no `--version` is given.
 
-- Responsible for creating core `ably.io` NuGet package.
-- Works only on Windows due to a dependency on the .NET Framework.
+Releases are packaged by the `Package ably` GitHub workflow
+(`.github/workflows/package.yml`), dispatched by hand with a `version` input. It
+runs `Package` and `Test.PackageConsumption.NoPack` on Windows and `UnityPackage`
+on Ubuntu, and uploads the three `.nupkg` files and the `.unitypackage` as one
+`output-package` artifact. Nothing is published: the release engineer pushes the
+packages to nuget.org by hand, following the release process in `CONTRIBUTING.md`.
+
+### package.cmd
+
+- Responsible for creating all three NuGet packages.
+- Works only on Windows (or with Mono): the core package carries a `lib/net46`
+  asset built by an old-style MSBuild head, and `NuGetPack` needs `nuget.exe`.
+- Merges `IO.Ably.DeltaCodec.dll` into the `net46` `Ably.PubSub.Core.dll` with ILRepack (internalized, signed).
 
 ```cmd
-.\package.cmd 1.2.3
+.\package.cmd 2.0.0
 ```
 
-Above command creates `ably.io.1.2.3.nupkg` package at root.
+Above command creates `Ably.PubSub.Core.2.0.0.nupkg`,
+`Ably.PubSub.Device.2.0.0.nupkg` and `Ably.PubSub.Server.2.0.0.nupkg` at root,
+from the package set at the top of `cake-build/tasks/package.cake`
+(`nugetPackageSet`), which is packed core-first to match the manual publish order.
+`package.cmd` takes only the version. To pack somewhere other than the repository
+root, run the target directly with `--packageOutput`, e.g.
+`.\build.cmd -- --target=Package --version=2.0.0 --packageOutput=packages` (or
+`./build.sh` with the same arguments on Unix with Mono); a relative path is
+resolved against the repository root.
 
-During release process, this package is hosted on [nuget.org/packages/ably.io](https://www.nuget.org/packages/ably.io).
+After the pack, `Package` runs `_Package_Verify_NuGet`, which opens each produced
+`.nupkg` and asserts its version and that every dependency group of both door
+packages pins `Ably.PubSub.Core` as exactly `[<version>]`. That is the one part of
+the contract the source nuspecs cannot prove: it depends on the packer substituting
+`$version$` inside the dependency's version attribute. To check packages that are
+already packed: `./build.sh -- --target=Package.Verify --version=2.0.0 --packageOutput=<dir>`.
 
-### 2. package-push.sh / package-push.cmd
+During release process, these packages are hosted on
+[nuget.org/packages/Ably.PubSub.Server](https://www.nuget.org/packages/Ably.PubSub.Server),
+[.Device](https://www.nuget.org/packages/Ably.PubSub.Device) and
+[.Core](https://www.nuget.org/packages/Ably.PubSub.Core).
 
-Responsible for creating push packages for Android and iOS.
+### package-unity.sh
 
-Please take a look at [Push Notification Documentation](../PushNotifications.md) for usage.
+Responsible for creating the Unity package.
 
-**Unix/macOS:**
 ```bash
-./package-push.sh 1.2.3
+./package-unity.sh 2.0.0
 ```
 
-**Windows:**
-```cmd
-.\package-push.cmd 1.2.3
+Above command creates `ably.pubsub.2.0.0.unitypackage` at root. The merged
+plugin assembly it packages is produced separately by
+`./unity-plugins-updater.sh 2.0.0`, which needs Mono (for ILRepack).
+
+## Package-Consumption Test
+
+### Test.PackageConsumption
+
+```bash
+./build.sh -- --target=Test.PackageConsumption --version=2.0.0 --packageOutput=<dir>
 ```
 
-Above command creates `ably.io.push.android.1.2.3.nupkg` and `ably.io.push.ios.1.2.3.nupkg` packages at root.
+Installs the packed packages into small apps the way a customer does, so problems
+that exist only in the shipped `.nupkg` files fail here rather than in a customer's
+app. The unit tests can't catch these, because they use project references, which
+skip NuGet's per-framework asset selection and the Package-only signing. For example,
+a .NET Framework app gets the Device or Server `netstandard2.0` asset paired with
+the Core `net46` asset.
 
-During release process, these packages are hosted on:
-- [nuget.org/packages/ably.io.push.android](https://www.nuget.org/packages/ably.io.push.android)
-- [nuget.org/packages/ably.io.push.ios](https://www.nuget.org/packages/ably.io.push.ios)
+The target runs `Package`, then:
+
+1. copies the apps in `tests/PackageConsumption` (`DeviceApp`, `ServerApp`) to
+   `test-results/package-consumption`;
+2. restores them through a generated `nuget.config` that takes `Ably.PubSub.*` only
+   from the packed `.nupkg` files (package source mapping) and everything else from
+   nuget.org, into a private global packages folder;
+3. builds each app for every target framework in the matrix (`net462`, `net48`,
+   `net6.0`, `net7.0`);
+4. asserts from `obj/project.assets.json` which `lib/<tfm>` asset of each Ably
+   package NuGet selected, and that the packages came from the local folder;
+5. runs each app. The .NET Framework apps run on the .NET Framework CLR on Windows
+   and on Mono elsewhere. Each app creates clients through its door and calls into
+   the core: a channel lookup, a REST request and a realtime connection attempt.
+   It also checks the side flag in the `Ably-Agent` header.
+
+The checks run offline: no credentials, REST requests go to a stub handler and the
+realtime connection targets a closed localhost port.
+
+The expected asset pair for each app and framework is set in one place, the matrix
+at the top of `cake-build/tasks/package-consumption.cake`. If the package layout
+changes, update that matrix. A row naming a `lib/<tfm>` that the nuspec doesn't
+declare fails the run.
+
+`Test.PackageConsumption.NoPack` runs the same steps against packages that are
+already in `--packageOutput`, without packing. The `package.yml` workflow runs it
+on Windows against the packages it has just packed, the ones the release engineer
+downloads.
+
+The full `Test.PackageConsumption` runs on every PR in two workflows: the Windows
+(NetFramework) workflow, where the .NET Framework apps run on the .NET Framework
+CLR, and the macOS (Mono) workflow, where they run on Mono.
+
+On macOS/Linux, `Package` needs Mono: it builds the core's `net46` head with Mono
+MSBuild and the other target frameworks with the .NET SDK.
 
 ## Advanced Options
 

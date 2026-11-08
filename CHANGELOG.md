@@ -1,5 +1,106 @@
 # Change Log
 
+## [2.0.0](https://github.com/ably/ably-pubsub-dotnet/tree/2.0.0) (2026-11-03)
+
+[Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/1.2.19...2.0.0)
+
+The 2.0.0 release makes it clear what to install on a device and what to install on a server. The SDK now comes as two packages named for where your code runs, `Ably.PubSub.Device` and `Ably.PubSub.Server`, so you and any coding assistant reading your project can see which side the code is for. Each client tells Ably which side it is on, which Ably's platform behaviour and monthly active user (MAU) billing depend on.
+
+Namespaces move to `Ably.PubSub`, the clients are renamed `PubSubRealtimeClient` and `PubSubHttpClient`, and "REST" names become "HTTP", as in the other Ably Pub/Sub SDKs. A single `Endpoint` option replaces the three host settings. You can now update, delete, append to and annotate published messages. The release also fixes problems you may have hit in 1.x, such as `AuthCallback` token strings and history on encrypted channels.
+
+2.0 also removes the APIs deprecated in 1.x. The `ably.io` 1.x line continues to receive security and critical fixes for one year from this release, then reaches end of life.
+
+Below is an overview of the major changes in this release.
+
+Please refer to [UPDATING.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md) for the full details, including a list of all breaking changes and instructions on how to address them.
+
+### Per-side packages
+
+This repository no longer publishes `ably.io`. Install the package for the side your code runs on:
+
+- `Ably.PubSub.Device` for a mobile, desktop or Unity app, or any other client the end user holds. Create clients with `PubSubDevice.CreateClient(...)`. For HTTP-only calls, use the client's `HttpClient`.
+- `Ably.PubSub.Server` for a backend, such as an ASP.NET app, a worker or a console app. Create clients with `PubSubServer.CreateRealtimeClient(...)` or `PubSubServer.CreateHttpClient(...)`.
+- Both depend on `Ably.PubSub.Core` at the same exact version, which NuGet installs for you. Don't reference it directly.
+- Clients can only be created through these methods. `PubSubRealtimeClient` is now sealed, like `PubSubHttpClient`.
+- Server clients must authenticate with an API key, or with a JWT that carries the signed `x-ably-clientType=server` claim. Ably rejects other tokens with error 40167. See [Server clients and token authentication](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#server-clients-and-token-authentication).
+
+### Client API naming
+
+Namespaces move from `IO.Ably` to `Ably.PubSub`, and `IO.Ably.Rest` becomes `Ably.PubSub.Http`. Client-facing `Rest` names become `Http`:
+
+| 1.x | 2.0 |
+|-----|-----|
+| `AblyRealtime`, `AblyRest` | `PubSubRealtimeClient`, `PubSubHttpClient` |
+| `IRealtimeClient`, `IRestClient` | `IPubSubRealtimeClient`, `IPubSubHttpClient` |
+| `RestChannel`, `RestChannels`, `IRestChannel` | `HttpChannel`, `HttpChannels`, `IHttpChannel` |
+| `PushRest` | `PushHttp` |
+| `AblyRealtime.RestClient` | `PubSubRealtimeClient.HttpClient` |
+
+### Endpoint and hosts
+
+- Set `ClientOptions.Endpoint` instead of `Environment`, `RestHost` and `RealtimeHost`, which are removed. For example, `Environment = "sandbox"` becomes `Endpoint = "nonprod:sandbox"`. See [Choose the host with `Endpoint`](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#choose-the-host-with-endpoint).
+- The SDK now connects to `main.realtime.ably.net` by default. If your network restricts outbound traffic, allow `*.realtime.ably.net` and `*.fallback.ably-realtime.com` before you upgrade, plus `*.realtime.ably-nonprod.net` and `*.fallback.ably-realtime-nonprod.com` if you use a `nonprod:` endpoint.
+- `FullRestHost()`, `FullRealtimeHost()` and `GetFallbackHosts()` are no longer available. You can now read `ClientOptions.FallbackHosts`, which returns only the hosts you set, or `null`.
+
+### Removed APIs
+
+The APIs marked `[Obsolete]` in 1.x are removed. See [Deprecated API removed](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#deprecated-api-removed).
+
+| Removed | Use instead |
+|---------|-------------|
+| `Auth.Authorise[Async]` | `Auth.Authorize[Async]` |
+| `Auth.CreateTokenRequestObject[Async]` | `Auth.CreateTokenRequest[Async]` |
+| `Connection.RecoveryKey` | `Connection.CreateRecoveryKey()` |
+| `ClientOptions.FallbackHostsUseDefault` | Nothing; the defaults apply |
+| `ClientOptions.CaptureCurrentSynchronizationContext` | `ClientOptions.CustomContext` |
+| `Request(string method, ...)` with a `JToken` body | `RequestV2(...)` |
+| `HistoryRequestParams` | `PaginatedRequestParams` |
+| `Presence.IsSyncComplete` | `Presence.SyncComplete` |
+
+`Presence.IsSyncInProgress` and the channel `HistoryAsync(untilAttach)` overloads stay. The presence `HistoryAsync(untilAttach)` overloads are deprecated instead.
+
+### Behaviour changes
+
+- Releasing a realtime channel with `Channels.Release()` or `ReleaseAll()` throws error 90011 unless the channel is `Initialized`, `Detached` or `Failed`. Detach the channel first. See [Release a realtime channel only once it is detached](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#release-a-realtime-channel-only-once-it-is-detached).
+- Raw `Request()` and `RequestV2()` calls can return responses in a newer format. UPDATING.md explains how to keep the old one.
+- A successful publish over HTTP whose response body isn't a JSON object, such as plain text, now throws an `AblyException`.
+- `PATCH` requests, such as push device-registration updates, now send their body.
+- A realtime publish or other realtime operation that the SDK refuses, for example on a suspended channel, now fails with the refusal's own error, such as 40000, instead of a generic 50000 "Unexpected error". Other exceptions are still reported as 50000. The error for a message that can't be queued names the connection state.
+- On a realtime client, `Auth.AuthorizeAsync` finishes only once the client is connected, connecting first if needed, and throws if the connection fails.
+- HTTP requests that renew a token no longer wait for the realtime connection.
+- The SDK reports itself to Ably as `ably-pubsub-dotnet` (was `ably-dotnet`), and says whether the client is device-side or server-side.
+- The realtime client now answers connection checks (`PING`) from Ably.
+
+### New features
+
+- Update, delete and append to published messages with `UpdateMessageAsync`, `DeleteMessageAsync` and `AppendMessageAsync`. Read a message, or its version history, with `GetMessageAsync` and `GetMessageVersionsAsync`.
+- Publish, delete and read message annotations through a channel's `Annotations`, and subscribe to them on realtime channels.
+- `Message` has new `Serial`, `Version`, `Action` and `Annotations` properties.
+- Publish methods return a `PublishResult` with the serial of each message. Most code only needs a recompile, but implementations of `IHttpChannel` or `IRealtimeChannel`, such as test fakes, must add the new members.
+
+### Push notifications
+
+- Device push-receive isn't available in 2.0; `ably.io.push.android` and `ably.io.push.ios` have no 2.0 equivalent. `Push.Activate()` and `Push.Deactivate()` throw, and `Device` and a channel's `Push` are `null`. To ask for the feature, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1360.
+- Push administration through `Push.Admin` is unchanged. Use it from a server.
+- See [Push notifications](https://github.com/ably/ably-pubsub-dotnet/blob/main/UPDATING.md#push-notifications) and [PushNotifications.md](https://github.com/ably/ably-pubsub-dotnet/blob/main/PushNotifications.md).
+
+### Fixed bugs
+
+- An `AuthCallback` that returns a token string (an Ably token or a JWT) works again; since 1.2.15 it failed with error 80019. A JSON string is read as token details or a token request, and an empty string is rejected.
+- History and presence history on an encrypted realtime channel are now decrypted with that channel's cipher, without changing the HTTP channel of the same name.
+- Changing a realtime channel's cipher with `SetOptions` or `Channels.Get(name, options)` now applies to the messages it receives afterwards.
+- `HistoryAsync(params, untilAttach: true)` no longer changes the `params` you pass, so you can reuse them. If they already contain a `fromSerial`, the attach serial replaces it instead of throwing.
+- A connection that Ably closes with a fatal error now stays failed, instead of trying to connect again.
+- `Auth.AuthorizeAsync` no longer sometimes waits for the whole `RealtimeRequestTimeout` after Ably has already accepted the new token.
+- The error for a token that can't be renewed (40171) no longer collects messages from earlier failed connections.
+- A realtime publish that Ably didn't acknowledge is now reported as failed, with the error from Ably's acknowledgement or 50000, not as published.
+
+### Supported platforms changes
+
+- The separate Xamarin.Android and Xamarin.iOS builds are gone; Xamarin apps use the `netstandard2.0` build. Other requirements are unchanged: .NET 6.0 or later, .NET Framework 4.6.2 or later (or Mono), any .NET Standard 2.0 runtime, and Unity 2019.x or later.
+- On .NET Framework, `Newtonsoft.Json` 13.0.1 is now a NuGet dependency instead of being merged into the SDK, and `IO.Ably.DeltaCodec.dll` ships as a separate file next to it.
+- The Unity package is now `ably.pubsub.<version>.unitypackage`, with the plugin `Ably.PubSub.Device.dll`, replacing `ably.io.<version>.unitypackage` and `IO.Ably.dll`.
+
 ## [1.2.19](https://github.com/ably/ably-pubsub-dotnet/tree/1.2.19) (2026-09-11)
 
 [Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/1.2.18...1.2.19)
@@ -46,7 +147,7 @@ Implements RTN23 dead-transport detection and the connection-recovery spec point
 - [ECO-4285] Fix build system by @sacOO7 in https://github.com/ably/ably-dotnet/pull/1300
 - [ECO-4285] Fix delta compression by @sacOO7 in https://github.com/ably/ably-dotnet/pull/1304
 
-## [1.2.15](https://github.com/ably/ably-dotnet/tree/1.2.15) (2023-04-19)
+## [1.2.15](https://github.com/ably/ably-dotnet/tree/1.2.15) (2024-04-19)
 
 [Full Changelog](https://github.com/ably/ably-dotnet/compare/1.2.14...1.2.15)
 

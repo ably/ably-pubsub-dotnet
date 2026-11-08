@@ -1,0 +1,296 @@
+using System;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
+using Ably.PubSub.Push;
+using Ably.PubSub.Realtime.Workflow;
+using Newtonsoft.Json.Linq;
+
+namespace Ably.PubSub.Realtime
+{
+    /// <summary>
+    /// Manages Realtime channels.
+    /// </summary>
+    public class RealtimeChannels : IChannels<IRealtimeChannel>
+    {
+        internal ILogger Logger { get; }
+
+        private ConcurrentDictionary<string, RealtimeChannel> Channels { get; } = new ConcurrentDictionary<string, RealtimeChannel>();
+
+        private readonly LockedList<IRealtimeChannel> _orderedChannels = new LockedList<IRealtimeChannel>();
+
+        private readonly PubSubRealtimeClient _realtimeClient;
+        private readonly IMobileDevice _mobileDevice;
+
+        internal RealtimeChannels(PubSubRealtimeClient realtimeClient, Connection connection, IMobileDevice mobileDevice = null)
+        {
+            _realtimeClient = realtimeClient;
+            Logger = realtimeClient.Logger;
+            connection.InternalStateChanged += ConnectionStateChange;
+            _mobileDevice = mobileDevice;
+        }
+
+        private void ConnectionStateChange(object sender, ConnectionStateChange stateChange)
+        {
+            foreach (var channel in Channels.Values)
+            {
+                try
+                {
+                    channel.ConnectionStateChanged(stateChange);
+                }
+                catch (Exception e)
+                {
+                    // TODO: Send to Sentry
+                    Logger.Error($"Error notifying channel '{channel.Name}' of connection stage change", e);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public IRealtimeChannel Get(string name)
+        {
+            return Get(name, null);
+        }
+
+        /// <inheritdoc/>
+        public IRealtimeChannel Get(string name, ChannelOptions options)
+        {
+            // if the channel cannot be found
+            if (!Channels.TryGetValue(name, out var result))
+            {
+                // create a new instance using the passed in option
+                var channel = new RealtimeChannel(name, _realtimeClient.Options.GetClientId(), _realtimeClient, options, _mobileDevice);
+                result = Channels.AddOrUpdate(name, channel, (s, realtimeChannel) =>
+                {
+                    if (options != null)
+                    {
+                        realtimeChannel.Options = options;
+                    }
+
+                    return realtimeChannel;
+                });
+                _orderedChannels.Add(result);
+            }
+            else
+            {
+                if (options != null)
+                {
+                    if (result.ShouldReAttach(options))
+                    {
+                        throw new AblyException(new ErrorInfo("Channels.Get() cannot be used to set channel options that would cause the channel to reattach. Please, use Channel.SetOptions() instead.", ErrorCodes.BadRequest, HttpStatusCode.BadRequest));
+                    }
+
+                    result.SetOptions(options);
+                }
+            }
+
+            return result;
+        }
+
+        /// <inheritdoc/>
+        public IRealtimeChannel this[string name] => Get(name);
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// A realtime channel can only be released when it is in the <see cref="ChannelState.Initialized"/>,
+        /// <see cref="ChannelState.Detached"/>, or <see cref="ChannelState.Failed"/> state.
+        /// </remarks>
+        /// <exception cref="AblyException">Thrown with error code 90011 if the channel is in any other state.</exception>
+        public bool Release(string name)
+        {
+            if (Logger.IsDebug)
+            {
+                Logger.Debug($"Releasing channel #{name}");
+            }
+
+            // RTS4c
+            if (!Channels.TryGetValue(name, out RealtimeChannel channel))
+            {
+                return false;
+            }
+
+            // RTS4e
+            ThrowIfNotReleasable(channel);
+
+            // RTS4d
+            return RemoveChannel(name);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Channels can only be released when they are in the <see cref="ChannelState.Initialized"/>,
+        /// <see cref="ChannelState.Detached"/>, or <see cref="ChannelState.Failed"/> state.
+        /// </remarks>
+        /// <exception cref="AblyException">Thrown with error code 90011, without releasing any channel, if any channel is in any other state.</exception>
+        public void ReleaseAll()
+        {
+            var channels = Channels.Values.ToArray();
+            foreach (var channel in channels)
+            {
+                ThrowIfNotReleasable(channel);
+            }
+
+            foreach (var channel in channels)
+            {
+                RemoveChannel(channel.Name);
+            }
+        }
+
+        private static void ThrowIfNotReleasable(RealtimeChannel channel)
+        {
+            var state = channel.State;
+            if (state != ChannelState.Initialized && state != ChannelState.Detached && state != ChannelState.Failed)
+            {
+                throw new AblyException(new ErrorInfo(
+                    $"Can only release a channel in a state where there is no possibility of further updates from the server being received (Initialized, Detached, or Failed). The current state of channel '{channel.Name}' is {state}.",
+                    ErrorCodes.ChannelReleaseInvalidState,
+                    HttpStatusCode.BadRequest));
+            }
+        }
+
+        private bool RemoveChannel(string name)
+        {
+            if (Channels.TryRemove(name, out RealtimeChannel removedChannel))
+            {
+                removedChannel.RemoveAllListeners();
+                _orderedChannels.Remove(removedChannel);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal void CleanupChannels()
+        {
+            try
+            {
+                var channels = Channels.Keys.ToList();
+                foreach (var channelName in channels)
+                {
+                    var success = Channels.TryRemove(channelName, out RealtimeChannel channel);
+                    if (success)
+                    {
+                        channel.RemoveAllListeners();
+                        _orderedChannels.Remove(channel);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error("Error while disposing channels", e);
+            }
+        }
+
+        /// <inheritdoc/>
+        public bool Exists(string name)
+        {
+            return Channels.ContainsKey(name);
+        }
+
+        /// <inheritdoc/>
+        IEnumerator<IRealtimeChannel> IEnumerable<IRealtimeChannel>.GetEnumerator() => GetEnumerator();
+
+        /// <inheritdoc/>
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        /// <summary>
+        /// Returns an enumerator that iterates through the channels collection.
+        /// </summary>
+        /// <returns>An enumerator that can be used to iterate through the channels collection.</returns>
+        protected virtual IEnumerator<IRealtimeChannel> GetEnumerator()
+        {
+            lock (_orderedChannels)
+            {
+                return _orderedChannels.ToList().GetEnumerator();
+            }
+        }
+
+        internal JArray GetCurrentState()
+        {
+            return new JArray(Channels.Values.Select(x => x.GetCurrentState()));
+        }
+
+        internal Task ExecuteCommand(ChannelCommand cmd)
+        {
+            var channelName = cmd.ChannelName;
+            var affectedChannels = Channels.Values
+                                        .ToArray()
+                                        .Where(x => cmd.ChannelName.IsEmpty() || x.Name.EqualsTo(channelName))
+                                        .ToList();
+
+            foreach (var channel in affectedChannels)
+            {
+                switch (cmd.Command)
+                {
+                    case InitialiseFailedChannelsOnConnect _:
+                        HandleInitialiseFailedChannelsCommand(channel);
+                        break;
+                    default:
+                        Logger.Debug($"Channels can't handle command: '{cmd.Name}'");
+                        break;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private void HandleInitialiseFailedChannelsCommand(RealtimeChannel channel)
+        {
+            switch (_realtimeClient.Connection.State)
+            {
+                case ConnectionState.Closing:
+                case ConnectionState.Closed:
+                case ConnectionState.Failed:
+                    /* (RTN11d) From CLOSED or FAILED, every channel goes to INITIALIZED with its
+                     * errorReason unset (RTL24). CLOSING is included because RTN11b asks for the
+                     * channel half there - "reinitialize channels per RTN11d" - and for that half
+                     * only. The connection half stays CLOSED/FAILED, per RTN11d's own trigger.
+                     *
+                     * Passing no error is what unsets it: SetChannelState hands it to OnError, which
+                     * assigns either way, and does so before the same-state early return.
+                     *
+                     * The connection half of RTN11d - Connection.errorReason and msgSerial - is done
+                     * once in the workflow's ConnectCommand handler. */
+                    channel.SetChannelState(ChannelState.Initialized);
+
+                    // RTN11d's "clear all internal connection data". RTL15b2 only nulls the serial
+                    // for Detached and Failed, and on a close an ATTACHED channel is left in
+                    // DETACHING with no DETACHED coming, so it needs clearing here.
+                    channel.Properties.ChannelSerial = null;
+                    break;
+            }
+        }
+
+        // RTN16j, RTL15b
+        internal void SetChannelSerialsFromRecoverOption(IDictionary<string, string> serials)
+        {
+            foreach (var keyValuePair in serials)
+            {
+                var channelName = keyValuePair.Key;
+                var channelSerial = keyValuePair.Value;
+                var channel = (RealtimeChannel)Get(channelName);
+                channel.Properties.ChannelSerial = channelSerial;
+            }
+        }
+
+        internal IDictionary<string, string> GetChannelSerials()
+        {
+            var channelSerials = new Dictionary<string, string>();
+            foreach (var realtimeChannel in this)
+            {
+                // Gated on the serial, not on the channel state. RTL15b2 keeps the serial through
+                // SUSPENDED and RTN16i needs it in the recovery key, so a state test would drop it
+                // in exactly the state RTN16g3 hands a key out for. ably-js gates on the serial too.
+                if (realtimeChannel.Properties.ChannelSerial.IsNotEmpty())
+                {
+                    channelSerials[realtimeChannel.Name] = realtimeChannel.Properties.ChannelSerial;
+                }
+            }
+
+            return channelSerials;
+        }
+    }
+}

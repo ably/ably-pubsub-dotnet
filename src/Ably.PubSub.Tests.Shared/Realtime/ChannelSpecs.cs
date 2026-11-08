@@ -1,0 +1,2477 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+using Ably.PubSub.AcceptanceTests;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.Http;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Tests.Infrastructure;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
+
+using FluentAssertions;
+using FluentAssertions.Execution;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Ably.PubSub.Tests.Realtime
+{
+    public class ChannelSpecs : AblyRealtimeSpecs
+    {
+        private readonly Action<ClientOptions> _switchBinaryOff = opts => opts.UseBinaryProtocol = false;
+
+        public class GeneralSpecs : ChannelSpecs
+        {
+            [Fact]
+            [Trait("spec", "RTL9")]
+            [Trait("spec", "RTL9a")]
+            public async Task ChannelPresenceShouldReturnAPresenceObject()
+            {
+                var (_, channel) = await GetClientAndChannel();
+                channel.Presence.Should().BeOfType<Presence>();
+            }
+
+            public GeneralSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL2")]
+        public class EventEmitterSpecs : ChannelSpecs
+        {
+            [Fact]
+            [Trait("spec", "RTL2")]
+            public void ValidateChannelEventAndChannelStateValues()
+            {
+                // ChannelState and ChannelEvent should have values that are aligned
+                // to allow for casting between the two (with the exception of the Update event)
+                // The assigned values are arbitrary, but should be unique per event/state pair
+                ((int)ChannelEvent.Initialized).Should().Be(0);
+                ((int)ChannelEvent.Attaching).Should().Be(1);
+                ((int)ChannelEvent.Attached).Should().Be(2);
+                ((int)ChannelEvent.Detaching).Should().Be(3);
+                ((int)ChannelEvent.Detached).Should().Be(4);
+                ((int)ChannelEvent.Suspended).Should().Be(5);
+                ((int)ChannelEvent.Failed).Should().Be(6);
+                ((int)ChannelEvent.Update).Should().Be(7);
+
+                // each ChannelState should have an equivalent ChannelEvent
+                ((int)ChannelState.Failed).Should().Be((int)ChannelEvent.Failed);
+                ((int)ChannelState.Detached).Should().Be((int)ChannelEvent.Detached);
+                ((int)ChannelState.Detaching).Should().Be((int)ChannelEvent.Detaching);
+                ((int)ChannelState.Initialized).Should().Be((int)ChannelEvent.Initialized);
+                ((int)ChannelState.Attached).Should().Be((int)ChannelEvent.Attached);
+                ((int)ChannelState.Attaching).Should().Be((int)ChannelEvent.Attaching);
+                ((int)ChannelState.Suspended).Should().Be((int)ChannelEvent.Suspended);
+            }
+
+            [Theory]
+            [InlineData(ChannelEvent.Attaching)]
+            [InlineData(ChannelEvent.Attached)]
+            [InlineData(ChannelEvent.Detaching)]
+            [InlineData(ChannelEvent.Detached)]
+            [InlineData(ChannelEvent.Failed)]
+            [InlineData(ChannelEvent.Suspended)]
+            [Trait("spec", "RTL2a")]
+            [Trait("spec", "RTL2b")]
+            [Trait("spec", "RTL2d")]
+            [Trait("spec", "TH1")]
+            [Trait("spec", "TH2")]
+            [Trait("spec", "TH5")]
+            public async Task ShouldEmitTheFollowingStates(ChannelEvent channelEvent)
+            {
+                var chanName = "test".AddRandomSuffix();
+                var client = await GetConnectedClient();
+                var channel = client.Channels.Get(chanName);
+
+                ChannelEvent sourceEvent = ChannelEvent.Update;
+                ChannelState previousState = ChannelState.Failed;
+                ChannelState newState = ChannelState.Initialized;
+                channel.On(channelStateChange =>
+                {
+                    // RTL2d first argument should be an instance of ChannelStateChange
+                    channelStateChange.Should().NotBeNull();
+                    channelStateChange.Error.Should().BeNull();
+
+                    // should be the state corresponding to the
+                    // passed in ChannelEvent
+                    // (which should be anything but Initialized)
+                    newState = channelStateChange.Current;
+
+                    // should always be Initialized
+                    previousState = channelStateChange.Previous;
+
+                    // TH5
+                    sourceEvent = channelStateChange.Event;
+                    Done();
+                });
+
+                ((RealtimeChannel)channel).SetChannelState((ChannelState)channelEvent);
+
+                WaitOne();
+
+                channel.State.Should().Be((ChannelState)channelEvent);
+                newState.Should().Be((ChannelState)channelEvent);
+                previousState.Should().Be(ChannelState.Initialized);
+                sourceEvent.Should().Be(channelEvent);
+            }
+
+            [Theory]
+            [InlineData(ProtocolMessage.MessageAction.Attached)]
+            [InlineData(ProtocolMessage.MessageAction.Detached)]
+            [Trait("spec", "RTL2d")]
+            public async Task ShouldSetTheErrorReasonIfPresent(ProtocolMessage.MessageAction action)
+            {
+                var chanName = "test".AddRandomSuffix();
+                var client = await GetConnectedClient();
+                var channel = client.Channels.Get(chanName);
+
+                ChannelState previousState = ChannelState.Failed;
+                ChannelState newState = ChannelState.Initialized;
+                channel.On(channelStateChange =>
+                {
+                    // RTL2d first argument should be an instance of ChannelStateChange
+                    channelStateChange.Should().NotBeNull();
+                    channelStateChange.Error.Should().NotBeNull();
+                    channelStateChange.Error.Message.Should().Be(action.ToString());
+                    channelStateChange.Error.Code.Should().Be((int)action);
+
+                    // should be the state corresponding to the
+                    // passed in ChannelEvent which should be
+                    // anything but Initialized
+                    newState = channelStateChange.Current;
+
+                    // should always be Initialized
+                    previousState = channelStateChange.Previous;
+                    Done();
+                });
+
+                // any state change triggered by a ProtocolMessage that contains an error member
+                // should populate the reason with that error in the corresponding state change event
+                client.FakeProtocolMessageReceived(new ProtocolMessage(action, chanName)
+                {
+                    Error = new ErrorInfo(action.ToString(), (int)action)
+                });
+
+                WaitOne();
+
+                channel.State.ToString().Should().Be(action.ToString());
+                newState.ToString().Should().Be(action.ToString());
+                previousState.Should().Be(ChannelState.Initialized);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL2c")]
+            public async Task ShouldEmmitErrorWithTheErrorThatHasOccuredOnTheChannel()
+            {
+                var error = new ErrorInfo();
+                ErrorInfo expectedError = null;
+                var channel = await GetChannel();
+                channel.On((args) =>
+                {
+                    expectedError = args.Error;
+                    Done();
+                });
+
+                ((RealtimeChannel)channel).SetChannelState(ChannelState.Attached, error);
+
+                WaitOne();
+
+                expectedError.Should().BeSameAs(error);
+                channel.ErrorReason.Should().BeSameAs(error);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL2f")]
+            [Trait("spec", "RTL2g")]
+            [Trait("spec", "RTL12")]
+            [Trait("spec", "TH2")]
+            [Trait("spec", "TH3")]
+            [Trait("spec", "TH4")]
+            public async Task WhenAttachedProtocolMessageWithResumedFlagReceived_EmittedChannelStateChangeShouldIndicateResumed()
+            {
+                var client = await GetConnectedClient();
+                var channel = client.Channels.Get("test");
+                var tc = new TimeoutCallback<ChannelStateChange>(2000);
+
+                channel.Once(ChannelEvent.Attached, tc.Wrap(csc =>
+                {
+                    // RTL2f
+                    csc.Current.Should().Be(ChannelState.Attached);
+                    csc.Previous.Should().Be(ChannelState.Initialized);
+                    csc.Resumed.Should().BeFalse();
+                }));
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = "test",
+                });
+
+                var result = await tc.Task;
+                result.Should().BeTrue("State change event should have been handled");
+                channel.State.Should().Be(ChannelState.Attached);
+
+                // reset
+                tc = new TimeoutCallback<ChannelStateChange>(2000);
+
+                // RTL2g / RTL12
+                channel.Once(ChannelEvent.Update, tc.Wrap(csc =>
+                {
+                    // RTL2f, TH2, TH4
+                    csc.Current.Should().Be(ChannelState.Attached);
+                    csc.Previous.Should().Be(ChannelState.Attached);
+                    csc.Resumed.Should().BeFalse();
+                }));
+
+                // Send another Attached message without the resume flag.
+                // This should cause and Update event to be emitted.
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached, "test"));
+
+                result = await tc.Task;
+                result.Should().BeTrue("Update event should have been handled");
+                channel.State.Should().Be(ChannelState.Attached);
+
+                channel.Once(stateChange =>
+                    throw new Exception("This should not be reached because resumed flag was set"));
+
+                // send another Attached protocol message with the resumed flag set.
+                // This should not trigger any channel event (per RTL12).
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = "test",
+                    Flags = 4, // resumed
+                });
+
+                await Task.Delay(2000);
+
+                tc = new TimeoutCallback<ChannelStateChange>(500);
+
+                // set detached so that the next Attached message with resume will pass
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached, "test"));
+
+                channel.Once(ChannelEvent.Attached, tc.Wrap(csc =>
+                {
+                    // RTL2f, TH4
+                    csc.Resumed.Should().BeTrue();
+
+                    // TH3
+                    csc.Error.Message.Should().Be("test error");
+                }));
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached, "test")
+                {
+                    Flags = (int)ProtocolMessage.Flag.Resumed, // resumed
+                    Error = new ErrorInfo("test error"),
+                });
+
+                result = await tc.Task;
+                result.Should().BeTrue();
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Initialized)]
+            [InlineData(ChannelState.Attaching)]
+            [InlineData(ChannelState.Attached)]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [InlineData(ChannelState.Failed)]
+            [InlineData(ChannelState.Suspended)]
+            [Trait("spec", "RTL2g")]
+            public async Task ShouldNeverEmitAChannelEventForAStateEqualToThePreviousState(ChannelState state)
+            {
+                var client = await GetConnectedClient();
+                var channel = (RealtimeChannel)client.Channels.Get("test");
+                bool stateDidChange = false;
+
+                // set initial state
+                channel.SetChannelState(state);
+
+                channel.Once(stateChange =>
+                {
+                    stateDidChange = true;
+                    throw new Exception("state change event should not be emitted");
+                });
+
+                // attempt to set the same state again
+                channel.SetChannelState(state);
+
+                stateDidChange.Should().BeFalse();
+            }
+
+            public EventEmitterSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL3")]
+        public class ConnectionStateChangeEffectSpecs : ChannelSpecs
+        {
+            [Theory]
+            [InlineData(ChannelState.Attached)]
+            [InlineData(ChannelState.Attaching)]
+            [Trait("spec", "RTL3a")]
+            public async Task WhenConnectionFails_AttachingOrAttachedChannelsShouldTransitionToFailedWithSameError(
+                ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                var error = new ErrorInfo();
+                ((RealtimeChannel)channel).SetChannelState(state);
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Error)
+                { Error = error });
+
+                await client.WaitForState(ConnectionState.Failed);
+
+                channel.State.Should().Be(ChannelState.Failed);
+                channel.ErrorReason.Should().BeSameAs(error);
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Attached)]
+            [InlineData(ChannelState.Attaching)]
+            [Trait("spec", "RTL3b")]
+            public async Task WhenConnectionIsClosed_AttachingOrAttachedChannelsShouldTransitionToDetached(
+                ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                ((RealtimeChannel)channel).SetChannelState(state);
+
+                client.Close();
+
+                await client.WaitForState(ConnectionState.Closing);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Closed));
+
+                await client.WaitForState(ConnectionState.Closed);
+
+                client.Connection.State.Should().Be(ConnectionState.Closed);
+                channel.State.Should().Be(ChannelState.Detached);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL2d")]
+            [Trait("spec", "RTL3d")]
+            public async Task WhenChannelIsSuspended_WhenConnectionBecomesConnectedAttemptAttach()
+            {
+                var client = await GetConnectedClient();
+                var channel = client.Channels.Get("test".AddRandomSuffix());
+
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Suspended);
+
+                ((RealtimeChannel)channel).SetChannelState(ChannelState.Suspended);
+
+                client.Workflow.QueueCommand(SetConnectedStateCommand.Create(ConnectedProtocolMessage, false));
+
+                await client.WaitForState(ConnectionState.Connected);
+
+                channel.State.Should().Be(ChannelState.Attaching);
+
+                var tsc = new TaskCompletionAwaiter(15000);
+                channel.Once(ChannelEvent.Suspended, s =>
+                {
+                    /* RTL2d */
+                    s.Error.Should().NotBeNull();
+                    s.Error.Message.Should().StartWith("Channel didn't attach within");
+                    s.Error.Code.Should().Be(ErrorCodes.ChannelOperationFailedNoServerResponse);
+                    tsc.SetCompleted();
+                });
+
+                var completed = await tsc.Task;
+                completed.Should().BeTrue("channel should have become Suspended again");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL3d1")]
+            [Trait("spec", "RTL3d")]
+            public async Task WhenConnectedIsEmittedExternally_TheRTL3dTransitionsShouldAlreadyBeApplied()
+            {
+                // RTL3d1: "The RTL3d channel state transitions must be applied before the CONNECTED
+                // connection state change is emitted to external listeners." Nothing implements it
+                // directly - it holds because Connection.NotifyUpdate runs the internal handlers,
+                // where RealtimeChannels fans the change out to every channel, before the emit.
+                //
+                // An ATTACHED channel on a successful resume is the case that needs it, and the one
+                // a conditional reattach would miss. With no SynchronizationContext - the default,
+                // and what every server-side host has - NotifyExternalClients invokes inline, so
+                // anything done after SetState is visible to the application too late.
+                var client = await GetConnectedClient(opts =>
+                    opts.DisconnectedRetryTimeout = TimeSpan.FromMinutes(10));
+
+                var channel = (RealtimeChannel)client.Channels.Get("test".AddRandomSuffix());
+                channel.SetChannelState(ChannelState.Attached);
+                await client.ProcessCommands();
+
+                client.ExecuteCommand(SetDisconnectedStateCommand.Create(ErrorInfo.ReasonDisconnected));
+                await client.WaitForState(ConnectionState.Disconnected);
+                await client.ProcessCommands();
+
+                ChannelState? seenByExternalListener = null;
+                client.Connection.On(ConnectionEvent.Connected, _ => seenByExternalListener = channel.State);
+
+                // The same connectionId the client already holds, so this is an RTN15c6 resume.
+                client.Workflow.QueueCommand(SetConnectedStateCommand.Create(ConnectedProtocolMessage, false));
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                seenByExternalListener.Should().Be(ChannelState.Attaching);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL3c")]
+            public async Task WhenConnectionIsSuspended_ADetachingChannelShouldNotBeStranded()
+            {
+                // RTL3c names only ATTACHING and ATTACHED, so DETACHING is ably-js parity rather than
+                // a spec requirement - propogateConnectionInterruption maps suspended over
+                // ['attaching','attached','detaching','suspended']. It matters because the handler
+                // fails the DetachedAwaiter first, leaving the channel with no DETACHED coming.
+                var (client, channel) = await GetClientAndChannel();
+
+                ((RealtimeChannel)channel).SetChannelState(ChannelState.Detaching);
+                await client.ProcessCommands();
+
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(new ErrorInfo("why it suspended", 12345)));
+                await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Suspended);
+
+                // And the connection's own reason, not a constant - ably-js passes change.reason.
+                channel.ErrorReason.Message.Should().Be("why it suspended");
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Attached)]
+            [InlineData(ChannelState.Attaching)]
+            [Trait("spec", "RTL3c")]
+            public async Task WhenConnectionIsSuspended_AttachingOrAttachedChannelsShouldTransitionToSuspended(
+                ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                ((RealtimeChannel)channel).SetChannelState(state);
+
+                // Driven straight to SUSPENDED, with no Close() first: CLOSING detaches channels per
+                // RTN11b/RTL3b, so closing would race the suspend for the outcome, and RTL3c is
+                // about entering SUSPENDED anyway.
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
+
+                // Assert
+                channel.State.Should().Be(ChannelState.Suspended);
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Attached)]
+            [InlineData(ChannelState.Attaching)]
+            [InlineData(ChannelState.Failed)]
+            [InlineData(ChannelState.Suspended)]
+            [InlineData(ChannelState.Detached)]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Initialized)]
+            [Trait("spec", "RTL3e")]
+            public async Task WhenConnectionIsDisconnected_ChannelStateShouldNotChange(ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                ((RealtimeChannel)channel).SetChannelState(state);
+
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+
+                await client.WaitForState(ConnectionState.Disconnected);
+
+                channel.State.Should().Be(state);
+            }
+
+            public ConnectionStateChangeEffectSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL4")]
+        public class ChannelAttachSpecs : ChannelSpecs
+        {
+            [Theory]
+            [InlineData(ChannelState.Attached)]
+            [Trait("spec", "RTL4a")]
+            public async Task WhenAttached_ShouldDoNothing(ChannelState state)
+            {
+                bool stateChanged = false;
+
+                var channel = await GetTestChannel();
+                await SetState(channel, state);
+                ChannelState newState = ChannelState.Initialized;
+                channel.On((args) =>
+                {
+                    newState = args.Current;
+                    stateChanged = true;
+                });
+
+                channel.Attach();
+
+                await Task.Delay(100);
+
+                stateChanged.Should().BeFalse("This should not happen. State changed to: " + newState);
+            }
+
+            [Fact]
+            public async Task WhenAttaching_ShouldAddMultipleAwaitingHandlers()
+            {
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+
+                int counter = 0;
+
+                channel.Attach((b, info) => Interlocked.Increment(ref counter));
+                channel.Attach((b, info) => Interlocked.Increment(ref counter));
+
+                await ReceiveAttachedMessage(client);
+
+                await Task.Delay(100);
+                counter.Should().Be(2);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4b")]
+            public async Task WhenConnectionIsClosedClosingSuspendedOrFailed_ShouldCallCallbackWithError()
+            {
+                var client = await GetConnectedClient();
+
+                // Closed
+                client.Workflow.SetState(new ConnectionClosedState(client.ConnectionManager, Logger));
+                var closedAttach = await client.Channels.Get("closed").AttachAsync();
+                AssertAttachResultIsFailure(closedAttach);
+
+                // Closing
+                client.Workflow.SetState(new ConnectionClosingState(client.ConnectionManager, false, Logger));
+                var closingAttach = await client.Channels.Get("closing").AttachAsync();
+                AssertAttachResultIsFailure(closingAttach);
+
+                // Suspended
+                client.Workflow.SetState(new ConnectionSuspendedState(client.ConnectionManager, Logger));
+                var suspendedAttach = await client.Channels.Get("suspended").AttachAsync();
+                AssertAttachResultIsFailure(suspendedAttach);
+
+                // Failed
+                client.Workflow.SetState(new ConnectionFailedState(
+                    client.ConnectionManager,
+                    ErrorInfo.ReasonFailed,
+                    Logger));
+
+                var failedAttach = await client.Channels.Get("failed").AttachAsync();
+                AssertAttachResultIsFailure(failedAttach);
+
+                void AssertAttachResultIsFailure(Result r)
+                {
+                    r.IsFailure.Should().BeTrue();
+                    r.Error.Code.Should().Be(ErrorCodes.ChannelOperationFailed);
+                    r.Error.Message.Should().Contain("Cannot attach when connection is in");
+                    var defaultErrorInfo = client.State.Connection.CurrentStateObject.DefaultErrorInfo;
+                    r.Error.Cause.Message.Should().Be(defaultErrorInfo.Message);
+                    r.Error.Cause.Code.Should().Be(defaultErrorInfo.Code);
+                }
+            }
+
+            [Theory]
+            [Trait("issue", "409")]
+            [InlineData(ConnectionState.Closed)]
+            [InlineData(ConnectionState.Closing)]
+            [InlineData(ConnectionState.Suspended)]
+            [InlineData(ConnectionState.Failed)]
+            public async Task WhenConnectionIsClosedClosingSuspendedOrFailed_ShouldThrowError(ConnectionState state)
+            {
+                var client = await GetConnectedClient();
+
+                var waiter = new TaskCompletionAwaiter();
+                switch (state)
+                {
+                    case ConnectionState.Closed:
+                        client.Workflow.SetState(new ConnectionClosedState(client.ConnectionManager, Logger));
+                        break;
+                    case ConnectionState.Closing:
+                        client.Workflow.SetState(new ConnectionClosingState(client.ConnectionManager, false, Logger));
+                        break;
+                    case ConnectionState.Suspended:
+                        client.Workflow.SetState(new ConnectionSuspendedState(client.ConnectionManager, Logger));
+                        break;
+                    case ConnectionState.Failed:
+                        client.Workflow.SetState(new ConnectionFailedState(
+                            client.ConnectionManager,
+                            ErrorInfo.ReasonFailed,
+                            Logger));
+                        break;
+                }
+
+                client.Channels.Get("suspended").Attach((success, error) =>
+                {
+                    success.Should().BeFalse();
+                    error.Should().NotBeNull();
+                    waiter.SetCompleted();
+                });
+
+                await waiter.Task;
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4c")]
+            public async Task ShouldSetStateToAttachingSendAnAttachMessageAndWaitForAttachedMessage()
+            {
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+                channel.Attach();
+                channel.State.Should().Be(ChannelState.Attaching);
+                await client.ProcessCommands();
+                var lastMessageSend = LastCreatedTransport.LastMessageSend;
+                lastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Attach);
+                lastMessageSend.Channel.Should().Be(channel.Name);
+
+                await ReceiveAttachedMessage(client);
+
+                await channel.WaitForAttachedState();
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Initialized)]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [InlineData(ChannelState.Failed)]
+            [Trait("spec", "RTL4f")]
+            public async Task ShouldBecomeSuspendedIfAttachMessageNotReceivedWithinDefaultTimeout(
+                ChannelState previousState)
+            {
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+                await SetState(channel, previousState);
+
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(100);
+                channel.Attach();
+
+                await Task.Delay(120);
+                for (int i = 0; i < 10; i++)
+                {
+                    if (channel.State != previousState)
+                    {
+                        await Task.Delay(50);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                for (var i = 0; i < 5; i++)
+                {
+                    if (channel.State == ChannelState.Attaching)
+                    {
+                        await Task.Delay(50);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                channel.State.Should().Be(ChannelState.Suspended);
+                channel.ErrorReason.Should().NotBeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4d")]
+            public async Task WithACallback_ShouldCallCallbackOnceAttached()
+            {
+                var called = false;
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+                channel.Attach((span, info) =>
+                {
+                    called = true;
+                    info.Should().BeNull();
+                    Done();
+                });
+
+                await ReceiveAttachedMessage(client);
+
+                WaitOne();
+
+                called.Should().BeTrue();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4d")]
+            public async Task WithACallback_ShouldCallCallbackWithErrorIfAttachFails()
+            {
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(100);
+                bool called = false;
+                channel.Attach((span, info) =>
+                {
+                    called = true;
+                    info.Should().NotBeNull();
+                    Done();
+                });
+
+                WaitOne();
+
+                called.Should().BeTrue();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4d")]
+            public async Task WhenCallingAsyncMethod_ShouldSucceedWhenChannelReachesAttached()
+            {
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+                var attachTask = channel.AttachAsync();
+                await Task.WhenAll(attachTask, ReceiveAttachedMessage(client));
+
+                attachTask.Result.IsSuccess.Should().BeTrue();
+                attachTask.Result.Error.Should().BeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4d")]
+            public async Task WhenCallingAsyncMethod_ShouldFailWithErrorWhenAttachFails()
+            {
+                var client = await GetConnectedClient();
+                var channel = await GetTestChannel(client);
+
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(100);
+                var attachTask = channel.AttachAsync();
+
+                await Task.WhenAll(Task.Delay(120), attachTask);
+
+                attachTask.Result.IsFailure.Should().BeTrue();
+                attachTask.Result.Error.Should().NotBeNull();
+            }
+
+            private new static async Task SetState(
+                IRealtimeChannel channel,
+                ChannelState state,
+                ErrorInfo error = null,
+                ProtocolMessage message = null)
+            {
+                ((RealtimeChannel)channel).SetChannelState(state, error, message);
+                await Task.Delay(10);
+            }
+
+            private Task ReceiveAttachedMessage(PubSubRealtimeClient client)
+            {
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = TestChannelName
+                });
+
+                return Task.CompletedTask;
+            }
+
+            public ChannelAttachSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL5")]
+        public class ChannelDetachSpecs : ChannelSpecs
+        {
+            [Theory]
+            [InlineData(ChannelState.Initialized)]
+            [InlineData(ChannelState.Detached)]
+            [InlineData(ChannelState.Detaching)]
+            [Trait("spec", "RTL5a")]
+            public async Task WhenInitializedDetachedOrDetaching_ShouldDoNothing(ChannelState state)
+            {
+                var channel = await GetTestChannel();
+
+                SetChannelState(channel, state);
+                bool changed = false;
+
+                channel.On((args) => { changed = true; });
+
+                channel.Detach();
+
+                changed.Should().BeFalse();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5b")]
+            public async Task WhenStateIsFailed_DetachShouldReturnAnError()
+            {
+                var channel = await GetTestChannel();
+                SetChannelState(channel, ChannelState.Failed, new ErrorInfo());
+
+                var result = await channel.DetachAsync();
+                result.IsFailure.Should().BeTrue();
+                result.Error.Should().NotBeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5d")]
+            public async Task ShouldSendDetachMessageAndOnceDetachedReceivedShouldMigrateToDetached()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, ChannelState.Attached);
+
+                channel.Detach();
+
+                await client.ProcessCommands();
+
+                LastCreatedTransport.LastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Detach);
+                channel.State.Should().Be(ChannelState.Detaching);
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachingOrDetached_ShouldSendDetachAndBeDetaching(ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, state);
+                var sentBefore = LastCreatedTransport.SentMessages.Count;
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                LastCreatedTransport.SentMessages.Count.Should().Be(sentBefore + 1);
+                LastCreatedTransport.LastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Detach);
+                LastCreatedTransport.LastMessageSend.Channel.Should().Be(channel.Name);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL5d")]
+            public async Task WhenAttachedReceivedWhileDetached_ShouldEmitDetachingAndThenDetachedOnceDetachedIsReceived()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detached);
+
+                var stateChanges = new ConcurrentQueue<ChannelStateChange>();
+                channel.On(stateChange => stateChanges.Enqueue(stateChange));
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                (await WaitUntil(() => stateChanges.Count >= 2)).Should().BeTrue();
+                stateChanges.Select(x => x.Event).Should().Equal(ChannelEvent.Detaching, ChannelEvent.Detached);
+                stateChanges.First().Previous.Should().Be(ChannelState.Detached);
+            }
+
+            [Theory]
+            [InlineData(ChannelState.Detaching)]
+            [InlineData(ChannelState.Detached)]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL15b2")]
+            [Trait("spec", "RTL4c1")]
+            public async Task WhenAttachedReceivedWhileDetachingOrDetached_ShouldNotUpdateTheChannel(ChannelState state)
+            {
+                var (client, channel) = await GetClientAndChannel();
+                var realtimeChannel = (RealtimeChannel)channel;
+                SetChannelState(channel, state);
+
+                var stateChanges = new ConcurrentQueue<ChannelStateChange>();
+                channel.On(stateChange => stateChanges.Enqueue(stateChange));
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = "unexpected-attached-serial",
+                    Flags = (int)(ProtocolMessage.Flag.Resumed | ProtocolMessage.Flag.HasPresence | ProtocolMessage.Flag.Subscribe),
+                    Params = new ChannelParams { { "rewind", "1" } },
+                });
+                await client.ProcessCommands();
+
+                realtimeChannel.Properties.ChannelSerial.Should().BeNull();
+                realtimeChannel.Properties.AttachSerial.Should().BeNull();
+                channel.Modes.Should().BeEmpty();
+                channel.Params.Should().BeEmpty();
+                realtimeChannel.Presence.SyncInProgress.Should().BeFalse();
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Detached);
+
+                channel.Attach();
+                await client.ProcessCommands();
+
+                var attachMessage = LastCreatedTransport.LastMessageSend;
+                attachMessage.Action.Should().Be(ProtocolMessage.MessageAction.Attach);
+                attachMessage.ChannelSerial.Should().BeNull();
+                stateChanges.Select(x => x.Event).Should().NotContain(new[] { ChannelEvent.Attached, ChannelEvent.Update });
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL5f")]
+            public async Task WhenAttachedReceivedWhileDetached_AndDetachedIsNotReceivedWithinTimeout_ShouldReturnToDetached()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(500);
+                SetChannelState(channel, ChannelState.Detached);
+
+                var stateChanges = new ConcurrentQueue<ChannelStateChange>();
+                var detached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                channel.On(stateChange =>
+                {
+                    stateChanges.Enqueue(stateChange);
+                    if (stateChange.Event == ChannelEvent.Detached)
+                    {
+                        detached.TrySetResult(true);
+                    }
+                });
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                (await Task.WhenAny(detached.Task, Task.Delay(5000))).Should().Be(detached.Task);
+
+                stateChanges.Select(x => x.Event).Should().Equal(ChannelEvent.Detaching, ChannelEvent.Detached);
+                stateChanges.Last().Error.Code.Should().Be(ErrorCodes.InternalError);
+                channel.State.Should().Be(ChannelState.Detached);
+                channel.ErrorReason.Code.Should().Be(ErrorCodes.InternalError);
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(1);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL5e")]
+            public async Task WhenDetachIsAnsweredWithAttached_ShouldSendDetachAgainAndCompleteOnceDetachedIsReceived()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Attached);
+
+                var detachResult = channel.DetachAsync();
+                await client.ProcessCommands();
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(1);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detaching);
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(2);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                (await detachResult).IsSuccess.Should().BeTrue();
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessages(ProtocolMessage.MessageAction.Attach).Should().Be(0);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTL13a")]
+            public async Task WhenDetachIsCalledBeforeAttached_LateAttachedShouldNotReattachTheChannel()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                channel.Attach();
+                await client.ProcessCommands();
+                channel.Detach();
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessages(ProtocolMessage.MessageAction.Attach).Should().Be(1);
+                CountSentMessages(ProtocolMessage.MessageAction.Detach).Should().Be(2);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTN19b")]
+            public async Task WhenAttachedReceivedWhileDetachedAndConnecting_ShouldBeDetachingAndSendDetachOnceConnected()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detached);
+
+                // From CONNECTED, DISCONNECTED retries immediately, leaving the connection CONNECTING.
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Connecting);
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detaching);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(0);
+
+                client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(1);
+                LastCreatedTransport.LastMessageSend.Action.Should().Be(ProtocolMessage.MessageAction.Detach);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            [Trait("spec", "RTN19b")]
+            public async Task WhenAttachedReceivedWhileDetaching_AndTransportIsReconnected_ShouldSendDetachAgainOnTheNewTransport()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Attached);
+
+                channel.Detach();
+                await client.ProcessCommands();
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                var firstTransport = LastCreatedTransport;
+                firstTransport.SentMessages.Count(x => x.Original.Action == ProtocolMessage.MessageAction.Detach).Should().Be(2);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                // From CONNECTED, DISCONNECTED retries immediately on a new transport.
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Connecting);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+                await client.WaitForState(ConnectionState.Connected);
+                await client.ProcessCommands();
+
+                LastCreatedTransport.Should().NotBeSameAs(firstTransport);
+                LastCreatedTransport.SentMessages.Count(x => x.Original.Action == ProtocolMessage.MessageAction.Detach).Should().Be(1);
+                channel.State.Should().Be(ChannelState.Detaching);
+
+                await ReceiveDetachedMessage(client);
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Attach).Should().Be(0);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachingAndDisconnected_ShouldNotSendDetachUntilConnected()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detaching);
+
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Connecting);
+
+                // From CONNECTING, DISCONNECTED waits for disconnectedRetryTimeout before retrying.
+                client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Disconnected);
+                await client.ProcessCommands();
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                client.Connection.State.Should().Be(ConnectionState.Disconnected);
+                channel.State.Should().Be(ChannelState.Detaching);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(0);
+                client.State.PendingMessages.Should().NotContain(x => x.Message.Action == ProtocolMessage.MessageAction.Detach);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5k")]
+            public async Task WhenAttachedReceivedWhileDetachedAndConnectionSuspended_ShouldNotChangeState()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetChannelState(channel, ChannelState.Detached);
+
+                client.Workflow.QueueCommand(SetSuspendedStateCommand.Create(null));
+                await client.WaitForState(ConnectionState.Suspended);
+                await client.ProcessCommands();
+
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Detached);
+                CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction.Detach).Should().Be(0);
+                client.State.PendingMessages.Should().NotContain(x => x.Message.Action == ProtocolMessage.MessageAction.Detach);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5f")]
+            public async Task ShouldReturnToPreviousStateIfDetachedMessageWasNotReceivedWithinDefaultTimeout()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, ChannelState.Attached);
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(100);
+                bool detachSuccess = true;
+                ErrorInfo detachError = null;
+
+                // use a TaskCompletionSource to let us know when the Detach event has been handled
+                TaskCompletionSource<bool> tsc = new TaskCompletionSource<bool>(false);
+                channel.Detach((success, error) =>
+                {
+                    detachSuccess = success;
+                    detachError = error;
+                    tsc.SetResult(true);
+                });
+
+                // timeout the tsc in case the detached event never happens
+                async Task TimeoutFn()
+                {
+                    await Task.Delay(1000);
+                    tsc.TrySetCanceled();
+                }
+
+#pragma warning disable 4014
+                TimeoutFn();
+#pragma warning restore 4014
+                await tsc.Task;
+
+                channel.State.Should().Be(ChannelState.Attached);
+                channel.ErrorReason.Should().NotBeNull();
+                detachSuccess.Should().BeFalse();
+                detachError.Should().NotBeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5e")]
+            public async Task WithACallback_ShouldCallCallbackOnceDetach()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, ChannelState.Attached);
+
+                bool called = false;
+                channel.Detach((span, info) =>
+                {
+                    called = true;
+                    Assert.Null(info);
+                    Done();
+                });
+
+                await ReceiveDetachedMessage(client);
+
+                WaitOne();
+
+                called.Should().BeTrue();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5e")]
+            public async Task WithACallback_ShouldCallCallbackWithErrorIfDetachFails()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, ChannelState.Attached);
+
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(100);
+                bool called = false;
+                channel.Detach((span, info) =>
+                {
+                    called = true;
+                    info.Should().NotBeNull();
+                    Done();
+                });
+
+                WaitOne();
+
+                called.Should().BeTrue();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5e")]
+            public async Task WhenCallingAsyncMethod_ShouldSucceedWhenChannelReachesDetached()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, ChannelState.Attached);
+
+                var detachTask = channel.DetachAsync();
+                await Task.WhenAll(detachTask, ReceiveDetachedMessage(client));
+
+                detachTask.Result.IsSuccess.Should().BeTrue();
+                detachTask.Result.Error.Should().BeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL5e")]
+            public async Task WhenCallingAsyncMethod_ShouldFailWithErrorWhenDetachFails()
+            {
+                var (client, channel) = await GetClientAndChannel();
+
+                SetChannelState(channel, ChannelState.Attached);
+
+                client.Options.RealtimeRequestTimeout = TimeSpan.FromMilliseconds(100);
+                var detachTask = channel.DetachAsync();
+
+                await Task.WhenAll(Task.Delay(120), detachTask);
+
+                detachTask.Result.IsFailure.Should().BeTrue();
+                detachTask.Result.Error.Should().NotBeNull();
+            }
+
+            private static async Task<bool> WaitUntil(Func<bool> condition)
+            {
+                var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+                while (!condition())
+                {
+                    if (DateTimeOffset.UtcNow > deadline)
+                    {
+                        return false;
+                    }
+
+                    await Task.Delay(10);
+                }
+
+                return true;
+            }
+
+            private int CountSentMessages(ProtocolMessage.MessageAction action) =>
+                LastCreatedTransport.SentMessages.Count(x => x.Original.Action == action);
+
+            private int CountSentMessagesOnAllTransports(ProtocolMessage.MessageAction action) =>
+                CreatedTransports.Sum(t => t.SentMessages.Count(x => x.Original.Action == action));
+
+            private Task ReceiveDetachedMessage(PubSubRealtimeClient client)
+            {
+                client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Detached)
+                {
+                    Channel = TestChannelName,
+                });
+                return Task.CompletedTask;
+            }
+
+            private void SetChannelState(
+                IRealtimeChannel channel,
+                ChannelState state,
+                ErrorInfo error = null,
+                ProtocolMessage message = null)
+            {
+                ((RealtimeChannel)channel).SetChannelState(state, error, message);
+            }
+
+            public ChannelDetachSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL6")]
+        public class PublishSpecs : ChannelSpecs
+        {
+            [Fact]
+            [Trait("spec", "RTL6a")]
+            [Trait("spec", "RTL6i")]
+            [Trait("spec", "RTL6ia")]
+            public async Task WithNameAndData_ShouldSendASingleProtocolMessageWithASingleEncodedMessageInside()
+            {
+                var channel = await GetTestChannel();
+                var bytes = new byte[] { 1, 2, 3, 4, 5 };
+
+                SetState(channel, ChannelState.Attached);
+
+                await channel.PublishAsync("byte", bytes);
+
+                await new ConditionalAwaiter(() => LastCreatedTransport.LastMessageSend.Messages.Length > 0);
+                var sentMessage = LastCreatedTransport.LastMessageSend.Messages.First();
+                LastCreatedTransport.SentMessages.Should().HaveCount(1);
+                sentMessage.Encoding.Should().Be("base64");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL6i")]
+            [Trait("spec", "RTL6i2")]
+            public async Task WithListOfMessages_ShouldPublishASingleProtocolMessageToTransport()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetState(channel, ChannelState.Attached);
+
+                var list = new List<Message>
+                {
+                    new Message("name", "test"),
+                    new Message("test", "best"),
+                };
+
+                channel.Publish(list);
+
+                await client.ProcessCommands();
+
+                LastCreatedTransport.SentMessages.Should().HaveCount(1);
+                LastCreatedTransport.LastMessageSend.Messages.Should().HaveCount(2);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL6i3")]
+            public async Task WithMessageWithOutData_ShouldSendOnlyData()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetState(channel, ChannelState.Attached);
+
+                channel.Publish(null, "data");
+
+                await client.ProcessCommands();
+                LastCreatedTransport.SentMessages.First().Text.Should().Contain("\"messages\":[{\"data\":\"data\"}]");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL6i3")]
+            public async Task WithMessageWithOutName_ShouldSendOnlyData()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                SetState(channel, ChannelState.Attached);
+
+                channel.Publish("name", null);
+                await client.ProcessCommands();
+                LastCreatedTransport.SentMessages.First().Text.Should().Contain("\"messages\":[{\"name\":\"name\"}]");
+            }
+
+            [Trait("spec", "RTL6c")]
+            public class ConnectionStateConditions : PublishSpecs
+            {
+                [Fact]
+                [Trait("spec", "RTL6c1")]
+                public async Task WhenConnectionIsConnected_ShouldSendMessagesDirectly()
+                {
+                    var (client, channel) = await GetClientAndChannel();
+
+                    SetState(channel, ChannelState.Attached);
+
+                    channel.Publish("test", "best");
+
+                    await client.ProcessCommands();
+
+                    var lastMessageSend = LastCreatedTransport.LastMessageSend;
+                    lastMessageSend.Channel.Should().Be("test");
+                    lastMessageSend.Messages.First().Name.Should().Be("test");
+                    lastMessageSend.Messages.First().Data.Should().Be("best");
+                }
+
+                [Fact]
+                [Trait("spec", "RTL6c2")]
+                public async Task WhenConnectionIsConnecting_MessageShouldBeQueuedUntilConnectionMovesToConnected()
+                {
+                    var client = GetClientWithFakeTransport();
+                    client.Connect();
+
+                    await client.ProcessCommands();
+                    await client.WaitForState(ConnectionState.Connecting);
+
+                    var channel = client.Channels.Get("connecting");
+                    SetState(channel, ChannelState.Attached);
+                    channel.Publish("test", "connecting");
+
+                    await client.ProcessCommands();
+
+                    LastCreatedTransport.LastMessageSend.Should().BeNull();
+                    client.State.PendingMessages.Should().HaveCount(1);
+                    client.State.PendingMessages.First().Message.Messages.First().Data.Should().Be("connecting");
+
+                    // Now connect the client
+                    client.FakeProtocolMessageReceived(new ProtocolMessage(ProtocolMessage.MessageAction.Connected));
+
+                    await client.WaitForState(ConnectionState.Connected);
+                    await client.ProcessCommands();
+
+                    // Messages should be sent
+                    LastCreatedTransport.LastMessageSend.Should().NotBeNull();
+                    client.State.PendingMessages.Should().BeEmpty();
+                }
+
+                [Fact]
+                [Trait("spec", "RTL6c2")]
+                public async Task WhenConnectionIsDisconnecting_MessageShouldBeQueuedUntilConnectionMovesToConnected()
+                {
+                    var client = GetClientWithFakeTransport();
+                    client.Workflow.QueueCommand(SetDisconnectedStateCommand.Create(null));
+
+                    await client.WaitForState(ConnectionState.Disconnected);
+
+                    var channel = client.Channels.Get("connecting");
+                    SetState(channel, ChannelState.Attached);
+                    channel.Publish("test", "connecting");
+
+                    await client.ProcessCommands();
+                    LastCreatedTransport.LastMessageSend.Should().BeNull();
+                    client.State.PendingMessages.Should().HaveCount(1);
+                    client.State.PendingMessages.First().Message.Messages.First().Data.Should().Be("connecting");
+
+                    // Now connect
+                    client.Connect();
+                    client.FakeProtocolMessageReceived(ConnectedProtocolMessage);
+
+                    await client.WaitForState(ConnectionState.Connected);
+                    await client.ProcessCommands();
+
+                    // Pending messages are sent
+                    LastCreatedTransport.LastMessageSend.Should().NotBeNull();
+                    client.State.PendingMessages.Should().BeEmpty();
+                }
+
+                public ConnectionStateConditions(ITestOutputHelper output)
+                    : base(output)
+                {
+                }
+            }
+
+            public class ClientIdSpecs : PublishSpecs
+            {
+                [Fact]
+                [Trait("spec", "RTL6g1")]
+                [Trait("spec", "RTL6g1a")]
+                public async Task WithClientIdInOptions_DoesNotSetClientIdOnPublishedMessages()
+                {
+                    var client = await GetConnectedClient(opts =>
+                    {
+                        opts.ClientId = "123";
+                        opts.Token = "test";
+                    });
+                    var channel = client.Channels.Get("test");
+                    await channel.PublishAsync("test", "test");
+                    SetState(channel, ChannelState.Attached);
+
+                    LastCreatedTransport.LastMessageSend.Messages.First().ClientId.Should().BeNullOrEmpty();
+                }
+
+                [Fact]
+                [Trait("spec", "RTL6h")]
+                public async Task CanEasilyAddClientIdWhenPublishingAMessage()
+                {
+                    var channel = await GetTestChannel();
+                    SetState(channel, ChannelState.Attached);
+                    await channel.PublishAsync("test", "best", "123");
+
+                    LastCreatedTransport.LastMessageSend.Messages.First().ClientId.Should().Be("123");
+                }
+
+                [Fact]
+                [Trait("spec", "RTL4k")]
+                public async Task SendsChannelParamsWithAttachMessage()
+                {
+                    var client = await GetConnectedClient();
+                    var channelParams = new ChannelParams { { "test", "blah" }, { "test2", "value" } };
+                    var channelOptions = new ChannelOptions(channelParams: channelParams);
+                    var channel = await GetTestChannel(client, channelOptions);
+                    channel.Attach();
+
+                    channel.WaitForState(ChannelState.Attaching);
+                    await client.ProcessCommands();
+
+                    var protocolMessage = LastCreatedTransport.LastMessageSend;
+                    protocolMessage.Action.Should().Be(ProtocolMessage.MessageAction.Attach);
+                    protocolMessage.Params.Should().NotBeNull();
+                    protocolMessage.Params.Should().BeEquivalentTo(channelParams);
+                }
+
+                [Fact]
+                [Trait("spec", "RTL4l")]
+                public async Task SendsChannelModesWithAttachMessage()
+                {
+                    var client = await GetConnectedClient();
+                    var modes = new ChannelModes(ChannelMode.Presence, ChannelMode.Publish);
+                    var channelOptions = new ChannelOptions(modes: modes);
+                    var channel = await GetTestChannel(client, channelOptions);
+                    channel.Attach();
+
+                    channel.WaitForState(ChannelState.Attaching);
+                    await client.ProcessCommands();
+
+                    var protocolMessage = LastCreatedTransport.LastMessageSend;
+                    protocolMessage.HasFlag(ProtocolMessage.Flag.Presence).Should().BeTrue();
+                    protocolMessage.HasFlag(ProtocolMessage.Flag.Publish).Should().BeTrue();
+                }
+
+                public ClientIdSpecs(ITestOutputHelper output)
+                    : base(output)
+                {
+                }
+            }
+
+            public PublishSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        public class PresenceSpecs : ChannelSpecs
+        {
+            [Theory(Skip = "Intermittently fails")]
+            [InlineData(ChannelState.Detached)]
+            [InlineData(ChannelState.Failed)]
+            [InlineData(ChannelState.Suspended)]
+            [Trait("spec", "RTL11")]
+            public async Task WhenDetachedOrFailed_AllQueuedPresenceMessagesShouldBeDeletedAndFailCallbackInvoked(
+                ChannelState state)
+            {
+                var client = await GetConnectedClient();
+                var channel = (RealtimeChannel)client.Channels.Get("test");
+                var expectedError = new ErrorInfo();
+
+                channel.Attach();
+
+                bool didSucceed = false;
+                ErrorInfo err = null;
+                channel.Presence.Enter(
+                    null,
+                    (b, info) =>
+                    {
+                        didSucceed = b;
+                        err = info;
+                    });
+
+                channel.Presence.PendingPresenceQueue.Should().HaveCount(1);
+
+                channel.SetChannelState(state, expectedError);
+                channel.Presence.PendingPresenceQueue.Should().HaveCount(0);
+
+                didSucceed.Should().BeFalse();
+                err.Should().BeSameAs(expectedError);
+            }
+
+            public PresenceSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        public class SubscribeSpecs : ChannelSpecs
+        {
+            [Fact]
+            [Trait("spec", "RTL7a")]
+            public async Task WithNoArguments_AddsAListenerForAllMessages()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+                SetState(channel, ChannelState.Attached);
+                var messages = new ConcurrentBag<Message>();
+                int count = 0;
+                channel.Subscribe(message =>
+                {
+                    messages.Add(message);
+                    count++;
+                    if (count == 2)
+                    {
+                        Done();
+                    }
+                });
+
+                client.FakeMessageReceived(new Message("test", "best"), TestChannelName);
+                client.FakeMessageReceived(new Message(string.Empty, "best"), TestChannelName);
+                client.FakeMessageReceived(new Message("blah", "best"), TestChannelName);
+
+                WaitOne();
+                await Task.Delay(250);
+                messages.Should().HaveCount(3);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL7b")]
+            public async Task WithEventArguments_ShouldOnlyNotifyWhenNameMatchesMessageName()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+                SetState(channel, ChannelState.Attached);
+                var messages = new List<Message>();
+                channel.Subscribe("test", message =>
+                {
+                    messages.Add(message);
+                    Done();
+                });
+
+                client.FakeMessageReceived(new Message(string.Empty, "best"), "test");
+                client.FakeMessageReceived(new Message("blah", "best"), "test");
+                client.FakeMessageReceived(new Message("test", "best"), "test");
+
+                WaitOne();
+
+                messages.Should().HaveCount(1);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL7c")]
+            public async Task ShouldImplicitlyAttachAChannel()
+            {
+                var channel = await GetTestChannel();
+                channel.State.Should().Be(ChannelState.Initialized);
+                channel.Subscribe(message =>
+                {
+                    // do nothing
+                });
+                channel.State.Should().Be(ChannelState.Attaching);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL7d")]
+            public async Task WithAMessageThatFailDecryption_ShouldDeliverMessageAndNotPutAnErrorOnTheChannel()
+            {
+                var otherChannelOptions = new ChannelOptions(true);
+                var client = await GetConnectedClient(_switchBinaryOff);
+                var encryptedChannel = client.Channels.Get("encrypted", new ChannelOptions(true));
+                SetState(encryptedChannel, ChannelState.Attached);
+                var awaiter = new TaskCompletionAwaiter();
+                var msgReceived = false;
+                var errorEmitted = false;
+
+                encryptedChannel.Subscribe(msg =>
+                {
+                    msgReceived = true;
+                    awaiter.Done();
+                });
+
+                encryptedChannel.Error += (sender, args) =>
+                {
+                    errorEmitted = true;
+                };
+
+                var message = new Message("name", "encrypted with otherChannelOptions");
+                MessageHandler.EncodePayloads(otherChannelOptions.ToDecodingContext(), new[] { message });
+
+                client.FakeMessageReceived(message, encryptedChannel.Name);
+
+                await awaiter;
+
+                msgReceived.Should().BeTrue();
+                errorEmitted.Should().BeFalse();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL7e")]
+            public async Task
+                WithMessageThatCantBeDecoded_ShouldDeliverMessageWithResidualEncodingAndLogError()
+            {
+                var otherChannelOptions = new ChannelOptions(true);
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+                SetState(channel, ChannelState.Attached);
+
+                Message receivedMessage = null;
+                channel.Subscribe(msg => { receivedMessage = msg; });
+
+                var message = new Message("name", "encrypted with otherChannelOptions") { Encoding = "json" };
+                MessageHandler.EncodePayloads(otherChannelOptions.ToDecodingContext(), new[] { message });
+
+                var testSink = new TestLoggerSink();
+                using (DefaultLogger.SetTempDestination(testSink))
+                {
+                    client.FakeMessageReceived(message, channel.Name);
+                    await client.ProcessCommands();
+                }
+
+                receivedMessage.Encoding.Should().Be(message.Encoding);
+                testSink.Messages.Should().Contain(x => x.Contains("Error decrypting payload"));
+            }
+
+            [Fact]
+            public async Task WithMultipleMessages_ShouldSetIdOnEachMessage()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+
+                SetState(channel, ChannelState.Attached);
+
+                List<Message> receivedMessages = new List<Message>();
+                channel.Subscribe(msg => { receivedMessages.Add(msg); });
+
+                var protocolMessage = SetupTestProtocolMessage();
+                client.FakeProtocolMessageReceived(protocolMessage);
+
+                await client.ProcessCommands();
+
+                receivedMessages.Should().HaveCount(3);
+                receivedMessages.Select(x => x.Id).Should().BeEquivalentTo(
+                    $"{protocolMessage.Id}:0",
+                    $"{protocolMessage.Id}:1",
+                    $"{protocolMessage.Id}:2");
+            }
+
+            [Fact]
+            public async Task WithMultipleMessagesHaveIds_ShouldPreserveTheirIds()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+
+                SetState(channel, ChannelState.Attached);
+
+                List<Message> receivedMessages = new List<Message>();
+                channel.Subscribe(msg => { receivedMessages.Add(msg); });
+
+                var protocolMessage = SetupTestProtocolMessage(messages: new[]
+                {
+                    new Message("message1", "data") { Id = "1" },
+                    new Message("message2", "data") { Id = "2" },
+                    new Message("message3", "data") { Id = "3" },
+                });
+
+                client.FakeProtocolMessageReceived(protocolMessage);
+
+                await client.ProcessCommands();
+
+                receivedMessages.Should().HaveCount(3);
+                receivedMessages.Select(x => x.Id)
+                    .Should()
+                    .BeEquivalentTo("1", "2", "3");
+            }
+
+            [Theory]
+            [InlineData("protocolMessageConnId", null, "protocolMessageConnId")]
+            [InlineData("protocolMessageConnId", "messageConId", "messageConId")]
+            public async Task WithMessageWithConnectionIdEqualTo_ShouldBeEqualToExpected(
+                string protocolMessageConId,
+                string messageConId,
+                string expectedConnId)
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+
+                SetState(channel, ChannelState.Attached);
+
+                Message receivedMessage = null;
+                channel.Subscribe(msg => { receivedMessage = msg; });
+
+                var protocolMessage = SetupTestProtocolMessage(protocolMessageConId, messages: new[]
+                {
+                    new Message("message1", "data") { Id = "1", ConnectionId = messageConId },
+                });
+
+                client.FakeProtocolMessageReceived(protocolMessage);
+
+                await client.ProcessCommands();
+                receivedMessage.ConnectionId.Should().Be(expectedConnId);
+            }
+
+            [Fact]
+            public async Task WithProtocolMessage_ShouldSetMessageTimestampWhenNotThere()
+            {
+                SetNowFunc(() => DateTimeOffset.UtcNow);
+                var timeStamp = Now;
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+
+                SetState(channel, ChannelState.Attached);
+
+                List<Message> receivedMessages = new List<Message>();
+                channel.Subscribe(msg => { receivedMessages.Add(msg); });
+
+                var protocolMessage = SetupTestProtocolMessage(
+                    timestamp: timeStamp,
+                    messages: new[]
+                    {
+                        new Message("message1", "data"),
+                        new Message("message1", "data") { Timestamp = timeStamp.AddMinutes(1) },
+                    });
+
+                client.FakeProtocolMessageReceived(protocolMessage);
+
+                await client.ProcessCommands();
+                await Task.Delay(50);
+
+                receivedMessages.Should().HaveCount(2);
+                receivedMessages.First().Timestamp.Should().Be(timeStamp);
+                receivedMessages.Last().Timestamp.Should().Be(timeStamp.AddMinutes(1));
+            }
+
+            [Fact]
+            [Trait("spec", "RTL16")]
+            public async Task SetChannelOptions_ShouldUpdateStoreOptionsOnTheChannel()
+            {
+                var (_, channel) = await GetClientAndChannel(_switchBinaryOff);
+                var newOptions = new ChannelOptions(true);
+                channel.Options.Should().NotBeSameAs(newOptions);
+
+                channel.SetOptions(newOptions);
+
+                channel.Options.Should().BeSameAs(newOptions);
+            }
+
+            [Fact]
+            [Trait("spec", "RTL16a")]
+            public async Task SetChannelOptionsWithoutModesOrParams_ShouldIndicateSuccessImmediately()
+            {
+                var (_, channel) = await GetClientAndChannel(_switchBinaryOff);
+                var newOptions = new ChannelOptions(true);
+                channel.Options.Should().NotBeSameAs(newOptions);
+                var states = new List<ChannelState>();
+                channel.On(x => states.Add(x.Current));
+
+                await channel.SetOptionsAsync(newOptions);
+
+                channel.Options.Should().BeSameAs(newOptions);
+                states.Should().BeEmpty(); // No state change happened.
+            }
+
+            [Fact]
+            [Trait("spec", "RTL16a")]
+            public async Task SetOptions_WithSameModesAndParams_ShouldIndicateSuccessImmediately()
+            {
+                var client = await GetConnectedClient(_switchBinaryOff);
+                var options = new ChannelOptions(channelParams: new ChannelParams { { "test", "test" } }, modes: new ChannelModes(ChannelMode.Presence));
+                var newOptions = new ChannelOptions(true, channelParams: new ChannelParams { { "test", "test" } }, modes: new ChannelModes(ChannelMode.Presence));
+                var channel = client.Channels.Get("test", options);
+                ((RealtimeChannel)channel).SetChannelState(ChannelState.Attached);
+
+                channel.Options.Should().NotBeSameAs(newOptions);
+                var states = new List<ChannelState>();
+                channel.On(x => states.Add(x.Current));
+
+                await channel.SetOptionsAsync(newOptions);
+
+                channel.Options.Should().BeSameAs(newOptions);
+                states.Should().BeEmpty(); // No state change happened.
+            }
+
+            [Fact]
+            [Trait("spec", "RTL17")]
+            public async Task WhenMessageReceivedWhileChannelIsAttaching_ShouldIgnoreMessage()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+
+                SetState(channel, ChannelState.Attached);
+                List<Message> received = new List<Message>();
+                channel.Subscribe(received.Add);
+
+                await ReceiveMessage("1");
+                received.Should().Contain(x => x.Id == "1");
+
+                SetState(channel, ChannelState.Attaching);
+                await ReceiveMessage("2");
+                received.Should().NotContain(x => x.Id == "2");
+
+                SetState(channel, ChannelState.Attached);
+                await ReceiveMessage("3");
+                received.Should().Contain(x => x.Id == "3");
+
+                Task ReceiveMessage(string id)
+                {
+                    var protocolMessage = new ProtocolMessage(ProtocolMessage.MessageAction.Message)
+                    {
+                        Channel = channel.Name,
+                        Messages = new[] { new Message { Id = id, Data = "message " }, },
+                    };
+                    return client.ProcessMessage(protocolMessage);
+                }
+            }
+
+            private ProtocolMessage SetupTestProtocolMessage(
+                string connectionId = null,
+                DateTimeOffset? timestamp = null,
+                Message[] messages = null)
+            {
+                var protocolMessage = new ProtocolMessage(ProtocolMessage.MessageAction.Message, "test")
+                {
+                    ConnectionId = connectionId,
+                    Timestamp = timestamp,
+                    Id = "protocolMessageId",
+                    Messages = messages ?? new[]
+                    {
+                        new Message("message1", "data"),
+                        new Message("message2", "data"),
+                        new Message("message3", "data"),
+                    }
+                };
+                return protocolMessage;
+            }
+
+            public SubscribeSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL8")]
+        public class UnsubscribeSpecs : ChannelSpecs
+        {
+            private readonly Action<Message> _handler = message => throw new AssertionFailedException("This handler should no longer be called");
+
+            [Fact]
+            [Trait("spec", "RTL8a")]
+            public async Task ShouldRemoveHandlerFromSubscribers()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+                SetState(channel, ChannelState.Attached);
+
+                channel.Subscribe(_handler);
+                channel.Unsubscribe(_handler);
+                client.FakeMessageReceived(new Message("test", "best"), channel.Name);
+
+                // Handler should not throw
+            }
+
+            [Fact]
+            [Trait("spec", "RTL8b")]
+            public async Task WithEventName_ShouldUnsubscribeHandlerFromTheSpecifiedEvent()
+            {
+                var (client, channel) = await GetClientAndChannel(_switchBinaryOff);
+                SetState(channel, ChannelState.Attached);
+                channel.Subscribe("test", _handler);
+                channel.Unsubscribe("test", _handler);
+                client.FakeMessageReceived(new Message("test", "best"), channel.Name);
+
+                // Handler should not throw
+            }
+
+            public UnsubscribeSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL10")]
+        public class HistorySpecs : ChannelSpecs
+        {
+            [Fact]
+            [Trait("spec", "RTL10a")]
+            public async Task ShouldCallRestClientToGetHistory()
+            {
+                var client = await GetConnectedClient();
+                var channel = client.Channels.Get("history");
+
+                await channel.HistoryAsync();
+
+                LastRequest.Url.Should().Be($"/channels/{channel.Name}/messages");
+            }
+
+            public HistorySpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        /// <summary>
+        /// channelSerial is the only continuity signal a reattach carries now that RTN15g and RTL4j
+        /// are deleted at 6.1.0, so its three invariants are pinned directly: RTL15b sets it, RTL15b2
+        /// says which states clear it, and RTL4c1 puts it on the outgoing ATTACH.
+        /// </summary>
+        [Trait("spec", "RTL15b")]
+        public class ChannelSerialSpecs : ChannelSpecs
+        {
+            [Theory]
+            [InlineData(ChannelState.Suspended, true)]
+            [InlineData(ChannelState.Detached, false)]
+            [InlineData(ChannelState.Failed, false)]
+            [Trait("spec", "RTL15b2")]
+            public async Task OnAStateChange_ShouldClearTheSerialOnlyWhereRTL15b2SaysTo(ChannelState state, bool shouldRetain)
+            {
+                // RTL15b2 - "If the channel enters the DETACHED or FAILED state, it must clear its
+                // channelSerial. (Unlike previous spec versions, it must not clear it when entering
+                // the SUSPENDED state)." Keeping it through SUSPENDED is what lets the reattach after
+                // an RTL4f attach timeout, or after the connection suspends and RTL3c suspends every
+                // channel, still ask to continue where it left off.
+                var (client, channel) = await GetClientAndChannel();
+                await AttachWithChannelSerial(client, channel, "serial-1");
+
+                SetState(channel, state, state == ChannelState.Failed ? new ErrorInfo("failed") : null);
+                await client.ProcessCommands();
+
+                if (shouldRetain)
+                {
+                    channel.Properties.ChannelSerial.Should().Be("serial-1");
+                }
+                else
+                {
+                    channel.Properties.ChannelSerial.Should().BeNull();
+                }
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4c1")]
+            public async Task OnAReattach_TheAttachShouldCarryTheChannelSerial()
+            {
+                // RTL4c1 - "The ATTACH ProtocolMessage channelSerial field must be set to the RTL15b
+                // channelSerial." Reattaching out of SUSPENDED is the case that matters: the serial
+                // survived per RTL15b2, and putting it on the wire is the whole of what replaced
+                // ATTACH_RESUME.
+                var (client, channel) = await GetClientAndChannel();
+                await AttachWithChannelSerial(client, channel, "serial-1");
+
+                SetState(channel, ChannelState.Suspended);
+                await client.ProcessCommands();
+                LastCreatedTransport.SentMessages.Clear();
+
+                channel.Attach();
+                await client.ProcessCommands();
+
+                var attach = SentProtocolMessages()
+                    .Should().ContainSingle(x => x.Action == ProtocolMessage.MessageAction.Attach)
+                    .Subject;
+                attach.ChannelSerial.Should().Be("serial-1");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4c1")]
+            public async Task WithNoSerialYet_TheAttachShouldNotInventOne()
+            {
+                // RTL4c1's second sentence - "If the RTL15b channelSerial is not set, the field may be
+                // set to null or omitted." A first attach has nothing to continue from.
+                var (client, channel) = await GetClientAndChannel();
+
+                channel.Attach();
+                await client.ProcessCommands();
+
+                SentProtocolMessages()
+                    .Should().ContainSingle(x => x.Action == ProtocolMessage.MessageAction.Attach)
+                    .Subject.ChannelSerial.Should().BeNull();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL4j")]
+            public async Task AcrossTheLifecycle_NoOutgoingMessageShouldSetAttachResume()
+            {
+                // RTL4j and its sub-clauses are deleted as of 6.1.0: "SDKs need not set ATTACH_RESUME
+                // any more". The Flag constant stays per TR3f, so nothing but a sweep of what actually
+                // goes out will notice it being set again - and the reattaches below are exactly the
+                // ones the deleted clauses used to demand it on.
+                var (client, channel) = await GetClientAndChannel();
+                await AttachWithChannelSerial(client, channel, "serial-1");
+
+                // A reattach out of SUSPENDED, where the serial survives.
+                SetState(channel, ChannelState.Suspended);
+                await client.ProcessCommands();
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = "serial-2",
+                });
+                await client.ProcessCommands();
+
+                // And one out of DETACHED, where it does not.
+                SetState(channel, ChannelState.Detached);
+                await client.ProcessCommands();
+                channel.Attach();
+                await client.ProcessCommands();
+
+                channel.Publish("name", "data");
+                await client.ProcessCommands();
+
+                var sent = SentProtocolMessages().ToList();
+                sent.Should().Contain(
+                    x => x.Action == ProtocolMessage.MessageAction.Attach,
+                    "the sweep has to have seen the ATTACHes for its result to mean anything");
+                sent.Where(x => x.Flags.HasValue
+                                && ((ProtocolMessage.Flag)x.Flags.Value).HasFlag(ProtocolMessage.Flag.AttachResume))
+                    .Should().BeEmpty();
+            }
+
+            private IEnumerable<ProtocolMessage> SentProtocolMessages() =>
+                LastCreatedTransport.SentMessages.Select(x => x.Original).Where(x => x != null);
+
+            /// <summary>
+            /// Attaches the channel and hands it an ATTACHED carrying a channelSerial, which is what
+            /// RTL15b reads. Asserting the serial landed makes RTL15b itself part of every case below.
+            /// </summary>
+            private async Task AttachWithChannelSerial(PubSubRealtimeClient client, IRealtimeChannel channel, string serial)
+            {
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = serial,
+                });
+                await client.ProcessCommands();
+
+                channel.State.Should().Be(ChannelState.Attached);
+                channel.Properties.ChannelSerial.Should().Be(serial, "RTL15b sets it from the ATTACHED");
+            }
+
+            public ChannelSerialSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL10b")]
+        public class HistoryUntilAttachSpecs : ChannelSpecs
+        {
+            private const string AttachSerial = "attach-serial-1";
+
+            [Fact]
+            public async Task HistoryAsync_WithUntilAttach_ShouldSendTheAttachSerialAsFromSerial()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+
+                await channel.HistoryAsync(true);
+
+                LastRequest.Url.Should().Be("/channels/test/messages");
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+            }
+
+            [Fact]
+            public async Task HistoryAsync_WithQueryAndUntilAttach_ShouldSendTheAttachSerialAndKeepTheQuery()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+
+                await channel.HistoryAsync(new PaginatedRequestParams { Limit = 10 }, true);
+
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+                LastRequest.AssertContainsParameter("limit", "10");
+            }
+
+            [Fact]
+            public async Task HistoryAsync_WithUntilAttachOnAChannelThatIsNotAttached_ShouldThrow()
+            {
+                var (_, channel) = await GetClientAndChannel();
+                channel.State.Should().Be(ChannelState.Initialized);
+
+                await Assert.ThrowsAsync<AblyException>(() => channel.HistoryAsync(true));
+                await Assert.ThrowsAsync<AblyException>(() => channel.HistoryAsync(new PaginatedRequestParams(), true));
+            }
+
+            [Fact]
+            public async Task HistoryAsync_WithoutUntilAttach_ShouldNotSendFromSerialEvenWhenNotAttached()
+            {
+                var (_, channel) = await GetClientAndChannel();
+
+                await channel.HistoryAsync(false);
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+
+                await channel.HistoryAsync(new PaginatedRequestParams { Limit = 5 }, false);
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+                LastRequest.AssertContainsParameter("limit", "5");
+
+                await channel.HistoryAsync();
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+            }
+
+            [Fact]
+            [Trait("spec", "RTL10b")]
+            public async Task HistoryAsync_WithUntilAttach_ShouldLeaveTheCallersQueryUnchanged()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+                var query = new PaginatedRequestParams { Limit = 10 };
+
+                // A second call with the same query must not fail on the fromSerial the first one added.
+                await channel.HistoryAsync(query, true);
+                await channel.HistoryAsync(query, true);
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+#pragma warning disable CS0618 // the deprecated presence overload shares the untilAttach helper
+                await channel.Presence.HistoryAsync(query, true);
+#pragma warning restore CS0618
+                LastRequest.AssertContainsParameter("fromSerial", AttachSerial);
+                query.ExtraParameters.Should().BeEmpty();
+
+                await channel.HistoryAsync(query, false);
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+                LastRequest.AssertContainsParameter("limit", "10");
+
+                await channel.HistoryAsync(PaginatedRequestParams.Empty, true);
+                PaginatedRequestParams.Empty.ExtraParameters.Should().BeEmpty();
+            }
+
+            [Fact]
+            [Trait("spec", "RTL10a")]
+            [Trait("spec", "RTP12")]
+            public async Task HistoryAsync_OnACipherChannel_ShouldDecryptTheRetrievedMessages()
+            {
+                var options = new ChannelOptions(Crypto.GetDefaultParams());
+                var message = new Message("n", "secret message");
+                var presenceMessage = new PresenceMessage(PresenceAction.Enter, "client", "secret presence");
+                MessageHandler.EncodePayloads(options.ToDecodingContext(), new IMessage[] { message, presenceMessage }).IsSuccess.Should().BeTrue();
+                message.Encoding.Should().Contain("cipher+aes-256-cbc");
+
+                var client = await GetConnectedClient(handleRequestFunc: request =>
+                    new AblyResponse
+                    {
+                        TextResponse = request.Url.EndsWith("/presence/history")
+                            ? JsonHelper.Serialize(new[] { presenceMessage })
+                            : JsonHelper.Serialize(new[] { message }),
+                    }.ToTask());
+
+                // Each call starts without the REST channel, so the call itself has to bring the options.
+                var channel = client.Channels.Get("test", options);
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = AttachSerial,
+                });
+                await client.ProcessCommands();
+
+                foreach (var history in new Func<Task<PaginatedResult<Message>>>[]
+                {
+                    () => channel.HistoryAsync(),
+                    () => channel.HistoryAsync(true),
+                    () => channel.HistoryAsync(new PaginatedRequestParams()),
+                    () => channel.HistoryAsync(new PaginatedRequestParams(), true),
+                })
+                {
+                    client.HttpClient.Channels.Release(channel.Name);
+                    (await history()).Items.Should().ContainSingle().Which.Data.Should().Be("secret message");
+                }
+
+                client.HttpClient.Channels.Release(channel.Name);
+                (await channel.Presence.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret presence");
+            }
+
+            [Fact]
+            public async Task PresenceHistoryAsync_WithoutUntilAttach_ShouldNotSendFromSerial()
+            {
+                var (_, channel) = await GetAttachedClientAndChannel();
+
+                await channel.Presence.HistoryAsync();
+
+                LastRequest.Url.Should().Be("/channels/test/presence/history");
+                LastRequest.QueryParameters.Should().NotContainKey("fromSerial");
+            }
+
+            private async Task<(PubSubRealtimeClient, IRealtimeChannel)> GetAttachedClientAndChannel()
+            {
+                var (client, channel) = await GetClientAndChannel();
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = AttachSerial,
+                });
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Attached);
+                return (client, channel);
+            }
+
+            public HistoryUntilAttachSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        [Trait("spec", "RTL10a")]
+        [Trait("spec", "RTP12a")]
+        [Trait("spec", "RTL28")]
+        [Trait("spec", "RTL31")]
+        [Trait("spec", "RTAN3a")]
+        [Trait("spec", "RSN3c")]
+        public class RetrievalHttpChannelOptionsSpecs : ChannelSpecs
+        {
+            private const string Serial = "01826232498871-001@abcdefghij:001";
+
+            public static IEnumerable<object[]> Retrievals => new[]
+            {
+                "History", "HistoryUntilAttach", "PresenceHistory", "GetMessage", "GetMessageVersions", "AnnotationsGet",
+            }.Select(x => new object[] { x });
+
+            [Theory]
+            [MemberData(nameof(Retrievals))]
+            public async Task Retrieval_ShouldKeepTheCipherOfTheHttpChannelOfTheSameName(string retrieval)
+            {
+                // The realtime retrievals go over REST with the realtime channel's options. Getting the
+                // app's HttpClient channel with those options would replace its own (RSN3c), so a later
+                // REST publish on it would go out unencrypted.
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var cipher = new ChannelOptions(Crypto.GetDefaultParams());
+                var httpChannel = (HttpChannel)client.HttpClient.Channels.Get("test", cipher);
+                var realtimeChannel = await GetAttachedChannel(client, new ChannelOptions());
+
+                await Retrieve(realtimeChannel, retrieval);
+
+                client.HttpClient.Channels.Get("test").Should().BeSameAs(httpChannel);
+                httpChannel.Options.Should().BeSameAs(cipher);
+                var published = await PublishOnHttpChannel(httpChannel);
+                published.Encoding.Should().Contain("cipher+aes-256-cbc");
+                published.Data.Should().NotBe("secret");
+            }
+
+            [Theory]
+            [MemberData(nameof(Retrievals))]
+            public async Task Retrieval_OnACipherChannel_ShouldNotEncryptThePlainHttpChannelOfTheSameName(string retrieval)
+            {
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var httpChannel = (HttpChannel)client.HttpClient.Channels.Get("test");
+                var optionsBefore = httpChannel.Options; // null, as the app gave none
+                var realtimeChannel = await GetAttachedChannel(client, new ChannelOptions(Crypto.GetDefaultParams()));
+
+                await Retrieve(realtimeChannel, retrieval);
+
+                client.HttpClient.Channels.Get("test").Should().BeSameAs(httpChannel);
+                ReferenceEquals(httpChannel.Options, optionsBefore).Should().BeTrue("the realtime retrieval must not set options on the app's channel");
+                var published = await PublishOnHttpChannel(httpChannel);
+                published.Data.Should().Be("secret");
+                published.Encoding.Should().BeNullOrEmpty();
+            }
+
+            [Fact]
+            public async Task RestChannel_ShouldBeReusedWhileTheOptionsAreUnchanged()
+            {
+                var client = await GetConnectedClient(handleRequestFunc: Respond);
+                var channel = (RealtimeChannel)await GetAttachedChannel(client, new ChannelOptions(Crypto.GetDefaultParams()));
+
+                var restChannel = channel.RestChannel;
+                await channel.HistoryAsync();
+                await channel.Presence.HistoryAsync();
+
+                channel.RestChannel.Should().BeSameAs(restChannel);
+                restChannel.Should().NotBeSameAs(client.HttpClient.Channels.Get("test"));
+            }
+
+            [Theory]
+            [InlineData("SetOptions")]
+            [InlineData("ChannelsGet")]
+            [Trait("spec", "RTL16")]
+            [Trait("spec", "RTS3c")]
+            public async Task Retrieval_AfterTheChannelOptionsChange_ShouldDecodeWithTheNewOptions(string update)
+            {
+                var first = new ChannelOptions(Crypto.GetDefaultParams());
+                var second = new ChannelOptions(Crypto.GetDefaultParams());
+                var serverOptions = first;
+                var client = await GetConnectedClient(handleRequestFunc: request =>
+                {
+                    // The server's copy is encrypted with whichever key the channel uses at the time.
+                    var message = new Message("n", "secret") { Serial = Serial };
+                    var presenceMessage = new PresenceMessage(PresenceAction.Enter, "client", "secret");
+                    MessageHandler.EncodePayloads(serverOptions.ToDecodingContext(), new IMessage[] { message, presenceMessage });
+                    return new AblyResponse
+                    {
+                        TextResponse = request.Url.EndsWith("/presence/history") ? JsonHelper.Serialize(new[] { presenceMessage })
+                            : request.Url.EndsWith("/messages") ? JsonHelper.Serialize(new[] { message })
+                            : JsonHelper.Serialize(message),
+                    }.ToTask();
+                });
+                var channel = await GetAttachedChannel(client, first);
+                (await channel.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+
+                serverOptions = second;
+                if (update == "SetOptions")
+                {
+                    channel.SetOptions(second);
+                }
+                else
+                {
+                    client.Channels.Get("test", second).Should().BeSameAs(channel);
+                }
+
+                channel.Options.Should().BeSameAs(second);
+                (await channel.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+                (await channel.Presence.HistoryAsync()).Items.Should().ContainSingle().Which.Data.Should().Be("secret");
+                (await channel.GetMessageAsync(Serial)).Data.Should().Be("secret");
+            }
+
+            private static Task<AblyResponse> Respond(AblyRequest request)
+            {
+                string response;
+                if (request.Method == System.Net.Http.HttpMethod.Post)
+                {
+                    response = "{\"serials\":[\"serial-1\"]}";
+                }
+                else if (request.Url.EndsWith("/messages") || request.Url.EndsWith("/history")
+                    || request.Url.EndsWith("/versions") || request.Url.EndsWith("/annotations"))
+                {
+                    response = "[]";
+                }
+                else
+                {
+                    response = JsonHelper.Serialize(new Message("n", "data") { Serial = Serial });
+                }
+
+                return new AblyResponse { TextResponse = response }.ToTask();
+            }
+
+            private static Task Retrieve(IRealtimeChannel channel, string retrieval)
+            {
+                switch (retrieval)
+                {
+                    case "History":
+                        return channel.HistoryAsync();
+                    case "HistoryUntilAttach":
+                        return channel.HistoryAsync(new PaginatedRequestParams(), true);
+                    case "PresenceHistory":
+                        return channel.Presence.HistoryAsync();
+                    case "GetMessage":
+                        return channel.GetMessageAsync(Serial);
+                    case "GetMessageVersions":
+                        return channel.GetMessageVersionsAsync(Serial);
+                    case "AnnotationsGet":
+                        return channel.Annotations.GetAsync(Serial);
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(retrieval), retrieval, null);
+                }
+            }
+
+            private async Task<IRealtimeChannel> GetAttachedChannel(PubSubRealtimeClient client, ChannelOptions options)
+            {
+                var channel = client.Channels.Get("test", options);
+                channel.Attach();
+                await client.ProcessMessage(new ProtocolMessage(ProtocolMessage.MessageAction.Attached)
+                {
+                    Channel = channel.Name,
+                    ChannelSerial = "attach-serial-1",
+                });
+                await client.ProcessCommands();
+                channel.State.Should().Be(ChannelState.Attached);
+                return channel;
+            }
+
+            private async Task<Message> PublishOnHttpChannel(HttpChannel channel)
+            {
+                Requests.Clear();
+                await channel.PublishAsync("n", "secret");
+                return ((IEnumerable<Message>)Requests.Single().PostData).Single();
+            }
+
+            public RetrievalHttpChannelOptionsSpecs(ITestOutputHelper output)
+                : base(output)
+            {
+            }
+        }
+
+        protected void SetState(
+            IRealtimeChannel channel,
+            ChannelState state,
+            ErrorInfo error = null,
+            ProtocolMessage message = null)
+        {
+            ((RealtimeChannel)channel).SetChannelState(state, error, message);
+        }
+
+        public ChannelSpecs(ITestOutputHelper output)
+            : base(output)
+        {
+        }
+    }
+}

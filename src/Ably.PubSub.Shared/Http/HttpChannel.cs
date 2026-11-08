@@ -1,0 +1,382 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Net;
+using Ably.PubSub.Encryption;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Push;
+using Newtonsoft.Json;
+
+namespace Ably.PubSub.Http
+{
+#pragma warning disable SA1600
+
+    /// <summary>
+    /// The Ably Realtime service organises the traffic within any application into named channels.
+    /// Channels are the "unit" of message distribution; clients attach to channels to subscribe to messages,
+    /// and every message broadcast by the service is associated with a unique channel.
+    /// A channel cannot be instantiated but needs to be created using the PubSubHttpClient.Channels.Get("channelname").
+    /// </summary>
+    public class HttpChannel : IHttpChannel, IPresence
+    {
+        private readonly PubSubHttpClient _ablyRest;
+        private readonly string _basePath;
+        private ChannelOptions _options;
+        private readonly PushChannel _pushChannel;
+        private readonly HttpAnnotations _annotations;
+
+        internal HttpChannel(PubSubHttpClient ablyRest, string name, ChannelOptions options, IMobileDevice mobileDevice = null)
+        {
+            Name = name;
+            _ablyRest = ablyRest;
+            _options = options;
+            _basePath = $"/channels/{name.EncodeUriPart()}";
+            _annotations = new HttpAnnotations(ablyRest, this, _basePath);
+
+            if (mobileDevice != null)
+            {
+                _pushChannel = new PushChannel(name, ablyRest);
+            }
+        }
+
+        /// <inheritdoc/>
+        public string Name { get; private set; }
+
+        /// <summary>
+        /// Channel options of this channel.
+        /// </summary>
+        public ChannelOptions Options
+        {
+            get => _options;
+            set => _options = value ?? new ChannelOptions();
+        }
+
+        /// <inheritdoc />
+        public PushChannel Push
+        {
+            get
+            {
+                if (_pushChannel is null)
+                {
+                    _ablyRest.Logger.Debug($"Device push notifications are not available in Ably Pub/Sub 2.0, so channel.Push is null. To request this feature, comment on {PushRealtime.DevicePushFeatureRequestUrl}.");
+                    return null;
+                }
+
+                return _pushChannel;
+            }
+        }
+
+        /// <inheritdoc/>
+        public IPresence Presence => this;
+
+        /// <inheritdoc/>
+        public HttpAnnotations Annotations => _annotations;
+
+        /// <inheritdoc/>
+        public Task<PublishResult> PublishAsync(string name, object data, string clientId = null)
+        {
+            return PublishAsync(new Message(name, data, clientId));
+        }
+
+        /// <inheritdoc/>
+        public Task<PublishResult> PublishAsync(Message message)
+        {
+            return PublishAsync(new[] { message });
+        }
+
+        /// <inheritdoc/>
+        public async Task<PublishResult> PublishAsync(IEnumerable<Message> messages)
+        {
+            var result = _ablyRest.AblyAuth.ValidateClientIds(messages);
+            if (result.IsFailure)
+            {
+                throw new AblyException(result.Error);
+            }
+
+            var request = _ablyRest.CreatePostRequest(_basePath + "/messages", Options);
+
+            // if idempotentRestPublishing is enabled
+            if (_ablyRest.Options.IdempotentRestPublishing)
+            {
+                // and all Messages have an empty id attribute
+                if (messages.All(m => m.Id == null))
+                {
+                    // generate a base id string by base64-encoding a sequence of at least 9 bytes
+                    var baseId = Crypto.GetRandomMessageId();
+                    int serial = 0;
+                    foreach (var message in messages)
+                    {
+                        // each message gets a unique id of the form <base id>:<serial>
+                        message.Id = $"{baseId}:{serial}";
+                        serial++;
+                    }
+                }
+            }
+
+            request.PostData = messages;
+
+            // RSL1n: the response body is a superset of a PublishResult. An empty or absent body yields an
+            // empty (never null) PublishResult; a malformed body surfaces as an exception.
+            try
+            {
+                var publishResult = await _ablyRest.ExecuteRequest<PublishResult>(request);
+                return publishResult ?? new PublishResult();
+            }
+            catch (JsonException ex)
+            {
+                throw new AblyException(
+                    new ErrorInfo("Unable to parse the publish response body: " + ex.Message, ErrorCodes.InternalError, HttpStatusCode.InternalServerError),
+                    ex);
+            }
+        }
+
+        /// <inheritdoc/>
+        Task<PaginatedResult<PresenceMessage>> IPresence.GetAsync(int? limit, string clientId, string connectionId)
+        {
+            if (limit.HasValue && (limit < 0 || limit > 1000))
+            {
+                throw new ArgumentException("Limit must be between 0 and 1000", nameof(limit));
+            }
+
+            var presenceLimit = limit ?? Defaults.QueryLimit;
+
+            var request = _ablyRest.CreateGetRequest(_basePath + "/presence", Options);
+
+            request.QueryParameters.Add("limit", presenceLimit.ToString());
+            if (clientId.IsNotEmpty())
+            {
+                request.QueryParameters.Add("clientId", clientId);
+            }
+
+            if (connectionId.IsNotEmpty())
+            {
+                request.QueryParameters.Add("connectionId", connectionId);
+            }
+
+            return _ablyRest.ExecutePaginatedRequest(request, Presence.GetAsync);
+        }
+
+        /// <inheritdoc/>
+        Task<PaginatedResult<PresenceMessage>> IPresence.GetAsync(PaginatedRequestParams query) => GetAsync(query);
+
+        /// <summary>
+        /// Obtain the set of members currently present for a channel.
+        /// </summary>
+        /// <param name="query"><see cref="PaginatedRequestParams"/> query.</param>
+        /// <returns><see cref="PaginatedResult{T}"/> of Presence messages.</returns>
+        protected virtual Task<PaginatedResult<PresenceMessage>> GetAsync(PaginatedRequestParams query)
+        {
+            if (query == null)
+            {
+                // Fall back on the default implementation
+                return Presence.GetAsync();
+            }
+
+            query.Validate();
+
+            var request = _ablyRest.CreateGetRequest(_basePath + "/presence", Options);
+            request.AddQueryParameters(query.GetParameters());
+            return _ablyRest.ExecutePaginatedRequest(request, Presence.GetAsync);
+        }
+
+        /// <inheritdoc/>
+        Task<PaginatedResult<PresenceMessage>> IPresence.HistoryAsync()
+        {
+            return Presence.HistoryAsync(new PaginatedRequestParams());
+        }
+
+        /// <inheritdoc/>
+        Task<PaginatedResult<PresenceMessage>> IPresence.HistoryAsync(PaginatedRequestParams query)
+        {
+            query = query ?? new PaginatedRequestParams();
+
+            query.Validate();
+
+            var request = _ablyRest.CreateGetRequest(_basePath + "/presence/history", Options);
+            request.AddQueryParameters(query.GetParameters());
+            return _ablyRest.ExecutePaginatedRequest(request, Presence.HistoryAsync);
+        }
+
+        /// <inheritdoc/>
+        public Task<PaginatedResult<Message>> HistoryAsync()
+        {
+            return HistoryAsync(new PaginatedRequestParams());
+        }
+
+        /// <inheritdoc/>
+        public Task<PaginatedResult<Message>> HistoryAsync(PaginatedRequestParams query)
+        {
+            query = query ?? new PaginatedRequestParams();
+
+            query.Validate();
+
+            var request = _ablyRest.CreateGetRequest(_basePath + "/messages", Options);
+
+            request.AddQueryParameters(query.GetParameters());
+
+            return _ablyRest.ExecutePaginatedRequest(request, HistoryAsync);
+        }
+
+        /// <inheritdoc/>
+        public async Task<Message> GetMessageAsync(string serial)
+        {
+            // RSL11a
+            ValidateSerial(serial);
+
+            // RSL11b
+            var request = _ablyRest.CreateGetRequest($"{_basePath}/messages/{serial.EncodeUriPart()}", Options);
+            var message = await _ablyRest.ExecuteRequest<Message>(request);
+            if (message == null)
+            {
+                throw new AblyException(new ErrorInfo($"No message was returned for serial '{serial}'", ErrorCodes.InternalError, HttpStatusCode.InternalServerError));
+            }
+
+            // A single message response bypasses the paginated decode path, so the TM2 defaults
+            // and the payload decoding are applied here (RSL11c).
+            MessageHandler.ApplyTm2Defaults(message);
+            return MessageHandler.FromEncoded(message, Options);
+        }
+
+        /// <inheritdoc/>
+        public Task<Message> GetMessageAsync(Message message)
+        {
+            return GetMessageAsync(message?.Serial);
+        }
+
+        /// <inheritdoc/>
+        public Task<UpdateDeleteResult> UpdateMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
+        {
+            return EditMessageAsync(message, operation, parameters, MessageAction.MessageUpdate);
+        }
+
+        /// <inheritdoc/>
+        public Task<UpdateDeleteResult> DeleteMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
+        {
+            return EditMessageAsync(message, operation, parameters, MessageAction.MessageDelete);
+        }
+
+        /// <inheritdoc/>
+        public Task<UpdateDeleteResult> AppendMessageAsync(Message message, MessageOperation operation = null, IDictionary<string, string> parameters = null)
+        {
+            return EditMessageAsync(message, operation, parameters, MessageAction.MessageAppend);
+        }
+
+        /// <inheritdoc/>
+        public Task<PaginatedResult<Message>> GetMessageVersionsAsync(string serial, PaginatedRequestParams query = null)
+        {
+            // RSL14a
+            ValidateSerial(serial);
+
+            query = query ?? new PaginatedRequestParams();
+            query.Validate();
+
+            // RSL14b
+            var request = _ablyRest.CreateGetRequest($"{_basePath}/messages/{serial.EncodeUriPart()}/versions", Options);
+            request.AddQueryParameters(query.GetParameters());
+
+            return _ablyRest.ExecutePaginatedRequest(request, next => GetMessageVersionsAsync(serial, next));
+        }
+
+        /// <inheritdoc/>
+        public Task<PaginatedResult<Message>> GetMessageVersionsAsync(Message message, PaginatedRequestParams query = null)
+        {
+            return GetMessageVersionsAsync(message?.Serial, query);
+        }
+
+        /// <inheritdoc/>
+        public PublishResult Publish(string name, object data, string clientId = null)
+        {
+            return AsyncHelper.RunSync(() => PublishAsync(name, data, clientId));
+        }
+
+        /// <inheritdoc/>
+        public PublishResult Publish(Message message)
+        {
+            return AsyncHelper.RunSync(() => PublishAsync(message));
+        }
+
+        /// <inheritdoc/>
+        public PublishResult Publish(IEnumerable<Message> messages)
+        {
+            return AsyncHelper.RunSync(() => PublishAsync(messages));
+        }
+
+        /// <inheritdoc/>
+        public PaginatedResult<Message> History()
+        {
+            return AsyncHelper.RunSync(HistoryAsync);
+        }
+
+        /// <inheritdoc/>
+        public PaginatedResult<Message> History(PaginatedRequestParams query)
+        {
+            return AsyncHelper.RunSync(() => HistoryAsync(query));
+        }
+
+        /// <inheritdoc/>
+        public async Task<ChannelDetails> StatusAsync()
+        {
+            AblyRequest request = _ablyRest.CreateGetRequest("/channels/" + Name);
+            return await _ablyRest.ExecuteRequest<ChannelDetails>(request);
+        }
+
+        /// <inheritdoc/>
+        public ChannelDetails Status()
+        {
+            return AsyncHelper.RunSync(StatusAsync);
+        }
+
+        private async Task<UpdateDeleteResult> EditMessageAsync(Message message, MessageOperation operation, IDictionary<string, string> parameters, MessageAction action)
+        {
+            // RSL15a, RSL15b1, RSL15b7, RSL15c - a fresh copy is sent, the caller's message is left alone.
+            var edit = Message.CreateEdit(message, operation, action);
+
+            var validation = _ablyRest.AblyAuth.ValidateClientIds(new[] { edit });
+            if (validation.IsFailure)
+            {
+                throw new AblyException(validation.Error);
+            }
+
+            // RSL15b - a single message (not an array) is sent; RSL15d - it is encoded when the request body is built.
+            var request = _ablyRest.CreatePatchRequest($"{_basePath}/messages/{edit.Serial.EncodeUriPart()}", Options);
+            request.PostData = edit;
+
+            // RSL15f
+            if (parameters != null)
+            {
+                foreach (var parameter in parameters)
+                {
+                    request.QueryParameters[parameter.Key] = parameter.Value;
+                }
+            }
+
+            // RSL15e - a body without a result is a server fault, unlike a publish (RSL1n), whose serials may be absent.
+            // A body such as {"versionSerial":null} is a valid result (UDR2a).
+            try
+            {
+                var result = await _ablyRest.ExecuteRequest<UpdateDeleteResult>(request);
+                if (result == null)
+                {
+                    throw new AblyException(new ErrorInfo("No versionSerial in the response", ErrorCodes.InternalError, HttpStatusCode.InternalServerError));
+                }
+
+                return result;
+            }
+            catch (JsonException ex)
+            {
+                throw new AblyException(
+                    new ErrorInfo("Unable to parse the response body: " + ex.Message, ErrorCodes.InternalError, HttpStatusCode.InternalServerError),
+                    ex);
+            }
+        }
+
+        private static void ValidateSerial(string serial)
+        {
+            if (serial.IsEmpty())
+            {
+                throw new AblyException(new ErrorInfo("A message serial is required", ErrorCodes.InvalidParameterValue, HttpStatusCode.BadRequest));
+            }
+        }
+    }
+}

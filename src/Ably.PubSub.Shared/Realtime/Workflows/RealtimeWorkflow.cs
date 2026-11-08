@@ -1,0 +1,1467 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
+using Ably.PubSub.Types;
+using Ably.PubSub.Utils;
+
+namespace Ably.PubSub.Realtime.Workflow
+{
+    /// <summary>
+    /// Realtime workflow has 2 roles
+    /// 1. It serializes requests coming from different threads and guarantees that they are executing one by one and in order
+    /// on a single thread. This makes it very easy to mutate state because we are immune from thread race conditions.
+    /// There requests are encapsulated in Command objects (objects inheriting from RealtimeCommand) which provide
+    /// information about what needs to happen and also hold any parameters necessary for the operation. For example if we take the
+    /// SetClosedStateCommand object. The intention is to change the Connection state to Closed but the Command object also contains the error
+    /// if any associated with this request. This makes logging very easy as we can clearly see the intent of the command and the parameters. Also in the
+    /// future we can parse the logs and easily recreate state in the library.
+    /// 2. Centralizes the logic for handling Commands. It is now much easier to find where things are happening. If you exclude
+    /// Channel presence and Channel state management, everything else could be found in this class. It does make it rather long but
+    /// the logic block are rather small and easy to understand.
+    /// </summary>
+    internal sealed class RealtimeWorkflow : IQueueCommand, IDisposable
+    {
+        private readonly CancellationTokenSource _heartbeatMonitorCancellationTokenSource;
+
+        // This is used for the tests so we can have a good
+        // way of figuring out when processing has finished
+        private volatile bool _processingCommand;
+        private bool _heartbeatMonitorDisconnectRequested;
+
+        private bool _warnedIdleCheckInactive;
+        private bool _disposedValue;
+
+        private PubSubRealtimeClient Client { get; }
+
+        private AblyAuth Auth => Client.HttpClient.AblyAuth;
+
+        public Connection Connection { get; }
+
+        public RealtimeChannels Channels { get; }
+
+        public ConnectionManager ConnectionManager => Connection.ConnectionManager;
+
+        public ILogger Logger { get; }
+
+        private RealtimeState State => Client.State;
+
+        private Func<DateTimeOffset> Now => Connection.Now;
+
+        internal ConnectionHeartbeatHandler HeartbeatHandler { get; }
+
+        internal ChannelMessageProcessor ChannelMessageProcessor { get; }
+
+        internal readonly List<(string, Func<ProtocolMessage, RealtimeState, Task<bool>>)> ProtocolMessageProcessors;
+
+        internal readonly Channel<RealtimeCommand> CommandChannel = Channel.CreateUnbounded<RealtimeCommand>(
+            new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false
+            });
+
+        public RealtimeWorkflow(PubSubRealtimeClient client, ILogger logger)
+        {
+            _heartbeatMonitorCancellationTokenSource = new CancellationTokenSource();
+
+            Client = client;
+            Client.HttpClient.AblyAuth.ExecuteCommand = cmd => QueueCommand(cmd);
+            Connection = client.Connection;
+            Channels = client.Channels;
+            Logger = logger;
+
+            SetInitialConnectionState();
+
+            HeartbeatHandler = new ConnectionHeartbeatHandler(Connection.ConnectionManager, logger);
+            ChannelMessageProcessor = new ChannelMessageProcessor(Channels, client.MessageHandler, logger);
+            ProtocolMessageProcessors = new List<(string, Func<ProtocolMessage, RealtimeState, Task<bool>>)>
+            {
+                ("State handler", (message, state) => ConnectionManager.State.OnMessageReceived(message, state)),
+                ("Heartbeat handler", HeartbeatHandler.OnMessageReceived),
+                ("Ack handler", (message, _) => HandleAckMessage(message)),
+                ("Ping handler", (message, _) => HandlePingMessage(message)),
+            };
+
+            Logger.Debug("Workflow initialised!");
+        }
+
+        private void SetInitialConnectionState()
+        {
+            var initialState = new ConnectionInitializedState(ConnectionManager, Logger);
+            State.Connection.CurrentStateObject = initialState;
+        }
+
+        public void Start()
+        {
+            ThreadPool.QueueUserWorkItem(
+                state =>
+                {
+                    _ = ((RealtimeWorkflow)state).Consume();
+                }, this);
+
+            _ = Task.Run(
+                async () =>
+                {
+                    var monitorToken = _heartbeatMonitorCancellationTokenSource.Token;
+
+                    try
+                    {
+                        while (true)
+                        {
+                            QueueCommand(HeartbeatMonitorCommand.Create(Now()).TriggeredBy("PubSubRealtimeClient.HeartbeatMonitor()"));
+                            await Client.Options.TimerScheduler.Delay(TimeSpan.FromMilliseconds(Client.Options.HeartbeatMonitorDelay), monitorToken);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Disposal. Not worth a line.
+                    }
+                    catch (Exception ex)
+                    {
+                        // Nothing observes this task, so without the catch anything thrown here
+                        // faults it silently and RTN23a detection is gone for the life of the client
+                        // with no trace of why. HeartbeatMonitorDelay is validated on the way in, so
+                        // reaching this means something unforeseen - which is precisely the case that
+                        // needs to be visible rather than inferred from a connection that never
+                        // notices it is dead.
+                        Logger.Error(
+                            "The RTN23a heartbeat monitor has stopped. Idle connection detection is " +
+                            "off for the rest of this client's life.",
+                            ex);
+                    }
+                },
+                _heartbeatMonitorCancellationTokenSource.Token);
+        }
+
+        public void QueueCommand(params RealtimeCommand[] commands)
+        {
+            foreach (var command in commands)
+            {
+                var writeResult = CommandChannel.Writer.TryWrite(command);
+
+                // This can only happen if the workflow is disposed.
+                if (writeResult == false)
+                {
+                    Logger.Warning(
+                        $"Cannot schedule command: {command.Explain()} because the execution channel is closed");
+                }
+            }
+        }
+
+        private async Task Consume()
+        {
+            try
+            {
+                Logger.Debug("Starting to process Workflow");
+
+                var reader = CommandChannel.Reader;
+                while (await reader.WaitToReadAsync())
+                {
+                    if (reader.TryRead(out RealtimeCommand cmd))
+                    {
+                        try
+                        {
+                            _processingCommand = true;
+
+                            int level = 0;
+                            var cmds = new List<RealtimeCommand> { cmd };
+                            while (cmds.Count > 0)
+                            {
+                                if (level > 5)
+                                {
+                                    throw new Exception("Something is wrong. There shouldn't be 5 levels of nesting");
+                                }
+
+                                var cmdsToExecute = cmds.ToArray();
+                                cmds.Clear();
+
+                                foreach (var cmdToExecute in cmdsToExecute)
+                                {
+                                    try
+                                    {
+                                        var result = await ProcessCommand(cmdToExecute);
+                                        cmds.AddRange(result);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Logger.Error($"Error Processing command: {cmdsToExecute}", e);
+                                    }
+                                }
+
+                                level++;
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            // TODO: Emit the error to the error reporting service
+                            Logger.Error("Error processing command: " + cmd.Explain(), e);
+                        }
+                        finally
+                        {
+                            _processingCommand = false;
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error("Error initialising workflow.", e);
+            }
+        }
+
+        private void DelayCommandHandler(TimeSpan delay, RealtimeCommand cmd) =>
+            Client.Options.TimerScheduler.Delay(delay).ContinueWith(_ => QueueCommand(cmd));
+
+        internal async Task<IEnumerable<RealtimeCommand>> ProcessCommand(RealtimeCommand command)
+        {
+            // Ticks every second, so logging each one would bury everything else at Debug.
+            bool shouldLogCommand = !((command is EmptyCommand) || (command is ListCommand) || (command is HeartbeatMonitorCommand));
+            try
+            {
+                if (Logger.IsDebug && shouldLogCommand)
+                {
+                    Logger.Debug("Begin - " + command.Explain());
+                }
+
+                switch (command)
+                {
+                    case ListCommand cmd:
+                        return cmd.Commands;
+                    case EmptyCommand _:
+                        return Enumerable.Empty<RealtimeCommand>();
+                    case DisposeCommand _:
+                        if (State.Connection.State == ConnectionState.Connected)
+                        {
+                            return new RealtimeCommand[]
+                            {
+                                SendMessageCommand.Create(
+                                    new ProtocolMessage(ProtocolMessage.MessageAction.Close), force: true).TriggeredBy(command),
+                                CompleteWorkflowCommand.Create().TriggeredBy(command),
+                            };
+                        }
+                        else
+                        {
+                            return new RealtimeCommand[] { CompleteWorkflowCommand.Create().TriggeredBy(command) };
+                        }
+
+                    case CompleteWorkflowCommand _:
+                        _heartbeatMonitorCancellationTokenSource.Cancel();
+                        Channels.CleanupChannels();
+                        ConnectionManager.Transport?.Dispose();
+                        CommandChannel.Writer.TryComplete();
+                        State.Connection.CurrentStateObject?.AbortTimer();
+                        return Enumerable.Empty<RealtimeCommand>();
+                    case HeartbeatMonitorCommand cmd:
+                        return HandleHeartbeatMonitorCommand(cmd);
+                    default:
+                        var next = await ProcessCommandInner(command);
+                        return new[]
+                        {
+                            next,
+                        };
+                }
+            }
+            finally
+            {
+                if (Logger.IsDebug && shouldLogCommand)
+                {
+                    Logger.Debug($"End - {command.Name}|{command.Id}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// RTN23a - a transport silent for longer than maxIdleInterval plus realtimeRequestTimeout
+        /// is treated as dead and disconnected. Any inbound message counts as activity, not just
+        /// Heartbeats, which is why ProcessMessage refreshes the timestamp rather than the Heartbeat
+        /// handler. Data we send does not count.
+        /// </summary>
+        private IEnumerable<RealtimeCommand> HandleHeartbeatMonitorCommand(HeartbeatMonitorCommand command)
+        {
+            var connection = State.Connection;
+
+            // Only meaningful while Connected: elsewhere there is no live transport, and
+            // ConfirmedAliveAt may still hold a previous transport's timestamp.
+            if (connection.State != ConnectionState.Connected)
+            {
+                _heartbeatMonitorDisconnectRequested = false;
+
+                // Re-armed per transport, since maxIdleInterval is a per-transport promise.
+                _warnedIdleCheckInactive = false;
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // RTN23b - without protocol heartbeats Ably may satisfy maxIdleInterval with websocket
+            // ping frames, which this library cannot observe, leaving nothing to measure. Read off
+            // the params this transport was built with, not off ClientOptions, which the caller can
+            // change after the fact; ConnectionManager.CreateTransport records it and warns.
+            if (connection.ProtocolHeartbeatsRequested == false)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // No promised idle period to measure against.
+            var maxIdleInterval = connection.MaxIdleInterval;
+            if (maxIdleInterval.HasValue == false || maxIdleInterval.Value <= TimeSpan.Zero)
+            {
+                if (_warnedIdleCheckInactive == false)
+                {
+                    _warnedIdleCheckInactive = true;
+
+                    // Logged because the two causes differ: absent means no CONNECTED carried the
+                    // field, zero is CD2h's explicit "arbitrarily-long levels of inactivity".
+                    Logger.Debug(
+                        maxIdleInterval.HasValue
+                            ? "Ably set maxIdleInterval to 0, so it guarantees no inactivity limit. Idle connection detection is off."
+                            : "No maxIdleInterval received from Ably, so idle connection detection is off.");
+                }
+
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            if (connection.ConfirmedAliveAt.HasValue == false)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // Measured to when the tick was queued, not to now. The workflow is a single reader, so
+            // work queued ahead of the tick - an inbound AUTH awaiting the application's
+            // authCallback - would otherwise be charged to the transport.
+            var idleFor = command.QueuedAt - connection.ConfirmedAliveAt.Value;
+
+            // A window that cannot be represented can never elapse. maxIdleInterval is unbounded off
+            // the wire, and an OverflowException here would be logged and dropped by the command
+            // loop, silently killing detection for the life of the connection.
+            if (maxIdleInterval.Value >= TimeSpan.MaxValue - Client.Options.RealtimeRequestTimeout)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            // Read live, unlike the two per-transport snapshots above: this term is the caller's own
+            // slack rather than anything Ably promised on this transport, its setter validates the
+            // range, and it is only ever additive.
+            var allowedIdleTime = maxIdleInterval.Value + Client.Options.RealtimeRequestTimeout;
+
+            if (idleFor <= allowedIdleTime)
+            {
+                _heartbeatMonitorDisconnectRequested = false;
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            if (_heartbeatMonitorDisconnectRequested)
+            {
+                return Enumerable.Empty<RealtimeCommand>();
+            }
+
+            _heartbeatMonitorDisconnectRequested = true;
+
+            var error = ErrorInfo.NoActivityFrom(idleFor);
+            Logger.Warning($"{error.Message} The limit was {allowedIdleTime.TotalSeconds:0.#}s.");
+
+            // RTN15a - a transport we have given up on counts as disconnected unexpectedly, so
+            // RTN15h3's immediate reconnect applies. Requested explicitly because NoActivityFrom
+            // carries 408, which the instant retry check does not recognise on its own.
+            return new RealtimeCommand[]
+            {
+                SetDisconnectedStateCommand.Create(error, retryInstantly: true).TriggeredBy(command),
+            };
+        }
+
+        /// <summary>
+        /// Processes a command and return a list of commands that need to be immediately executed.
+        /// </summary>
+        /// <param name="command">The current command that will be executed.</param>
+        /// <returns>returns the next command that needs to be executed.</returns>
+        /// <exception cref="AblyException">will throw an AblyException if anything goes wrong.</exception>
+        private async Task<RealtimeCommand> ProcessCommandInner(RealtimeCommand command)
+        {
+            switch (command)
+            {
+                case ConnectCommand _:
+
+                    // RTN11d - connect() out of CLOSED or FAILED starts afresh. The channel half,
+                    // back to INITIALIZED with errorReason unset, is done per channel by the command
+                    // queued below; Id and Key are already emptied on entering CLOSED or FAILED.
+                    //
+                    // Deliberately not CLOSING. RTN11d's trigger is CLOSED or FAILED, and RTN11b
+                    // asks only that channels be reinitialised from CLOSING - the operations table
+                    // maps that column to RTN11b, not RTN11d. So the channel command below covers
+                    // CLOSING and this connection level reset does not.
+                    //
+                    // ably-js reaches the same place for CLOSING by a different route rather than
+                    // by the same split: its reset lives in clearConnection, called on entering a
+                    // terminal state, and closing is not one - so no msgSerial reset either. It is
+                    // no guide to the rest of RTN11d though, since it clears errorReason only on
+                    // reaching CONNECTED and never returns channels to INITIALIZED at all.
+                    if (State.Connection.State == ConnectionState.Closed ||
+                        State.Connection.State == ConnectionState.Failed)
+                    {
+                        State.Connection.ErrorReason = null;
+                        State.Connection.MessageSerial = 0;
+                    }
+
+                    var nextCommand = ConnectionManager.Connect();
+                    var initFailedChannelsOnConnect =
+                        ChannelCommand.CreateForAllChannels(InitialiseFailedChannelsOnConnect.Create().TriggeredBy(command));
+                    return ListCommand.Create(initFailedChannelsOnConnect, nextCommand);
+
+                case CloseConnectionCommand _:
+                    ConnectionManager.CloseConnection();
+                    break;
+
+                case RetryAuthCommand retryAuth:
+
+                    ClearTokenAndRecordRetry();
+
+                    if (retryAuth.UpdateState)
+                    {
+                        return ListCommand.Create(
+                            SetDisconnectedStateCommand.Create(
+                                retryAuth.Error,
+                                skipAttach: State.Connection.State == ConnectionState.Connecting).TriggeredBy(command),
+                            SetConnectingStateCommand.Create(retryAuth: true).TriggeredBy(command));
+                    }
+                    else
+                    {
+                        await Auth.RenewToken();
+                        return EmptyCommand.Instance;
+                    }
+
+                case ForceStateInitializationCommand _:
+                case SetConnectedStateCommand _:
+                case SetConnectingStateCommand _:
+                case SetFailedStateCommand _:
+                case SetDisconnectedStateCommand _:
+                case SetClosingStateCommand _:
+                case SetSuspendedStateCommand _:
+                case SetClosedStateCommand _:
+                    return await HandleSetStateCommand(command);
+
+                case ProcessMessageCommand cmd:
+                    await ProcessMessage(cmd.ProtocolMessage);
+                    break;
+                case SendMessageCommand cmd:
+                    if (State.Connection.CurrentStateObject.CanSend || cmd.Force)
+                    {
+                        var sendResult = SendMessage(cmd.ProtocolMessage, cmd.Callback);
+
+                        // Never queue a message already awaiting an ACK. One instance in both queues
+                        // would be sent twice on reconnect, and SendMessage's second MsgSerial
+                        // assignment would renumber the copy WaitingForAck reads live, leaving a hole
+                        // in the sequence RTN7b requires to be unique and serially incrementing.
+                        //
+                        // Unreachable today only by coincidence - AckRequired implies CanSend, and
+                        // CanQueue is false in CONNECTED - so the invariant is stated rather than
+                        // left to three unrelated facts. ably-js keeps it deliberately, via
+                        // MessageQueue's sendAttempted flag.
+                        if (sendResult.IsFailure &&
+                            cmd.ProtocolMessage.AckRequired == false &&
+                            State.Connection.CurrentStateObject.CanQueue &&
+                            Client.Options.QueueMessages)
+                        {
+                            Logger.Debug("Failed to send message. Queuing it.");
+                            State.PendingMessages.Add(new MessageAndCallback(
+                                cmd.ProtocolMessage,
+                                cmd.Callback,
+                                Logger));
+                        }
+                    }
+                    else if (State.Connection.CurrentStateObject.CanQueue && Client.Options.QueueMessages)
+                    {
+                        Logger.Debug("Queuing message");
+                        State.PendingMessages.Add(new MessageAndCallback(
+                            cmd.ProtocolMessage,
+                            cmd.Callback,
+                            Logger));
+                    }
+
+                    break;
+                case PingCommand cmd:
+                    return ListCommand.Create(HandlePingCommand(cmd).ToArray());
+                case EmptyCommand _:
+                    break;
+                case DelayCommand cmd:
+                    DelayCommandHandler(cmd.Delay, cmd.CommandToQueue);
+                    break;
+                case PingTimerCommand cmd:
+                    HandlePingTimer(cmd);
+                    break;
+                case ChannelCommand cmd:
+                    await Channels.ExecuteCommand(cmd);
+                    break;
+                case HandleConnectingTokenErrorCommand cmd:
+                    try
+                    {
+                        if (Auth.TokenRenewable)
+                        {
+                            if (State.AttemptsInfo.TriedToRenewToken == false)
+                            {
+                                ClearTokenAndRecordRetry();
+                                try
+                                {
+                                    await Auth.RenewToken();
+                                    await AttemptANewConnection();
+                                    return EmptyCommand.Instance;
+                                }
+                                catch (AblyException e)
+                                {
+                                    return SetDisconnectedStateCommand.Create(e.ErrorInfo)
+                                        .TriggeredBy(cmd);
+                                }
+                            }
+
+                            return SetDisconnectedStateCommand.Create(cmd.Error).TriggeredBy(cmd);
+                        }
+
+                        // If Token is not renewable we go to the failed state
+                        return SetFailedStateCommand.Create(cmd.Error).TriggeredBy(cmd);
+                    }
+                    catch (AblyException ex)
+                    {
+                        Logger.Error("Error trying to renew token.", ex);
+                        return SetDisconnectedStateCommand.Create(ex.ErrorInfo).TriggeredBy(cmd);
+                    }
+
+                    async Task AttemptANewConnection()
+                    {
+                        // Through the same gated decision as the CONNECTING handler. This path builds
+                        // a transport directly rather than queueing a CONNECTING - the connection is
+                        // already in that state and the renewed token has to be picked up by the next
+                        // transport, not by a re-transition - so before, it reached GetHost with no
+                        // RTN17j check at all and could open a transport against a fallback on the
+                        // strength of an earlier failure.
+                        var host = await ChooseHostForNextAttempt();
+                        SetNewHostInState(host);
+
+                        await ConnectionManager.CreateTransport(host);
+                    }
+
+                case HandleConnectingDisconnectedCommand cmd:
+
+                    // Suspending is decided in the SetDisconnectedStateCommand handler, for every path.
+                    return SetDisconnectedStateCommand.Create(cmd.Error ?? ErrorInfo.ReasonDisconnected)
+                        .TriggeredBy(cmd);
+
+                case HandleConnectingErrorCommand cmd:
+                    var error = cmd.Error ?? cmd.Exception?.ErrorInfo ?? ErrorInfo.ReasonUnknown;
+
+                    if (error.IsTokenError)
+                    {
+                        return HandleConnectingTokenErrorCommand.Create(error)
+                            .TriggeredBy(cmd);
+                    }
+
+                    if (error.IsRetryableStatusCode())
+                    {
+                         return SetDisconnectedStateCommand.Create(error)
+                            .TriggeredBy(cmd);
+                    }
+                    else
+                    {
+                        return SetFailedStateCommand.Create(error)
+                            .TriggeredBy(cmd);
+                    }
+
+                case HandleTransportEventCommand cmd:
+
+                    if (ConnectionManager.Transport != null
+                        && ConnectionManager.Transport.Id != cmd.TransportId)
+                    {
+                        Logger.Debug($"Skipping Transport Event command because the transport it relates to no longer exists. Current transport: {ConnectionManager.Transport.Id}");
+                        return EmptyCommand.Instance;
+                    }
+
+                    // If it's an error or has been closed we want to do something about it
+                    if (cmd.TransportState == TransportState.Closed || cmd.Exception != null)
+                    {
+                        // A server that sends ERROR, DISCONNECTED or CONNECTED and then closes the
+                        // transport puts the message and the close in the queue back to back. The
+                        // state handles the message by queueing a command, which lands behind the
+                        // close, so the close would be handled in the state the message was meant
+                        // to leave: a fatal ERROR would first cause a disconnect and an instant
+                        // reconnect, and then FAILED would be followed by CONNECTING (RTN14g,
+                        // RTN15h3, RTN27h). One hop behind the commands queued so far restores the
+                        // order in which the transport delivered them. ably-java gets the same order by
+                        // deciding the ERROR's target state inline, on the transport thread, so its
+                        // FAILED request is queued ahead of anything the close produces.
+                        if (cmd.Deferred == false)
+                        {
+                            QueueCommand(cmd.Defer().TriggeredBy(cmd));
+                            return EmptyCommand.Instance;
+                        }
+
+                        switch (State.Connection.State)
+                        {
+                            case ConnectionState.Closing:
+                                return SetClosedStateCommand.Create(exception: cmd.Exception).TriggeredBy(cmd);
+
+                            case ConnectionState.Connecting:
+                                AblyException ablyException = null;
+                                if (cmd.Exception != null)
+                                {
+                                    ablyException = cmd.Exception as AblyException ?? new AblyException(cmd.Exception.Message, ErrorCodes.ConnectionFailed, HttpStatusCode.ServiceUnavailable);
+                                }
+
+                                return HandleConnectingErrorCommand.Create(null, ablyException).TriggeredBy(cmd);
+
+                            case ConnectionState.Connected:
+                                var errorInfo =
+                                    GetErrorInfoFromTransportException(cmd.Exception, ErrorInfo.ReasonDisconnected);
+                                return SetDisconnectedStateCommand.Create(
+                                    errorInfo,
+                                    retryInstantly: Connection.ConnectionResumable,
+                                    exception: cmd.Exception).TriggeredBy(cmd);
+
+                            case ConnectionState.Initialized:
+                            case ConnectionState.Disconnected:
+                            case ConnectionState.Suspended:
+                            case ConnectionState.Closed:
+                            case ConnectionState.Failed:
+                                // Nothing to do here.
+                                break;
+
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
+                    }
+
+                    return EmptyCommand.Instance;
+                case HandleAblyAuthorizeErrorCommand cmd:
+                    var exception = cmd.Exception;
+                    if (exception?.ErrorInfo?.StatusCode == HttpStatusCode.Forbidden)
+                    {
+                        Logger.Debug("Triggering Connection Error due to 403 Authorize error");
+                        return HandleConnectingErrorCommand.Create(null, cmd.Exception).TriggeredBy(cmd);
+                    }
+
+                    return EmptyCommand.Instance;
+                default:
+                    throw new AblyException("No handler found for - " + command.Explain());
+            }
+
+            async Task ProcessMessage(ProtocolMessage message)
+            {
+                try
+                {
+                    State.Connection.SetConfirmedAlive(Now());
+
+                    foreach (var (name, handler) in ProtocolMessageProcessors)
+                    {
+                        var handled = await handler(message, State);
+                        if (Logger.IsDebug)
+                        {
+                            Logger.Debug($"Message handler '{name}' - {(handled ? "Handled" : "Skipped")}");
+                        }
+
+                        if (handled)
+                        {
+                            break;
+                        }
+                    }
+
+                    // Notify the Channel message processor regardless of what happened above
+                    await ChannelMessageProcessor.MessageReceived(message, State);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error("Error processing message: " + message, e);
+                    throw new AblyException(e);
+                }
+            }
+
+            ErrorInfo GetErrorInfoFromTransportException(Exception ex, ErrorInfo @default)
+            {
+                if (ex?.Message == "HTTP/1.1 401 Unauthorized")
+                {
+                    return ErrorInfo.ReasonRefused;
+                }
+
+                @default.InnerException = ex;
+                return @default;
+            }
+
+            return EmptyCommand.Instance;
+        }
+
+        /// <summary>
+        /// The host for the next transport, with the connectivity check RTN17j requires before an
+        /// alternative host is used.
+        /// </summary>
+        /// <remarks>
+        /// RTN17 - every attempt considers a fallback, including the timer driven ones. Excluding
+        /// those would lock a client out once the immediate retry budget is spent, since every
+        /// remaining attempt is timer driven and so pinned to the primary. Which host is a candidate
+        /// at all is RTN17i's business and GetHost's job - it returns to the primary whenever the
+        /// last host was a fallback.
+        ///
+        /// RTN17j scopes the check to "the use of an alternative host", so a candidate that is the
+        /// primary is taken without one: there is nothing to verify, and the probe would only add
+        /// latency to the reconnect. When the candidate is a fallback and the internet is
+        /// unreachable, the problem is not this host, so we stay on the primary rather than working
+        /// through fallbacks that cannot answer either.
+        ///
+        /// Shared with the token renewal path, which reaches CreateTransport without queueing a
+        /// CONNECTING and so cannot inherit the handler's own gate.
+        /// </remarks>
+        private async Task<string> ChooseHostForNextAttempt()
+        {
+            var primaryDomain = Defaults.GetPrimaryDomain(Client.Options.Endpoint);
+            var candidateHost = AttemptsHelpers.GetHost(State, primaryDomain);
+
+            if (candidateHost == primaryDomain)
+            {
+                return primaryDomain;
+            }
+
+            return await Client.HttpClient.CanConnectToAbly() ? candidateHost : primaryDomain;
+        }
+
+        private void SetNewHostInState(string newHost)
+        {
+            if (IsFallbackHost())
+            {
+                Client.HttpClient.SetRealtimeFallbackHost(newHost);
+            }
+            else
+            {
+                Client.HttpClient.ClearRealtimeFallbackHost();
+            }
+
+            State.Connection.Host = newHost;
+
+            bool IsFallbackHost()
+            {
+                return State.Connection.FallbackHosts.Contains(newHost);
+            }
+        }
+
+        private void ClearTokenAndRecordRetry()
+        {
+            Auth.CurrentToken = null;
+            State.AttemptsInfo.RecordTokenRetry();
+        }
+
+        private Result SendMessage(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback)
+        {
+            if (message.AckRequired)
+            {
+                message.MsgSerial = State.Connection.IncrementSerial();
+                State.AddAckMessage(message, callback);
+            }
+
+            return ConnectionManager.SendToTransport(message);
+        }
+
+        private void HandleConnectedCommand(SetConnectedStateCommand cmd)
+        {
+            var info = new ConnectionInfo(cmd.Message);
+
+            // Whether this Connected continues the message serial sequence we are already part of.
+            // One that does not must restart at zero per RTN15c7, renumbering anything still
+            // awaiting an ACK. Three ways to continue:
+            //
+            //  - an RTN24 update, which arrives on the connection we already hold;
+            //  - a successful resume (RTN15c6), judged on the connectionId alone. RTN15c6's "and no
+            //    error property" describes what Ably sends, while the reset belongs to RTN15c7,
+            //    which is keyed on "a new connectionId". ably-js discriminates the same way, on
+            //    connIdChanged;
+            //  - a successful recover, which deliberately adopts a previous connection's counter.
+            //    RTN16f initialises it from the recovery key, which carries no connectionId, so
+            //    success is judged by the absence of an error.
+            //
+            // Broader than testing for an error on the message: a resume the server refuses is
+            // answered with a new connectionId and, often, no error at all - exactly the case that
+            // most needs a new sequence.
+            //
+            // Must be evaluated before Update below, which overwrites the id being compared, and
+            // before Options.Recover is cleared for RTN16k.
+            var isRecoverAttempt = Client.Options.Recover.IsNotEmpty();
+            var connectionContinues = cmd.IsUpdate ||
+                                      (isRecoverAttempt && cmd.Message.Error == null) ||
+                                      (State.Connection.Id.IsNotEmpty() && State.Connection.Id == info.ConnectionId);
+
+            State.Connection.Update(info, cmd.IsUpdate); // RTN16d, RTN15e, RTN23a
+
+            if (info.ClientId.IsNotEmpty())
+            {
+                Auth.ConnectionClientId = info.ClientId;
+            }
+
+            var connectedState = new ConnectionConnectedState(
+                ConnectionManager,
+                cmd.Message.Error,
+                cmd.IsUpdate,
+                Logger);
+
+            SetState(connectedState); // RTN15c7 - if error, set on connection and part of emitted connected event
+
+            Client.Options.Recover = null; // RTN16k, explicitly setting null so it won't be used for subsequent connection requests
+
+            // RTN15c7, RTN11d - a connection that is not a continuation of the one we held
+            // restarts the message serial sequence at zero.
+            if (connectionContinues == false)
+            {
+                State.Connection.MessageSerial = 0;
+            }
+
+            // The RTL3d reattach lives in RealtimeChannel.ConnectionStateChanged, not here: that
+            // handler runs inside NotifyUpdate's internal handlers, so the channel transitions land
+            // before CONNECTED reaches external listeners, as RTL3d1 requires.
+            SendPendingMessagesOnConnected(connectionContinues, cmd.IsUpdate); // RTN19a
+        }
+
+        private void HandlePingTimer(PingTimerCommand cmd)
+        {
+            var relevantRequest = State.PingRequests.FirstOrDefault(x => x.Id.EqualsTo(cmd.PingRequestId));
+
+            if (relevantRequest != null)
+            {
+                // fail the request if it still exists. If it was already handled it will not be there
+                relevantRequest.Callback?.Invoke(null, PingRequest.TimeOutError);
+
+                State.PingRequests.Remove(relevantRequest);
+            }
+        }
+
+        private IEnumerable<RealtimeCommand> HandlePingCommand(PingCommand cmd)
+        {
+            if (Connection.State != ConnectionState.Connected)
+            {
+                // We don't want to wait for the execution to finish
+                _ = NotifyExternalClient(
+                    () => { cmd.Request.Callback?.Invoke(null, PingRequest.DefaultError); },
+                    "Notifying Ping callback because connection state is not Connected");
+            }
+            else
+            {
+                yield return SendMessageCommand.Create(new ProtocolMessage(ProtocolMessage.MessageAction.Heartbeat)
+                {
+                    Id = cmd.Request.Id, // Pass the ping request id so we can match it on the way back
+                }).TriggeredBy(cmd);
+
+                // Only trigger the timer if there is a callback
+                // Question: Do we trigger the error if there is no callback but then we can just emmit it
+                if (cmd.Request.Callback != null)
+                {
+                    State.PingRequests.Add(cmd.Request);
+                    yield return DelayCommand.Create(
+                        ConnectionManager.DefaultTimeout,
+                        PingTimerCommand.Create(cmd.Request.Id)).TriggeredBy(cmd);
+                }
+            }
+        }
+
+        private Task NotifyExternalClient(Action action, string reason)
+        {
+            try
+            {
+                return Task.Run(() => ActionUtils.SafeExecute(action));
+            }
+            catch (Exception e)
+            {
+                Logger.Error("Error while notifying external client for " + reason, e);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private async Task<RealtimeCommand> HandleSetStateCommand(RealtimeCommand command)
+        {
+            try
+            {
+                switch (command)
+                {
+                    case ForceStateInitializationCommand _:
+                        var initState = new ConnectionInitializedState(ConnectionManager, Logger);
+                        SetState(initState);
+                        break;
+                    case SetConnectedStateCommand cmd:
+                        HandleConnectedCommand(cmd);
+                        break;
+                    case SetConnectingStateCommand cmd:
+
+                        try
+                        {
+                            var connectingHost = await ChooseHostForNextAttempt();
+                            SetNewHostInState(connectingHost);
+
+                            var connectingState = new ConnectionConnectingState(ConnectionManager, new CountdownTimer("Connecting state timer", Logger, Client.Options.TimerScheduler), Logger);
+                            SetState(connectingState);
+
+                            if (cmd.RetryAuth)
+                            {
+                                try
+                                {
+                                    await Auth.RenewToken();
+                                }
+                                catch (AblyException ablyException)
+                                {
+                                    return SetDisconnectedStateCommand.Create(ablyException.ErrorInfo).TriggeredBy(command);
+                                }
+                            }
+
+                            await ConnectionManager.CreateTransport(connectingHost);
+
+                            break;
+                        }
+                        catch (AblyException ex)
+                        {
+                            Logger.Error("Error setting connecting state", ex);
+
+                            // RSA4c2 & RSA4d
+                            if (ex.ErrorInfo.Code == ErrorCodes.ClientAuthProviderRequestFailed & !ex.ErrorInfo.IsForbiddenError)
+                            {
+                                return SetDisconnectedStateCommand.Create(ex.ErrorInfo).TriggeredBy(command);
+                            }
+
+                            return HandleConnectingErrorCommand.Create(null, ex);
+                        }
+
+                    case SetFailedStateCommand cmd:
+
+                        var error = TransformIfTokenErrorAndNotRetryable();
+                        var failedState = new ConnectionFailedState(ConnectionManager, error, Logger);
+
+                        // RTN7e - the queued messages are failed with "an error representing the
+                        // reason for the state change", taken off the state object so it is this
+                        // transition's reason even if SetState early-returns. In the finally, after
+                        // the transition, so a publisher's callback sees the state it is being told
+                        // about and a throwing transition cannot strand the messages uncalled.
+                        // ably-js orders it the same way: enactStateChange then failQueuedMessages.
+                        //
+                        // RTN8d, RTN9d - the key and id go the other way round, before the
+                        // transition, because SetState emits the state change and with no
+                        // SynchronizationContext that emit is inline. Nothing between here and the
+                        // emit reads either field.
+                        State.Connection.ClearKeyAndId(); // RTN8d, RTN9d
+
+                        try
+                        {
+                            SetState(failedState);
+                        }
+                        finally
+                        {
+                            ClearAckQueueAndFailMessages(failedState.Error);
+                            ConnectionManager.DestroyTransport();
+                        }
+
+                        ErrorInfo TransformIfTokenErrorAndNotRetryable()
+                        {
+                            if (cmd.Error.IsTokenError && Auth.TokenRenewable == false)
+                            {
+                                // A copy: NonRenewableToken is process wide, so appending to it
+                                // would leak this connection's message into every later client.
+                                var nonRenewable = ErrorInfo.NonRenewableToken;
+                                return new ErrorInfo(
+                                    nonRenewable.Message + $" Original: {cmd.Error.Message} ({cmd.Error.Code})",
+                                    nonRenewable.Code,
+                                    nonRenewable.StatusCode,
+                                    nonRenewable.Href);
+                            }
+
+                            return cmd.Error;
+                        }
+
+                        break;
+                    case SetDisconnectedStateCommand cmd:
+
+                        // RTN14e - measured here because this is the one place every path into
+                        // DISCONNECTED converges. Checking only the two connection-attempt failure
+                        // handlers misses the token and auth retry paths, which do not pass through
+                        // either: a client whose token source keeps failing would loop CONNECTING and
+                        // DISCONNECTED indefinitely without ever suspending.
+                        //
+                        // Ordered before CheckInstantRetryFlag so that suspending beats retrying.
+                        //
+                        // SkipAttach is excluded: the caller has already queued the next command, so
+                        // diverting would emit SUSPENDED and then immediately CONNECTING.
+                        if (cmd.SkipAttach == false && State.ShouldSuspend(Now))
+                        {
+                            return SetSuspendedStateCommand.Create(cmd.Error ?? ErrorInfo.ReasonSuspended)
+                                .TriggeredBy(command);
+                        }
+
+                        var retryInstantly = CheckInstantRetryFlag();
+
+                        var disconnectedState = new ConnectionDisconnectedState(ConnectionManager, cmd.Error, new CountdownTimer("Disconnected state timer", Logger, Client.Options.TimerScheduler), Logger)
+                        {
+                            RetryInstantly = retryInstantly,
+                            Exception = cmd.Exception,
+                        };
+
+                        if (cmd.SkipAttach)
+                        {
+                            // RTN14d - retryIn must be the delay actually waited. skipAttach means
+                            // the caller has already queued the next command, so there is no wait,
+                            // and StartTimer, which records the real figure, never runs.
+                            disconnectedState.RetryIn = TimeSpan.Zero;
+                        }
+
+                        SetState(disconnectedState, skipTimer: cmd.SkipAttach);
+
+                        // RTN7d
+                        if (Client.Options.QueueMessages == false)
+                        {
+                            var failAckMessages = new ErrorInfo(
+                                "Clearing message AckQueue(created at connected state) because Options.QueueMessages is false",
+                                ErrorCodes.Disconnected,
+                                HttpStatusCode.BadRequest,
+                                null,
+                                cmd.Error);
+                            ClearAckQueueAndFailMessages(failAckMessages);
+                        }
+
+                        if (cmd.SkipAttach == false)
+                        {
+                            ConnectionManager.DestroyTransport();
+                        }
+
+                        if (retryInstantly)
+                        {
+                            State.AttemptsInfo.RecordInstantRetry();
+
+                            // Queued, not returned. A returned command is processed inside the same
+                            // batch, one level deeper - and now that the probe no longer vetoes the
+                            // retry, an endpoint that fails synchronously (a transport whose connect
+                            // throws) recurses DISCONNECTED -> CONNECTING -> DISCONNECTED within that
+                            // batch until the loop's nesting guard trips. The guard throws, the outer
+                            // catch logs and swallows it, and the batch is abandoned: no transport, no
+                            // timer, and a connection left sitting in CONNECTING for good. Queueing
+                            // restarts the level count, so the traversal is bounded by the instant
+                            // retry budget above, which is what is meant to bound it.
+                            //
+                            // One check per cycle also falls out of scoping the RTN17j check
+                            // correctly rather than passing an answer along: this handler no longer
+                            // asks, and the CONNECTING behind it asks only if it settles on a
+                            // fallback.
+                            QueueCommand(SetConnectingStateCommand.Create().TriggeredBy(command));
+                            break;
+                        }
+
+                        bool CheckInstantRetryFlag()
+                        {
+                            if (cmd.RetryInstantly)
+                            {
+                                return true;
+                            }
+
+                            // RTN17j sanctions reconnecting immediately, rather than waiting out the
+                            // disconnected retry timeout, to work through the fallback domains. It
+                            // does not sanction doing so without end, and every failed attempt
+                            // produces another DISCONNECTED carrying an exception that qualifies
+                            // again - so the traversal is bounded by the number of domains to
+                            // traverse. Past that we are in RTN14d, where attempts are periodic and
+                            // spaced per RTB1, and host selection continues at that slower pace.
+                            var domainCount = 1 + State.Connection.FallbackHosts.Count;
+                            if (State.AttemptsInfo.InstantRetryCount >= domainCount)
+                            {
+                                return false;
+                            }
+
+                            // RTN15a and RTN15h3 - an unexpected transport drop or a non-token
+                            // DISCONNECTED both earn an immediate reconnect. The first two tests
+                            // cover the drop, the third the DISCONNECTED, which carries no status
+                            // code of its own.
+                            //
+                            // Token errors are excluded because RTN15h3 is the "error other than a
+                            // token error" clause: RTN15h2 owns them and has already queued its own
+                            // CONNECTING behind this command, so granting a retry here too gives two
+                            // overlapping attempts.
+                            //
+                            // Not gated on the connectivity check. RTN17j scopes that check to "the
+                            // use of an alternative host", and whether this attempt reaches one is
+                            // decided later, by ChooseHostForNextAttempt, which takes the check where
+                            // the clause actually asks for it. Gating here cost the attempt twice
+                            // over: every reconnect that was going to stay on the primary waited out
+                            // a probe RTN17j never asked for, and a probe that failed while the
+                            // realtime endpoint was fine cancelled the reconnect outright, deferring
+                            // it to the RTB1 timer - up to disconnectedRetryTimeout of downtime where
+                            // RTN15h3 says reconnect now.
+                            return cmd.Exception != null
+                                   || (cmd.Error != null && cmd.Error.IsRetryableStatusCode())
+                                   || (State.Connection.State == ConnectionState.Connected
+                                       && cmd.Error?.IsTokenError != true);
+                        }
+
+                        break;
+
+                    case SetClosingStateCommand _:
+
+                        var transport = ConnectionManager.Transport;
+                        var connectedTransport = transport?.State == TransportState.Connected;
+
+                        var closingState = new ConnectionClosingState(ConnectionManager, null, connectedTransport, new CountdownTimer("Closing state timer", Logger, Client.Options.TimerScheduler), Logger);
+                        State.Connection.ClearKeyAndId(); // RTN8d, RTN9d - before the emit
+                        SetState(closingState);
+
+                        if (connectedTransport)
+                        {
+                            return SendMessageCommand.Create(new ProtocolMessage(ProtocolMessage.MessageAction.Close), force: true).TriggeredBy(command);
+                        }
+                        else
+                        {
+                            return SetClosedStateCommand.Create().TriggeredBy(command);
+                        }
+
+                    case SetSuspendedStateCommand cmd:
+
+                        var suspendedState = new ConnectionSuspendedState(ConnectionManager, cmd.Error, new CountdownTimer("Suspended state timer", Logger, Client.Options.TimerScheduler), Logger);
+
+                        // RTN7e and the teardown - see the note on the FAILED case.
+                        try
+                        {
+                            SetState(suspendedState);
+                        }
+                        finally
+                        {
+                            ClearAckQueueAndFailMessages(suspendedState.Error);
+
+                            // Needed here as well as in the DISCONNECTED handler, which diverts to
+                            // this case before reaching its own DestroyTransport. A surviving
+                            // transport keeps its listener for up to suspendedRetryTimeout.
+                            ConnectionManager.DestroyTransport();
+                        }
+
+                        break;
+
+                    case SetClosedStateCommand cmd:
+
+                        var closedState = new ConnectionClosedState(ConnectionManager, cmd.Error, Logger)
+                        {
+                            Exception = cmd.Exception,
+                        };
+
+                        // RTN7e, RTN8d, RTN9d and the teardown - see the note on the FAILED case.
+                        State.Connection.ClearKeyAndId(); // RTN8d, RTN9d - before the emit
+
+                        try
+                        {
+                            SetState(closedState);
+                        }
+                        finally
+                        {
+                            ClearAckQueueAndFailMessages(closedState.Error);
+                            ConnectionManager.DestroyTransport();
+                        }
+
+                        break;
+                }
+            }
+            catch (AblyException ex)
+            {
+                Logger.Error($"Error executing set state command {command.Name}", ex);
+
+                if (command is SetFailedStateCommand == false)
+                {
+                    return SetFailedStateCommand.Create(ex.ErrorInfo).TriggeredBy(command);
+                }
+            }
+
+            return EmptyCommand.Instance;
+        }
+
+        public void SetState(ConnectionStateBase newState, bool skipTimer = false)
+        {
+            if (Logger.IsDebug)
+            {
+                var message = $"Changing state from {State.Connection.State} => {newState.State}.";
+                if (skipTimer)
+                {
+                    message += " Skip timer";
+                }
+
+                Logger.Debug(message);
+            }
+
+            var notified = false;
+
+            try
+            {
+                if (newState.IsUpdate == false)
+                {
+                    if (State.Connection.State == newState.State)
+                    {
+                        if (Logger.IsDebug)
+                        {
+                            Logger.Debug($"State is already {State.Connection.State}. Skipping SetState action.");
+                        }
+
+                        return;
+                    }
+
+                    State.AttemptsInfo.UpdateAttemptState(newState, State.Connection.State, Logger);
+                    State.Connection.CurrentStateObject.AbortTimer();
+                }
+
+                if (skipTimer == false)
+                {
+                    newState.StartTimer();
+                }
+                else if (Logger.IsDebug)
+                {
+                    Logger.Debug($"xx {newState.State}: Skipping attaching.");
+                }
+
+                notified = true;
+                UpdateStateAndNotifyConnection(newState);
+            }
+            catch (Exception ex)
+            {
+                // Everything, not just AblyException: anything else thrown by StartTimer or the
+                // state object would reach the command loop, which logs and drops it, leaving the
+                // connection with no transport, no timer and no state change emitted. The transition
+                // is still completed below and the exception still rethrown.
+                Logger.Error($"Error attaching to context while changing state to {newState.State}", ex);
+
+                // Only if the notify has not already happened. A throw during the transition lands
+                // here after the state change has been emitted - StartTimer is one source, and a
+                // negative retry timeout reaches System.Threading.Timer. Not a channel's
+                // ConnectionStateChanged, which RealtimeChannels guards per channel. Re-emitting is harmless for an ordinary transition, which the
+                // same-state check swallows, but an RTN24 update has no such check and was emitted
+                // twice. The flag is set before the call so a throw from inside it does not trigger
+                // a second attempt either.
+                if (notified == false)
+                {
+                    UpdateStateAndNotifyConnection(newState);
+                }
+
+                newState.AbortTimer();
+
+                throw;
+            }
+        }
+
+        private void UpdateStateAndNotifyConnection(ConnectionStateBase newState)
+        {
+            var change = State.Connection.UpdateState(newState, Logger);
+            if (change != null)
+            {
+                Connection.NotifyUpdate(change);
+            }
+        }
+
+        private void SendPendingMessagesOnConnected(bool connectionContinues, bool isUpdate)
+        {
+            // RTN19 is scoped to "when a transport is disconnected for any reason", which puts an
+            // RTN24 update outside it: nothing was disconnected, and the transport that will ACK the
+            // in-flight messages is the one they went out on. Resending would put a duplicate of each
+            // on the wire for Ably to discard by msgSerial, and requeueing would renumber messages
+            // the server is still expecting under their original serials. ably-js does not re-drain
+            // on a CONNECTED received while already connected either.
+            //
+            // The RTL6c2 queue below is still flushed. It should be empty while connected, and
+            // skipping it would strand anything that did land there.
+            if (isUpdate == false)
+            {
+                if (connectionContinues)
+                {
+                    // RTN19a2 - the same connection is still expecting the serials these messages were
+                    // originally given, so resend them unchanged and leave them awaiting their ACK.
+                    foreach (var message in State.WaitingForAck.Select(x => x.Message))
+                    {
+                        ConnectionManager.SendToTransport(message);
+                    }
+                }
+                else
+                {
+                    // RTN19a1, RTN19a2 - a different connection means a fresh serial sequence, so
+                    // requeue rather than resend. The loop below hands each message to SendMessage,
+                    // which assigns a serial from the counter that HandleConnectedCommand has just
+                    // reset and re-registers it for its ACK.
+                    //
+                    // Resending these unchanged would leave the server's sequence sitting at the old
+                    // high water mark while ours restarted at zero, and Ably silently discards a
+                    // message whose serial is below what it has already seen - no ACK, no NACK, so the
+                    // publish callback would never be called at all.
+                    //
+                    // WaitingForAck is cleared because SendMessage re-registers each message as it
+                    // goes; stale entries would hold serials of the old sequence that the next ACK also
+                    // matches, running their callbacks twice.
+                    //
+                    // Inserted at the front, not appended: PendingMessages is the RTL6c2 queue and
+                    // already holds anything published while disconnected, which happened *after* these.
+                    // Appending would give the newer messages the lower serials and reverse publish
+                    // order. ably-js prepends for the same reason.
+                    State.PendingMessages.InsertRange(
+                        0,
+                        State.WaitingForAck.Select(x => new MessageAndCallback(x.Message, x.Callback, x.Logger)));
+
+                    State.WaitingForAck.Clear();
+                }
+            }
+
+            if (Logger.IsDebug && State.PendingMessages.Count > 0)
+            {
+                Logger.Debug("Sending pending message: Count: " + State.PendingMessages.Count);
+            }
+
+            foreach (var pendingMessage in State.PendingMessages)
+            {
+                var sendResult = SendMessage(pendingMessage.Message, pendingMessage.Callback);
+                if (sendResult.IsFailure)
+                {
+                    Logger.Warning($"Error sending pending message with ID: {pendingMessage.Message.Id}. Action: {pendingMessage.Message?.Action}");
+                }
+            }
+
+            State.PendingMessages.Clear();
+        }
+
+        /// <summary>
+        /// RTN7e - when the connection enters SUSPENDED, CLOSED or FAILED, everything that has not
+        /// been acknowledged has failed and must be reported as such.
+        /// </summary>
+        private void ClearAckQueueAndFailMessages(ErrorInfo error)
+        {
+            var messageError = error ?? ErrorInfo.ReasonUnknown;
+
+            foreach (var item in State.WaitingForAck.Where(x => x.Callback != null))
+            {
+                item.SafeExecute(null, messageError);
+            }
+
+            State.WaitingForAck.Clear();
+
+            // RTN7e covers RTL6c2 as well as RTL6c1: a message submitted via either "should be
+            // considered failed ... and removed from any RTN19a retry queue". PendingMessages is the
+            // RTL6c2 queue.
+            foreach (var item in State.PendingMessages.Where(x => x.Callback != null))
+            {
+                item.SafeExecute(null, messageError);
+            }
+
+            State.PendingMessages.Clear();
+        }
+
+        public void QueueAck(ProtocolMessage message, Action<PublishResult, ErrorInfo> callback)
+        {
+            if (message.AckRequired)
+            {
+                State.WaitingForAck.Add(new MessageAndCallback(message, callback));
+                if (Logger.IsDebug)
+                {
+                    Logger.Debug($"Message ({message.Action}) with serial ({message.MsgSerial}) was queued to get Ack");
+                }
+            }
+        }
+
+        // RTN23c1: on receiving a PING on a transport, reply with a PONG on that same transport,
+        // regardless of the heartbeats transport param. RTN23c2: the PONG carries the PING's id when
+        // present, and no id otherwise. A PONG is not AckRequired, so sending it straight to the
+        // transport keeps it out of the MsgSerial/ACK machinery.
+        internal Task<bool> HandlePingMessage(ProtocolMessage message)
+        {
+            if (message.Action != ProtocolMessage.MessageAction.Ping)
+            {
+                return TaskConstants.BooleanFalse;
+            }
+
+            ConnectionManager.SendToTransport(new ProtocolMessage(ProtocolMessage.MessageAction.Pong) { Id = message.Id });
+            return TaskConstants.BooleanTrue;
+        }
+
+        internal Task<bool> HandleAckMessage(ProtocolMessage message)
+        {
+            if (message.Action == ProtocolMessage.MessageAction.Ack ||
+                message.Action == ProtocolMessage.MessageAction.Nack)
+            {
+                var endSerial = message.MsgSerial + (message.Count - 1);
+                var listForProcessing = new List<MessageAndCallback>(State.WaitingForAck);
+                foreach (var current in listForProcessing)
+                {
+                    if (current.Serial <= endSerial)
+                    {
+                        if (message.Action == ProtocolMessage.MessageAction.Ack)
+                        {
+                            if (current.Serial < message.MsgSerial)
+                            {
+                                // An ACK covers only msgSerial..msgSerial+count-1; a pending message below that
+                                // range was skipped, so it counts as NACKed (protocol.md "Message acknowledgement
+                                // protocol"). Like java and cocoa, fail it with the ACK's error, else an unknown error.
+                                current.SafeExecute(null, message.Error ?? ErrorInfo.ReasonUnknown);
+                            }
+                            else
+                            {
+                                // TR4s / RTL6j: res holds one PublishResult per acknowledged protocol message,
+                                // in order, so this entry's result sits at its offset from the ACK's msgSerial.
+                                // It is null when the server sent no (or too short a) res, e.g. a pre-v5 server.
+                                var index = current.Serial - message.MsgSerial;
+                                var publishResult = message.Res != null && index < message.Res.Length
+                                    ? message.Res[index]
+                                    : null;
+                                current.SafeExecute(publishResult, null);
+                            }
+                        }
+                        else
+                        {
+                            current.SafeExecute(null, message.Error ?? ErrorInfo.ReasonUnknown);
+                        }
+
+                        State.WaitingForAck.Remove(current);
+                    }
+                }
+
+                return Task.FromResult(true);
+            }
+
+            return Task.FromResult(false);
+        }
+
+        public bool IsProcessingCommands()
+        {
+            var gotCount = TryGetCount(out int count);
+            return _processingCommand || (gotCount && count > 0);
+        }
+
+        /// <summary>
+        /// Attempt to query the backlog length of the queue.
+        /// </summary>
+        /// <param name="count">The (approximate) count of items in the Channel.</param>
+        private bool TryGetCount(out int count)
+        {
+            // get this using the reflection
+            try
+            {
+                var prop = CommandChannel.GetType()
+                    .GetProperty("ItemsCountForDebugger", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (prop != null)
+                {
+                    count = (int)prop.GetValue(CommandChannel);
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                ErrorPolicy.HandleUnexpected(e, Logger);
+            }
+
+            count = default(int);
+            return false;
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    _heartbeatMonitorCancellationTokenSource.Dispose();
+                }
+
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+    }
+}

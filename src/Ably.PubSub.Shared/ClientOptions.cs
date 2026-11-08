@@ -1,0 +1,516 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Transport.States.Connection;
+using Newtonsoft.Json;
+
+namespace Ably.PubSub
+{
+    /// <summary>
+    /// Options: Ably library options for REST and Realtime APIs.
+    /// </summary>
+    public class ClientOptions : AuthOptions
+    {
+        private string _clientId;
+        private Func<DateTimeOffset> _nowFunc;
+#if MSGPACK
+        private bool _useBinaryProtocol;
+#endif
+
+        /// <summary>
+        /// If false, suppresses the automatic initiation of a connection when the library is instanced.
+        /// Default: true.
+        /// </summary>
+        public bool AutoConnect { get; set; } = true;
+
+        /// <summary>
+        /// The id of the client represented by this instance. The clientId is relevant
+        /// to presence operations, where the clientId is the principal identifier of the
+        /// client in presence update messages. The clientId is also relevant to
+        /// authentication; a token issued for a specific client may be used to authenticate
+        /// the bearer of that token to the service.
+        /// Default: null.
+        /// </summary>
+        public string ClientId
+        {
+            get => _clientId;
+
+            set
+            {
+                if (value == "*")
+                {
+                    throw new InvalidOperationException("Wildcard clientIds are not support in ClientOptions");
+                }
+
+                _clientId = value;
+            }
+        }
+
+        /// <summary>
+        /// When a TokenParams object is provided, it will override
+        /// the client library defaults described in TokenParams
+        /// Spec: TO3j11.
+        /// Default: null.
+        /// </summary>
+        public TokenParams DefaultTokenParams { get; set; }
+
+        /// <summary>
+        /// Used internally for getting clientId from options or DefaultTokenParams.
+        /// </summary>
+        /// <returns>clientId.</returns>
+        internal string GetClientId()
+        {
+            if (ClientId.IsNotEmpty())
+            {
+                return ClientId;
+            }
+
+            return DefaultTokenParams?.ClientId;
+        }
+
+        /// <summary>
+        /// If <c>false</c>, this disables the default behaviour whereby the library queues messages on a
+        /// connection in the disconnected or connecting states. The default behaviour allows applications
+        /// to submit messages immediately upon instancing the library, without having to wait for the
+        /// connection to be established. Applications may use this option to disable that behaviour if they
+        /// wish to have application-level control over the queueing under those conditions.
+        /// Default: true.
+        /// </summary>
+        public bool QueueMessages { get; set; } = true;
+
+        /// <summary>
+        /// If <c>false</c>, prevents messages originating from this connection being echoed back on the same
+        /// connection.
+        /// Default: true.
+        /// </summary>
+        public bool EchoMessages { get; set; } = true;
+
+        /// <summary>
+        /// A connection recovery string, specified by a client when initializing the library
+        /// with the intention of inheriting the state of an earlier connection. See the Ably
+        /// Realtime API documentation for further information on connection state recovery. (RTN16i)
+        /// Default: null.
+        /// </summary>
+        public string Recover { get; set; }
+
+        /// <summary>
+        /// Log level; controls the level of verbosity of log messages from the library.
+        /// Default: Defaults.DefaultLogLevel. Which means the log level is set to Warning.
+        /// </summary>
+        public LogLevel LogLevel { get; set; } = Defaults.DefaultLogLevel;
+
+        /// <summary>
+        /// Log handler: allows the client to intercept log messages and handle them in a client-specific way.
+        /// Default: null.
+        /// </summary>
+        [JsonIgnore]
+        public ILoggerSink LogHandler { get; set; }
+
+        /// <summary>
+        /// Sets the endpoint that both REST requests and realtime connections use. The value can be:
+        /// <list type="bullet">
+        /// <item><description>a routing policy name, such as <c>main</c>, which connects to <c>[name].realtime.ably.net</c>;</description></item>
+        /// <item><description>a nonprod routing policy name prefixed with <c>nonprod:</c>, such as <c>nonprod:sandbox</c>,
+        /// which connects to <c>[name].realtime.ably-nonprod.net</c>;</description></item>
+        /// <item><description>a hostname (one containing <c>.</c> or <c>::</c>, or <c>localhost</c>), which is used as given
+        /// with no default fallback hosts.</description></item>
+        /// </list>
+        /// The default is <c>main</c>.
+        /// Spec: REC1.
+        /// </summary>
+        public string Endpoint { get; set; }
+
+        /// <summary>
+        /// An array of fallback hosts to be used in the case of an error necessitating the use of an alternative host.
+        /// If you have been provided a set of custom fallback hosts by Ably, please specify them here.
+        /// When set, these replace the default fallback hosts derived from <see cref="Endpoint"/>;
+        /// an empty array disables fallback.
+        /// Reading it returns the hosts that were set, or <c>null</c> when none were (the default fallback
+        /// hosts derived from <see cref="Endpoint"/> then apply).
+        /// Default: null.
+        /// Spec: REC2a2, RSC15a, TO3k6.
+        /// </summary>
+        public string[] FallbackHosts { get; set; }
+
+        /// <summary>
+        /// The fallback hosts to use: an explicit <see cref="FallbackHosts"/> always replaces the defaults (REC2a2);
+        /// otherwise they derive from <see cref="Endpoint"/> (REC2c).
+        /// </summary>
+        /// <returns>A copy of the fallback hosts; empty when fallback is disabled or the endpoint is a hostname.</returns>
+        internal string[] GetFallbackHosts() =>
+            FallbackHosts != null ? (string[])FallbackHosts.Clone() : Defaults.GetEndpointFallbackHosts(Endpoint);
+
+        /// <summary>
+        /// For development environments only; allows a non-default Ably port to be specified.
+        /// Default: 80.
+        /// </summary>
+        public int Port { get; set; } = Defaults.Port;
+
+        /// <summary>
+        /// Encrypted transport: if true, TLS will be used for all connections (whether REST/HTTP
+        /// or Realtime WebSocket or Comet connections).
+        /// Default: true.
+        /// </summary>
+        public bool Tls { get; set; } = true;
+
+        /// <summary>
+        /// Allows non-default Tls port to be specified.
+        /// Default: 443.
+        /// </summary>
+        public int TlsPort { get; set; } = Defaults.TlsPort;
+
+        /// <summary>
+        /// If false, forces the library to use the JSON encoding for REST and Realtime operations,
+        /// If true, the MsgPack binary format is used (if available in the current build
+        /// Default: false.
+        /// </summary>
+        public bool UseBinaryProtocol
+        {
+#if MSGPACK
+            get { return _useBinaryProtocol; }
+#else
+            get { return false; }
+#endif
+
+#if MSGPACK
+            set { _useBinaryProtocol = value; }
+#else
+            set { _ = value; }
+#endif
+        }
+
+        /// <summary>
+        /// Number of seconds before the library will retry after a disconnect.
+        /// Default: 15s.
+        /// </summary>
+        public TimeSpan DisconnectedRetryTimeout { get; set; } = Defaults.DisconnectedRetryTimeout;
+
+        /// <summary>
+        /// Number of seconds before the library will retry after reaching Suspended state.
+        /// Default: 30s.
+        /// </summary>
+        public TimeSpan SuspendedRetryTimeout { get; set; } = Defaults.SuspendedRetryTimeout;
+
+        /// <summary>
+        /// Number of seconds before a channel will try to reattach itself after becoming suspended.
+        /// Default: 15s.
+        /// </summary>
+        public TimeSpan ChannelRetryTimeout { get; set; } = Defaults.ChannelRetryTimeout;
+
+        private TimeSpan _realtimeRequestTimeout = Defaults.RealtimeRequestTimeout;
+        private int _heartbeatMonitorDelay = 1000;
+
+        /// <summary>
+        /// How long the library waits for Ably to answer before treating a realtime request as
+        /// having failed. Applies while establishing a connection, while awaiting a response to a
+        /// Heartbeat, Connect, Attach, Detach or Close, and as part of the RTN23a idle timeout.
+        /// Default: 10s. Must be at least one millisecond, and values beyond a minute or so are
+        /// rarely useful. Disabling the timeout is not supported - the timeouts this value drives are
+        /// all required to fire - so both Timeout.InfiniteTimeSpan and TimeSpan.MaxValue are rejected.
+        /// TO3l11 - https://sdk.ably.com/builds/ably/specification/main/features/#TO3l11.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">when set below one millisecond, or to an
+        /// interval too large for the underlying timers to fire.</exception>
+        public TimeSpan RealtimeRequestTimeout
+        {
+            get => _realtimeRequestTimeout;
+
+            set
+            {
+                // The lower bound is one millisecond, not zero. CountdownTimer hands the delay to
+                // System.Threading.Timer as (int)TotalMilliseconds, so anything under a millisecond
+                // truncates to a zero delay timer - the same hot loop a literal zero produces, and
+                // just as quiet. A negative value stops the timer firing at all, and
+                // Timeout.InfiniteTimeSpan is -1ms, which matters because both Task.Delay and
+                // System.Threading.Timer accept it as genuine infinity and it would disable RTN14c,
+                // RTN12b, RTL4f, RTL5f and RSA4c outright.
+                //
+                // The upper bound is the tightest limit across the sinks this value reaches on every
+                // framework shipped: Task.Delay allows uint.MaxValue - 1 ms on .NET 6+ but only
+                // Int32.MaxValue on .NET Framework, Mono and Xamarin, and CountdownTimer casts to
+                // int for System.Threading.Timer. So Int32.MaxValue ms - a bound on the arithmetic,
+                // not a supported configuration, which is why the message names the useful range.
+                if (value < TimeSpan.FromMilliseconds(1) || value.TotalMilliseconds > int.MaxValue)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(RealtimeRequestTimeout),
+                        value,
+                        "RealtimeRequestTimeout must be at least one millisecond. The default is 10s; " +
+                        "values beyond a minute or so are rarely useful. Disabling the timeout is " +
+                        "not supported - the connect, close, attach, detach and auth timeouts it " +
+                        "drives are all required to fire.");
+                }
+
+                _realtimeRequestTimeout = value;
+            }
+        }
+
+        /// <summary>
+        /// Timeout for opening an http request.
+        /// Default: 4s.
+        /// </summary>
+        public TimeSpan HttpOpenTimeout { get; set; } = Defaults.MaxHttpOpenTimeout;
+
+        /// <summary>
+        /// Timeout for completing an http request.
+        /// Default: 10s.
+        /// </summary>
+        public TimeSpan HttpRequestTimeout { get; set; } = Defaults.MaxHttpRequestTimeout;
+
+        /// <summary>
+        /// After a failed request to the default endpoint, followed by a successful request to a fallback endpoint),
+        /// the period in milliseconds before HTTP requests are retried against the default endpoint.
+        /// Default: 10 minutes.
+        /// </summary>
+        public TimeSpan FallbackRetryTimeout { get; set; } = Defaults.FallbackRetryTimeout;
+
+        /// <summary>
+        /// Maximum number of Http retries the library will attempt.
+        /// Default: 3.
+        /// </summary>
+        public int HttpMaxRetryCount { get; set; } = Defaults.HttpMaxRetryCount;
+
+        /// <summary>
+        /// Duration for which the library will retry an http request.
+        /// Default: 15s.
+        /// </summary>
+        public TimeSpan HttpMaxRetryDuration { get; set; } = Defaults.HttpMaxRetryDuration;
+
+        /// <summary>
+        /// Provides Channels Setting for all Channels created. For more information see <see cref="ChannelOptions"/>.
+        /// </summary>
+        public ChannelOptions ChannelDefaults { get; internal set; } = new ChannelOptions();
+
+        /// <summary>
+        /// Allows the user to override the Websocket Transport Factory and provide their own implementation.
+        /// </summary>
+        [JsonIgnore]
+        public ITransportFactory TransportFactory { get; set; }
+
+        /// <summary>
+        /// Switched on IdempotentRest publishing. Currently switched off by default in libraries with version less than 1.2.
+        /// Default before 1.2: false.
+        /// Default from 1.2: true.
+        /// </summary>
+        public bool IdempotentRestPublishing { get; set; } = true;
+
+        /// <summary>
+        /// Additional parameters to be sent in the querystring when initiating a realtime connection.
+        /// </summary>
+        public Dictionary<string, object> TransportParams { get; set; } = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Useful where you want to execute callbacks on the main/UI thread instead of background thread in UI based apps.
+        /// Allows developers to provide their Thread Synchronization Context to be used when triggering handlers and emitters.
+        /// This is majorly useful in unity, xamarin and MAUI apps.
+        /// Default: null.
+        /// </summary>
+        public SynchronizationContext CustomContext { get; set; }
+
+        /// <summary>
+        /// Allows developers to control Automatic network state monitoring. When set to `false` the library will not subscribe to
+        /// `NetworkChange.NetworkAvailabilityChanged` events. Developers can manually notify the Connection for changes by calling
+        /// `Connection.NotifyOperatingSystemNetworkState(NetworkState.Online or NetworkState.Offline)`.
+        /// Unity and some Mono environments don't have `NetworkChange.NetworkAvailabilityChanged` event implemented and
+        /// which used to prevent the library from initialising.
+        /// Default: true.
+        /// </summary>
+#if NETSTANDARD2_0_OR_GREATER && UNITY_PACKAGE
+        public bool AutomaticNetworkStateMonitoring { get; set; } = false;
+#else
+        public bool AutomaticNetworkStateMonitoring { get; set; } = true;
+#endif
+
+        /// <summary>
+        /// Allows developers to control how often (in milliseconds) the heartbeat is checked to determine if the server
+        /// connection has been lost.
+        /// Defaults: 1000.
+        /// </summary>
+        public int HeartbeatMonitorDelay
+        {
+            get => _heartbeatMonitorDelay;
+
+            set
+            {
+                // This is the granularity of RTN23a idle detection, and the monitor driving it is a
+                // fire-and-forget loop, so a value it cannot wait on takes detection out for the life
+                // of the client. Zero is a hot loop, queueing a command per scheduler tick. Minus one
+                // is Timeout.Infinite, which Task.Delay accepts as genuine infinity, so the monitor
+                // ticks once and is then silent for good - nothing thrown, nothing logged. Below
+                // minus one it throws inside the loop instead. None of the three can be what a caller
+                // meant, so this rejects rather than clamping and quietly overriding them.
+                if (value < 1)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(HeartbeatMonitorDelay),
+                        value,
+                        "HeartbeatMonitorDelay must be at least one millisecond. The default is 1000. " +
+                        "It is how often RTN23a idle detection is evaluated, so a large value delays " +
+                        "noticing a dead connection, and turning it off is not supported.");
+                }
+
+                _heartbeatMonitorDelay = value;
+            }
+        }
+
+        /// <summary>
+        /// If enabled, every REST request to Ably includes a `request_id` query string parameter.
+        /// This request ID remains the same if a request is retried to a fallback host.
+        /// </summary>
+        public bool AddRequestIds { get; set; }
+
+        /// <summary>
+        /// It tells Ably push REST requests to fully wait for all their effects before responding.
+        /// Default: false.
+        /// </summary>
+        public bool PushAdminFullWait { get; set; }
+
+        /// <summary>
+        /// Map of agents that will be appended to the internal ably agent headers.
+        /// This should only be used by Ably-authored SDKs.
+        /// If you need to use this then you have to add the agent to the agents.json file:
+        /// https://github.com/ably/ably-common/blob/main/protocol/agents.json
+        /// The keys represent agent names and its corresponding values represent agent versions.
+        /// RSC7d6.
+        /// </summary>
+        public Dictionary<string, string> Agents { get; set; }
+
+        /// <summary>
+        /// Allows injection of an externally managed HttpClient instance.
+        /// When provided, the library will use this HttpClient instead of creating its own.
+        /// This enables proper HttpClient lifecycle management and connection pooling.
+        /// The injected HttpClient should be configured with appropriate timeouts and handlers.
+        /// Default: null (library creates its own HttpClient).
+        /// </summary>
+        [JsonIgnore]
+        public HttpClient HttpClient { get; set; }
+
+        [JsonIgnore]
+        internal Func<DateTimeOffset> NowFunc
+        {
+            get => _nowFunc ?? (_nowFunc = Defaults.NowFunc());
+            set => _nowFunc = value;
+        }
+
+        [JsonIgnore]
+        internal ILogger Logger { get; set; } = DefaultLogger.LoggerInstance;
+
+        internal bool SkipInternetCheck { get; set; }
+
+        /// <summary>
+        /// Where the realtime client's timers and delays come from. Test-only: the UTS unit tests install
+        /// a fake clock here (with <see cref="NowFunc"/>) so they can advance time instead of waiting.
+        /// </summary>
+        [JsonIgnore]
+        internal ITimerScheduler TimerScheduler { get; set; } = SystemTimerScheduler.Instance;
+
+        /// <summary>
+        /// Replaces the vcdiff codec used to apply deltas: <c>(base, delta) =&gt; result</c>. Test-only: null,
+        /// the default, uses the built-in codec. The UTS unit tests install the mock decoder of
+        /// <c>mock_vcdiff.md</c> here.
+        /// </summary>
+        [JsonIgnore]
+        internal Func<byte[], byte[], byte[]> DeltaDecoder { get; set; }
+
+        /// <summary>
+        /// Default constructor for ClientOptions.
+        /// </summary>
+        public ClientOptions()
+        {
+        }
+
+        /// <summary>
+        /// Construct ClientOptions class and set the Key
+        /// It automatically parses the key to ensure the correct format is used and sets the KeyId and KeyValue properties.
+        /// </summary>
+        /// <param name="key">Ably authentication key.</param>
+        public ClientOptions(string key)
+            : base(key)
+        {
+        }
+
+        /// <summary>
+        /// Creates a member-wise copy of these options. Value-typed members are copied by value;
+        /// the mutable dictionary members (<see cref="Agents"/>, <see cref="AuthOptions.AuthHeaders"/>,
+        /// <see cref="AuthOptions.AuthParams"/> and <see cref="TransportParams"/>) are copied into new
+        /// dictionaries so the copy can be mutated without affecting the original; every other
+        /// reference-typed member (delegates, <see cref="FallbackHosts"/>, <see cref="AuthOptions.TokenDetails"/>,
+        /// <see cref="LogHandler"/>, <see cref="HttpClient"/>, <see cref="TransportFactory"/>,
+        /// <see cref="CustomContext"/>, <see cref="DefaultTokenParams"/> and <see cref="ChannelDefaults"/>)
+        /// is shared by reference, matching how the core's own constructors retain them.
+        /// <para>
+        /// This is the copy the door packages (Ably.PubSub.Device / Ably.PubSub.Server) stamp their
+        /// side agent onto, so that stamping a client never mutates the caller's own options instance.
+        /// It lives here rather than in the door helper because some of the internal state the core
+        /// reads can only be carried across from inside the class.
+        /// </para>
+        /// </summary>
+        /// <returns>A copy of these options.</returns>
+        public ClientOptions Clone()
+        {
+            var copy = new ClientOptions
+            {
+                // AuthOptions members.
+                AuthCallback = AuthCallback,
+                AuthUrl = AuthUrl,
+                AuthMethod = AuthMethod,
+                Key = Key,
+                Token = Token,
+                TokenDetails = TokenDetails,
+                AuthHeaders = AuthHeaders == null ? null : new Dictionary<string, string>(AuthHeaders),
+                AuthParams = AuthParams == null ? null : new Dictionary<string, string>(AuthParams),
+                QueryTime = QueryTime,
+                UseTokenAuth = UseTokenAuth,
+
+                // ClientOptions members.
+                AutoConnect = AutoConnect,
+                ClientId = ClientId,
+                DefaultTokenParams = DefaultTokenParams,
+                QueueMessages = QueueMessages,
+                EchoMessages = EchoMessages,
+                Recover = Recover,
+                LogLevel = LogLevel,
+                LogHandler = LogHandler,
+                Endpoint = Endpoint,
+                FallbackHosts = FallbackHosts,
+                Port = Port,
+                Tls = Tls,
+                TlsPort = TlsPort,
+                UseBinaryProtocol = UseBinaryProtocol,
+                DisconnectedRetryTimeout = DisconnectedRetryTimeout,
+                SuspendedRetryTimeout = SuspendedRetryTimeout,
+                ChannelRetryTimeout = ChannelRetryTimeout,
+                HttpOpenTimeout = HttpOpenTimeout,
+                HttpRequestTimeout = HttpRequestTimeout,
+                FallbackRetryTimeout = FallbackRetryTimeout,
+                HttpMaxRetryCount = HttpMaxRetryCount,
+                HttpMaxRetryDuration = HttpMaxRetryDuration,
+                ChannelDefaults = ChannelDefaults,
+                TransportFactory = TransportFactory,
+                IdempotentRestPublishing = IdempotentRestPublishing,
+                TransportParams = TransportParams == null ? null : new Dictionary<string, object>(TransportParams),
+                CustomContext = CustomContext,
+                AutomaticNetworkStateMonitoring = AutomaticNetworkStateMonitoring,
+                HeartbeatMonitorDelay = HeartbeatMonitorDelay,
+                AddRequestIds = AddRequestIds,
+                PushAdminFullWait = PushAdminFullWait,
+                Agents = Agents == null ? null : new Dictionary<string, string>(Agents),
+                HttpClient = HttpClient,
+
+                // Internal state the core reads.
+                Logger = Logger,
+                SkipInternetCheck = SkipInternetCheck,
+                RealtimeRequestTimeout = RealtimeRequestTimeout,
+                TimerScheduler = TimerScheduler,
+                DeltaDecoder = DeltaDecoder,
+            };
+
+            // Private-field members, only reachable from inside the class.
+            copy._nowFunc = _nowFunc;
+
+            return copy;
+        }
+    }
+}

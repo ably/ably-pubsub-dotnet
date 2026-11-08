@@ -1,0 +1,225 @@
+using System.Linq;
+using System.Threading.Tasks;
+using Ably.PubSub.MessageEncoders;
+using Ably.PubSub.Realtime.Workflow;
+using Ably.PubSub.Types;
+
+namespace Ably.PubSub.Realtime
+{
+    internal class ChannelMessageProcessor
+    {
+        internal ILogger Logger { get; private set; }
+
+        private readonly IChannels<IRealtimeChannel> _channels;
+        private readonly MessageHandler _messageHandler;
+
+        public ChannelMessageProcessor(IChannels<IRealtimeChannel> channels, MessageHandler messageHandler, ILogger logger)
+        {
+            Logger = logger;
+            _channels = channels;
+            _messageHandler = messageHandler;
+        }
+
+        private RealtimeChannel GetChannel(string name)
+        {
+            return _channels.Get(name) as RealtimeChannel;
+        }
+
+        public Task<bool> MessageReceived(ProtocolMessage protocolMessage, RealtimeState state)
+        {
+            if (protocolMessage.Channel.IsEmpty())
+            {
+                return Task.FromResult(false);
+            }
+
+            var channel = _channels.Exists(protocolMessage.Channel) ? GetChannel(protocolMessage.Channel) : null;
+            if (channel == null)
+            {
+                Logger.Warning($"Message received {protocolMessage} for a channel that does not exist {protocolMessage.Channel}");
+                return Task.FromResult(false);
+            }
+
+            // RTL5k - an ATTACHED received while the channel is DETACHING or DETACHED must not
+            // re-attach a channel the application has detached. It is answered with a new DETACH and
+            // leaves the channel untouched otherwise: in particular the RTL15b channelSerial below,
+            // which RTL15b2 cleared on entering DETACHED and the next ATTACH would carry (RTL4c1).
+            if (protocolMessage.Action == ProtocolMessage.MessageAction.Attached &&
+                (channel.State == ChannelState.Detaching || channel.State == ChannelState.Detached))
+            {
+                channel.DetachForUnexpectedAttached();
+                return TaskConstants.BooleanTrue;
+            }
+
+            // RTL15b
+            if (protocolMessage.ChannelSerial.IsNotEmpty() &&
+                (protocolMessage.Action == ProtocolMessage.MessageAction.Message ||
+                protocolMessage.Action == ProtocolMessage.MessageAction.Presence ||
+                protocolMessage.Action == ProtocolMessage.MessageAction.Annotation ||
+                protocolMessage.Action == ProtocolMessage.MessageAction.Object ||
+                protocolMessage.Action == ProtocolMessage.MessageAction.Attached))
+            {
+                Logger.Debug($"Setting channel serial for channelName - {channel.Name}," +
+                             $"previous - {channel.Properties.ChannelSerial}, current - {protocolMessage.ChannelSerial}");
+                channel.Properties.ChannelSerial = protocolMessage.ChannelSerial;
+            }
+
+            switch (protocolMessage.Action)
+            {
+                case ProtocolMessage.MessageAction.Error:
+                    channel.SetChannelState(ChannelState.Failed, protocolMessage);
+                    break;
+                case ProtocolMessage.MessageAction.Attached:
+                    channel.Properties.AttachSerial = protocolMessage.ChannelSerial; // RTL15a
+
+                    if (protocolMessage.Flags.HasValue)
+                    {
+                        var modes = new ChannelModes(((ProtocolMessage.Flag)protocolMessage.Flags.Value).FromFlag());
+                        channel.Modes = new ReadOnlyChannelModes(modes.ToList());
+                    }
+
+                    if (protocolMessage.Params != null)
+                    {
+                        channel.Params = new ReadOnlyChannelParams(protocolMessage.Params);
+                    }
+
+                    // RTL12
+                    if (channel.State == ChannelState.Attached)
+                    {
+                        if (!protocolMessage.HasFlag(ProtocolMessage.Flag.Resumed))
+                        {
+                            channel.Presence.ChannelAttached(protocolMessage);
+                            channel.EmitErrorUpdate(protocolMessage.Error, false, protocolMessage);
+                        }
+                    }
+                    else
+                    {
+                        channel.Presence.ChannelAttached(protocolMessage);
+                        channel.SetChannelState(ChannelState.Attached, protocolMessage);
+                    }
+
+                    // RTAN4e
+                    channel.Annotations.ChannelAttached();
+
+                    break;
+                case ProtocolMessage.MessageAction.Detach:
+                case ProtocolMessage.MessageAction.Detached:
+                    if (channel.State != ChannelState.Detached)
+                    {
+                        channel.SetChannelState(ChannelState.Detached, protocolMessage);
+                    }
+
+                    break;
+                case ProtocolMessage.MessageAction.Message:
+
+                    if (channel.State != ChannelState.Attached)
+                    {
+                        Logger.Warning(
+                            $"Channel #{channel.Name} is currently in #{channel.State} state. Messages received in this state are ignored. Ignoring {protocolMessage.Messages?.Length ?? 0} messages");
+                        return TaskConstants.BooleanTrue;
+                    }
+
+                    if (ValidateIfDeltaItHasCorrectPreviousMessageId(protocolMessage, channel.LastSuccessfulMessageIds) == false)
+                    {
+                        var message =
+                            "Delta message decode failure. Previous message id does not equal expected message id.";
+                        var reason = new ErrorInfo(message, ErrorCodes.VcDiffDecodeError);
+                        channel.StartDecodeFailureRecovery(reason);
+                        return TaskConstants.BooleanTrue;
+                    }
+
+                    var result = _messageHandler.DecodeMessages(
+                        protocolMessage,
+                        protocolMessage.Messages,
+                        channel.MessageDecodingContext);
+
+                    if (result.IsFailure)
+                    {
+                        Logger.Error($"{channel.Name} - failed to decode message. ErrorCode: {result.Error.Code}, Message: {result.Error.Message}");
+                        if (result.Error is VcDiffErrorInfo)
+                        {
+                            channel.StartDecodeFailureRecovery(result.Error);
+
+                            // Break any further message processing
+                            return TaskConstants.BooleanTrue;
+                        }
+                    }
+
+                    channel.LastSuccessfulMessageIds = LastMessageIds.Create(protocolMessage);
+
+                    foreach (var msg in protocolMessage.Messages)
+                    {
+                        channel.OnMessage(msg);
+                    }
+
+                    break;
+                case ProtocolMessage.MessageAction.Presence:
+                case ProtocolMessage.MessageAction.Sync:
+
+                    var presenceDecodeResult = _messageHandler.DecodeMessages(
+                                                protocolMessage,
+                                                protocolMessage.Presence,
+                                                channel.Options);
+
+                    if (presenceDecodeResult.IsFailure)
+                    {
+                        Logger.Error($"{channel.Name} - failed to decode presence message. ErrorCode: {presenceDecodeResult.Error.Code}, Message: {presenceDecodeResult.Error.Message}");
+
+                        channel.OnError(presenceDecodeResult.Error);
+                    }
+
+                    if (protocolMessage.Action == ProtocolMessage.MessageAction.Sync)
+                    {
+                        channel.Presence.OnSyncMessage(protocolMessage);
+                    }
+                    else
+                    {
+                        channel.Presence.OnPresence(protocolMessage.Presence);
+                    }
+
+                    break;
+                case ProtocolMessage.MessageAction.Annotation:
+                    // RTAN4b
+                    var annotationDecodeResult = _messageHandler.DecodeMessages(
+                                                protocolMessage,
+                                                protocolMessage.Annotations,
+                                                channel.Options);
+
+                    if (annotationDecodeResult.IsFailure)
+                    {
+                        Logger.Error($"{channel.Name} - failed to decode annotation. ErrorCode: {annotationDecodeResult.Error.Code}, Message: {annotationDecodeResult.Error.Message}");
+
+                        channel.OnError(annotationDecodeResult.Error);
+                    }
+
+                    channel.Annotations.OnAnnotations(protocolMessage.Annotations);
+
+                    break;
+                default:
+                    // RTF1: tolerate protocol messages with actions this library does not handle
+                    // (e.g. OBJECT/OBJECT_SYNC or future additions) by ignoring them.
+                    Logger.Debug($"Ignoring ProtocolMessage with unhandled action {protocolMessage.Action} on channel {channel.Name}");
+                    break;
+            }
+
+            return Task.FromResult(true);
+        }
+
+        private bool ValidateIfDeltaItHasCorrectPreviousMessageId(ProtocolMessage protocolMessage, LastMessageIds channelSuccessfulMessageIds)
+        {
+            if (protocolMessage.Messages == null || protocolMessage.Messages.Length == 0)
+            {
+                return true;
+            }
+
+            var firstMessage = protocolMessage.Messages.First();
+            var deltaFrom = firstMessage.Extras?.Delta?.From;
+            if (deltaFrom != null && deltaFrom.EqualsTo(channelSuccessfulMessageIds.LastMessageId) == false)
+            {
+               Logger.Warning($"Delta message decode failure. Previous message id does not equal expected message id. PreviousMessageId: {channelSuccessfulMessageIds.LastMessageId}. ExpectedMessageId: {deltaFrom}");
+               return false;
+            }
+
+            return true;
+        }
+    }
+}

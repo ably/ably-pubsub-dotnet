@@ -1,15 +1,19 @@
 # ============================================================================
-# ACTIVE PACKAGING WORKFLOW - Uses Cake Build System
+# PACKAGING WORKFLOW - Uses Cake Build System
 # ============================================================================
-# This is the primary workflow for creating NuGet packages and Unity packages.
+# Builds the NuGet packages and the Unity package for a release. It publishes
+# nothing: the release engineer downloads the artifacts and pushes them to
+# nuget.org by hand, following the release process in CONTRIBUTING.md.
 #
-# To create a release:
-# 1. Go to Actions tab → Package ably workflow
-# 2. Click "Run workflow" and enter the version number (e.g., 1.2.3)
-# 3. Download artifacts:
-#    - ably-package: Main NuGet packages (.nupkg)
-#    - ably-push-package: Push notification packages (.nupkg)
-#    - ably-unity-package: Unity package (.unitypackage)
+# To package a release:
+# 1. Go to Actions tab → Package ably workflow (or `gh workflow run package.yml`)
+# 2. Click "Run workflow", pick the release branch and enter the version
+#    (e.g. 2.0.1), which must be the version committed on that branch
+# 3. Download the `output-package` artifact. It holds exactly:
+#    - Ably.PubSub.Core.<version>.nupkg
+#    - Ably.PubSub.Device.<version>.nupkg
+#    - Ably.PubSub.Server.<version>.nupkg
+#    - ably.pubsub.<version>.unitypackage
 # ============================================================================
 
 name: Package ably
@@ -17,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Ably version'
+        description: 'Ably version, e.g. 2.0.1 (must equal src/CommonAssemblyInfo.cs on the chosen branch)'
         required: true
 
 permissions:
@@ -25,7 +29,13 @@ permissions:
 
 jobs:
   package-library:
+    # Windows: the core package carries a lib/net46 asset built by an old-style
+    # MSBuild head, and Windows runs the .NET Framework apps of the
+    # package-install test on the real .NET Framework CLR.
     runs-on: windows-2022
+    env:
+      DOTNET_NOLOGO: true
+      VERSION: ${{ github.event.inputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -40,153 +50,70 @@ jobs:
             6.0.428
             7.0.410
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
-        
-      - name: Install Android SDK Platform 30
-        shell: pwsh
-        run: |
-          echo "y" | & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "platforms;android-30"
-          echo "y" | & "$env:ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" "build-tools;30.0.3"
-
-      - name: Install legacy Xamarin
-        shell: pwsh
-        run: |
-          # Install Xamarin.Android and Xamarin.iOS components via VS installer
-          Write-Host "Installing Xamarin workload for VS 2022..."
-          Write-Host "This may take several minutes..."
-          
-          & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-            --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
-            --add Microsoft.VisualStudio.Workload.XamarinBuildTools `
-            --add Component.Xamarin `
-            --wait
-          
-          Write-Host "Xamarin installation completed"
-          
-          # Verify installation
-          Write-Host "Verifying Xamarin.iOS targets..."
-          if (-not (Test-Path "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Xamarin\iOS\Xamarin.iOS.CSharp.targets")) {
-            Write-Error "Xamarin.iOS targets not found at expected path"
-            exit 1
-          }
-          Write-Host "Verified Xamarin.iOS installation"
-
-          Write-Host "Verifying Xamarin.Android targets..."
-          if (-not (Test-Path "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Xamarin\Android\Xamarin.Android.CSharp.targets")) {
-            Write-Error "Xamarin.Android targets not found at expected path"
-            exit 1
-          }
-          Write-Host "Verified Xamarin.Android installation"
-
       - name: Download cake tool
         run: dotnet tool restore
 
+      # Package stamps src/CommonAssemblyInfo.cs with the input, so compare the input with the
+      # committed version files first. The packages, the Unity package and the plugin inside it
+      # must all carry the version the release PR committed.
+      - name: Check the version input against the committed version
+        run: |
+          $errors = @()
+          $numeric = $env:VERSION.Split('-')[0]
+          $assemblyInfo = Get-Content -Raw src/CommonAssemblyInfo.cs
+          foreach ($check in @(
+              @('AssemblyVersion', $numeric),
+              @('AssemblyFileVersion', $numeric),
+              @('AssemblyInformationalVersion', $env:VERSION))) {
+            $match = [regex]::Match($assemblyInfo, $check[0] + '\("([^"]*)"\)')
+            if (-not $match.Success -or $match.Groups[1].Value -ne $check[1]) {
+              $errors += "src/CommonAssemblyInfo.cs $($check[0]) is '$($match.Groups[1].Value)', expected '$($check[1])'."
+            }
+          }
+          $unityVersion = (Get-Content -Raw unity/Assets/Ably/version.txt).Trim()
+          if ($unityVersion -ne $env:VERSION) {
+            $errors += "unity/Assets/Ably/version.txt is '$unityVersion', expected '$env:VERSION'."
+          }
+          $pluginVersion = (Get-Item unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll).VersionInfo.ProductVersion
+          if (($pluginVersion -split '\+')[0] -ne $env:VERSION) {
+            $errors += "The Unity plugin unity/Assets/Ably/Plugins/Ably.PubSub.Device.dll has ProductVersion '$pluginVersion', expected '$env:VERSION'. Regenerate it with ./unity-plugins-updater.sh."
+          }
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host "::error::$_" }
+            throw "The version input '$env:VERSION' does not match the committed version. Bump and commit the version files in the release PR, then package that commit."
+          }
+          Write-Host "src/CommonAssemblyInfo.cs, unity/Assets/Ably/version.txt and the Unity plugin are all at $env:VERSION."
+
       - name: Package
-        env:
-          VERSION: ${{ github.event.inputs.version }}
         run: ./package.cmd $env:VERSION
-        
+
+      # Installs the packed packages into small .NET Framework (net462, net48) and .NET
+      # (net6.0, net7.0) apps the way a customer would, asserts which lib/<tfm> asset of each
+      # package NuGet selected, and runs the apps (on the .NET Framework CLR here). These are
+      # the exact files the release engineer downloads. Offline: no credentials.
+      # The matrix lives in cake-build/tasks/package-consumption.cake.
+      - name: Package-install test on the packed packages
+        run: ./build.cmd -- --target=Test.PackageConsumption.NoPack "--version=$env:VERSION"
+
       - name: Archive package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ably-package
           path: |
             ${{ github.workspace }}/*.nupkg
-
-  package-push:
-    # Intel (x86_64) runner: the classic Xamarin.iOS/Android SDKs this job installs are
-    # x86_64 Mono packages, and the last green run of this job (macOS-13) was Intel.
-    # The standard macos-14 label is arm64, which would put the whole Xamarin build
-    # under Rosetta. If larger runners are not enabled for this org (job stays queued),
-    # fall back to 'macos-14' and accept Rosetta.
-    runs-on: macos-14-large
-    env:
-      DOTNET_NOLOGO: true
-
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          submodules: 'recursive'
-          persist-credentials: false
-
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
-        with:
-          # Xcode 14.3 (which classic Xamarin.iOS 16.4 targets) was only ever present on
-          # the retired macOS-13 image; the macOS-14 image ships 15.0.1-16.2, so 14.3 can
-          # no longer resolve and the job died here. 15.0.1 is the lowest version the
-          # image carries, i.e. the smallest step away from what Xamarin.iOS expects.
-          xcode-version: '15.0.1'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
-        
-      - name: Install Android SDK Platform 30
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-30"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;30.0.3"
-
-      - name: Download dotnet framework
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: |
-            3.1.426
-            6.0.428
-            7.0.410
-
-      - name: Install legacy Xamarin
-        run: |
-          # macOS-14+ images ship no Xamarin (Mono only), and the xamarin-ios /
-          # xamarin-android brew casks were removed after Xamarin's EOL, so both the
-          # "preinstalled" and the brew paths of the old step are dead. Install the final
-          # classic SDK releases from Microsoft's archived installers instead - the same
-          # versions the last green run had preinstalled on macOS-13 (Xamarin.iOS 16.4,
-          # Xamarin.Android 13.2).
-          set -euo pipefail
-
-          if [ ! -d "/Library/Frameworks/Xamarin.iOS.framework/" ]; then
-            echo "Installing Xamarin.iOS 16.4.0.23 from archived pkg..."
-            curl -fL --retry 3 -o /tmp/xamarin.ios.pkg \
-              "https://download.visualstudio.microsoft.com/download/pr/ceb0ea3f-4db8-46b4-8dc3-8049d27c0107/3960868aa9b1946a6c77668c3f3334ee/xamarin.ios-16.4.0.23.pkg"
-            sudo installer -pkg /tmp/xamarin.ios.pkg -target /
-          fi
-
-          if [ ! -d "/Library/Frameworks/Xamarin.Android.framework/" ]; then
-            echo "Installing Xamarin.Android 13.2.2.0 from archived pkg..."
-            curl -fL --retry 3 -o /tmp/xamarin.android.pkg \
-              "https://download.visualstudio.microsoft.com/download/pr/8cbf56b1-ef0d-466f-8cfe-fae4ba8c5080/e9e853fee3169b1c5128098942f19120/xamarin.android-13.2.2.0.pkg"
-            sudo installer -pkg /tmp/xamarin.android.pkg -target /
-          fi
-
-          echo "Verifying Xamarin targets..."
-          ls -la "/Library/Frameworks/Mono.framework/External/xbuild/Xamarin/"
-          test -d "/Library/Frameworks/Xamarin.iOS.framework/"
-          test -d "/Library/Frameworks/Xamarin.Android.framework/"
-
-      - name: Download cake tool
-        run: dotnet tool restore
-
-      - name: Package Push (iOS & Android)
-        env:
-          VERSION: ${{ github.event.inputs.version }}
-        run: ./package-push.sh "$VERSION"
-
-      - name: Archive push packages
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ably-push-package
-          path: |
-            ${{ github.workspace }}/*.nupkg
+          if-no-files-found: error
 
   package-unity:
     runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ github.event.inputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           submodules: 'recursive'
           persist-credentials: false
 
+      # unity-packager v1.0.0 targets netcoreapp2.0, so it needs the 2.1 runtime.
       - name: Download dotnet framework
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
@@ -197,69 +124,61 @@ jobs:
       - name: Download cake tool
         run: dotnet tool restore
 
+      # Zips the committed unity/Assets/Ably tree, including the merged plugin that
+      # ./unity-plugins-updater.sh regenerated in the release PR. It does not rebuild it.
       - name: Package Unity
-        env:
-          VERSION: ${{ github.event.inputs.version }}
         run: ./package-unity.sh "$VERSION"
-        
+
+      # The Cake task only warns if the packager fails, so the missing file is the failure.
       - name: Archive Unity package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ably-unity-package
           path: |
             ${{ github.workspace }}/*.unitypackage
+          if-no-files-found: error
 
   merge-artifacts:
     runs-on: ubuntu-22.04
-    needs: [package-library, package-push, package-unity]
+    needs: [package-library, package-unity]
+    env:
+      VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
-          
+
       - name: Merge artifacts into single directory
         run: |
+          set -euo pipefail
           mkdir -p output-package
-          
-          # Copy all .nupkg files from ably-package
-          if [ -d "artifacts/ably-package" ]; then
-            find artifacts/ably-package -name "*.nupkg" -exec cp {} output-package/ \;
-            echo "Copied .nupkg files from ably-package"
-          else
-            echo "Warning: ably-package artifact not found"
-          fi
-          
-          # Copy all .nupkg files from ably-push-package
-          if [ -d "artifacts/ably-push-package" ]; then
-            find artifacts/ably-push-package -name "*.nupkg" -exec cp {} output-package/ \;
-            echo "Copied .nupkg files from ably-push-package"
-          else
-            echo "Warning: ably-push-package artifact not found"
-          fi
-          
-          # Copy .unitypackage file
-          if [ -d "artifacts/ably-unity-package" ]; then
-            find artifacts/ably-unity-package -name "*.unitypackage" -exec cp {} output-package/ \;
-            echo "Copied .unitypackage files from ably-unity-package"
-          else
-            echo "Warning: ably-unity-package artifact not found"
-          fi
-          
-          # Verify we have files and list merged contents
-          if [ -z "$(ls -A output-package)" ]; then
-            echo "Error: No files were copied to output-package"
+
+          find artifacts/ably-package -name "*.nupkg" -exec cp {} output-package/ \;
+          find artifacts/ably-unity-package -name "*.unitypackage" -exec cp {} output-package/ \;
+
+          # Exactly the three NuGet packages and the Unity package, at the requested version.
+          expected="$(printf '%s\n' \
+            "Ably.PubSub.Core.$VERSION.nupkg" \
+            "Ably.PubSub.Device.$VERSION.nupkg" \
+            "Ably.PubSub.Server.$VERSION.nupkg" \
+            "ably.pubsub.$VERSION.unitypackage" | LC_ALL=C sort)"
+          actual="$(ls -1 output-package | LC_ALL=C sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "Error: output-package does not hold exactly the expected files."
+            echo "Expected:"
+            echo "$expected"
+            echo "Found:"
+            echo "$actual"
             exit 1
           fi
-          
-          echo ""
-          echo "Merged artifact contents:"
-          ls -lh output-package/
-          echo ""
-          echo "Total files: $(ls -1 output-package | wc -l)"
-          
+
+          echo "Merged artifact contents (SHA-256), to compare with the downloaded files:"
+          (cd output-package && sha256sum *)
+
       - name: Upload merged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: output-package
           path: output-package/
+          if-no-files-found: error

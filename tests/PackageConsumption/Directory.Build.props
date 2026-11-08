@@ -1,0 +1,37 @@
+<Project>
+  <!--
+    Shared settings for the package-consumption apps. They reference the door packages exactly as
+    a customer does (a PackageReference, never a ProjectReference), so they exercise NuGet's
+    per-target-framework asset selection and the signed (Package) assemblies that ship.
+
+    Run them through the Cake target Test.PackageConsumption (see cake-build/README.md), not in
+    place. The target copies this directory to test-results/package-consumption, writes the generated
+    props imported below (the package version and the target frameworks under test, both taken
+    from the matrix in cake-build/tasks/package-consumption.cake) and a nuget.config that restores
+    Ably.PubSub.* from the freshly packed .nupkg files only, then builds, inspects and runs each app.
+
+    This file also stops MSBuild's upward search, so no repository-level Directory.Build.props can
+    leak into what is meant to be a plain customer project.
+  -->
+  <Import Project="$(MSBuildProjectDirectory)/PackageConsumption.generated.props" Condition="Exists('$(MSBuildProjectDirectory)/PackageConsumption.generated.props')" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>$(PackageConsumptionTargetFrameworks)</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Ably.PubSub.PackageConsumption</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Lets a net6.0 app run where only a newer .NET runtime is installed (e.g. a CI image).
+         Asset selection happens at restore, so it is unaffected. -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/*.cs" LinkBase="Shared" />
+    <Reference Include="System.Net.Http" Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'" />
+  </ItemGroup>
+
+  <Target Name="RequirePackageConsumptionProperties" BeforeTargets="Restore;CollectPackageReferences">
+    <Error Condition="'$(AblyPackageVersion)' == '' Or '$(PackageConsumptionTargetFrameworks)' == ''" Text="AblyPackageVersion and PackageConsumptionTargetFrameworks are not set. Run these apps through the Cake target Test.PackageConsumption (see cake-build/README.md)." />
+  </Target>
+</Project>

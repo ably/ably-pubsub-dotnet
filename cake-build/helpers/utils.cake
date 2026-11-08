@@ -20,49 +20,57 @@ public void RestoreSolution(FilePath solutionPath)
     // Needed for projects using old packages.config format for maintaining dependencies.
     // This will not be needed once deprecated projects are removed.
     Information("Running NuGet restore...");
-    try
+    if (IsRunningOnWindows())
     {
-        if (IsRunningOnWindows())
+        Information("Windows system detected, running direct NuGetRestore command");
+        // Throws on failure, which is what we want: a failed packages.config
+        // restore must stop the build here, not resurface later as a confusing
+        // EnsureNuGetPackageBuildImports error.
+        NuGetRestore(solutionPath.FullPath, new NuGetRestoreSettings
         {
-            Information("Windows system detected, running direct NuGetRestore command");
-            NuGetRestore(solutionPath.FullPath, new NuGetRestoreSettings
-            {
-                Verbosity = NuGetVerbosity.Quiet
-            });
+            Verbosity = NuGetVerbosity.Quiet
+        });
+    }
+    else
+    {
+        // On macOS/Linux the `nuget` CLI exists only where Mono tooling was installed
+        // (the mono workflow runs ./tools/mono-install.sh; the plain macOS/Linux test
+        // legs do not, and macos-14/ubuntu-24.04 runners ship no Mono). The legacy
+        // packages.config heads it restores are only *built* on Windows/Mono anyway,
+        // so a missing tool is skippable — but a present tool that fails is a real
+        // error. StartProcess returns the exit code rather than throwing, so check it.
+        var nugetTool = Context.Tools.Resolve("nuget") ?? Context.Tools.Resolve("nuget.exe");
+        if (nugetTool == null)
+        {
+            Warning("nuget CLI not found; skipping packages.config restore (only needed for the net46 heads, which build on Windows/Mono).");
         }
         else
         {
             Information("macOS/Linux system detected, running nuget restore from CLI");
-            // On macOS/Linux, use nuget command (installed via mono)
-            StartProcess("nuget", new ProcessSettings
+            var nugetExit = StartProcess(nugetTool, new ProcessSettings
             {
                 Arguments = $"restore \"{solutionPath.FullPath}\" -Verbosity quiet"
             });
+            if (nugetExit != 0)
+            {
+                throw new Exception(
+                    $"nuget restore failed for {solutionPath.GetFilename()} with exit code {nugetExit}.");
+            }
         }
     }
-    catch (Exception ex)
-    {
-        Warning($"NuGet restore failed: {ex.Message}");
-    }
 
-    // dotnet restore (all platforms, for SDK-style projects)
-    try
+    // dotnet restore (all platforms, for SDK-style projects). No try/catch: a
+    // restore failure must fail the build at the point it happens.
+    Information("Running dotnet restore...");
+    // Suppress restore warning as errors NU1503 for xamarin/old style projects
+    var restoreSettings = new DotNetRestoreSettings
     {
-        Information("Running dotnet restore...");
-        // Suppress restore warning as errors NU1503 for xamarin/old style projects
-        var restoreSettings = new DotNetRestoreSettings
-        {
-            MSBuildSettings = new DotNetMSBuildSettings()
-                .WithProperty("WarningsNotAsErrors", "NU1503")
-                .WithProperty("NoWarn", "NU1503")
-        };
-        DotNetRestore(solutionPath.FullPath, restoreSettings);
-        Information($"✓ dotnet restore completed");
-    }
-    catch (Exception e)
-    {
-        Warning($"dotnet restore failed: {e.Message}");
-    }
+        MSBuildSettings = new DotNetMSBuildSettings()
+            .WithProperty("WarningsNotAsErrors", "NU1503")
+            .WithProperty("NoWarn", "NU1503")
+    };
+    DotNetRestore(solutionPath.FullPath, restoreSettings);
+    Information($"✓ dotnet restore completed");
 }
 
 /// <summary>

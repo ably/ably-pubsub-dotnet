@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using IO.Ably;
+using Ably.PubSub;
 
 namespace NotificationsPublisher
 {

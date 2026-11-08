@@ -1,7 +1,7 @@
 ﻿using System;
-using IO.Ably;
-using IO.Ably.Transport;
-using IO.Ably.Types;
+using Ably.PubSub;
+using Ably.PubSub.Transport;
+using Ably.PubSub.Types;
 
 namespace Assets.Tests.AblySandbox
 {

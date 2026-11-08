@@ -7,18 +7,19 @@
 * API Compatibility Level should be '.NET Standard 2.0'
 
 ### Downloading Unity Package
-- Please download the latest Unity package from the [GitHub releases page](https://github.com/ably/ably-pubsub-dotnet/releases/latest). All releases from 1.2.4 have `.unitypackage` included.
+- Please download the latest Unity package from the [GitHub releases page](https://github.com/ably/ably-pubsub-dotnet/releases/latest). All releases from 1.2.4 have `.unitypackage` included. From 2.0, the package bundles `Ably.PubSub.Device`, so create clients with `PubSubDevice.CreateClient(...)`, as in the sample below.
 
 ### Importing Unity Package
 - You can import the package by going to Assets -> Import Package -> Custom Package in the Unity UI. For more detailed information on importing packages, visit https://docs.unity3d.com/Manual/AssetPackagesImport.html.
-- [Configure SynchronizationContext](../README.md#executing-callbacks-on-mainui-thread) to execute callbacks on Main/UI thread.
+- Configure a `SynchronizationContext` (via `ClientOptions.CustomContext`) to execute callbacks on the Main/UI thread.
 - Sample code :
 
-```dotnet
+```csharp
 using System;
 using System.Threading;
-using IO.Ably;
-using IO.Ably.Realtime;
+using Ably.PubSub;
+using Ably.PubSub.Device;
+using Ably.PubSub.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -26,43 +27,52 @@ namespace Example.ChatApp
 {
     public class AblyConsole : MonoBehaviour
     {
-        private AblyRealtime _ably;
+        private PubSubRealtimeClient _ably;
         private ClientOptions _clientOptions;
 
-        // It's recommended to use other forms of authentication. E.g. JWT, Token Auth 
-        // This is to avoid exposing root api key to a client
-        private static string _apiKey = "ROOT_API_KEY_COPIED_FROM_ABLY_WEB_DASHBOARD";
+        // Get tokens from your own server. Never embed an API key in an app that
+        // runs on an end-user device.
+        private static readonly Uri _authUrl = new Uri("https://your-server.example.com/ably-auth");
 
         void Start()
         {
             InitializeAbly();
+            CreateAblyClient();
         }
 
         private void InitializeAbly()
         {
             _clientOptions = new ClientOptions
             {
-                Key = _apiKey,
+                AuthUrl = _authUrl,
                 AutoConnect = false,
                 // this will make sure to post callbacks on UnitySynchronization Context Main Thread
                 CustomContext = SynchronizationContext.Current
             };
 
-            _ably = new AblyRealtime(_clientOptions);
+            // PubSubDevice.CreateClient clones the options, so anything the client must
+            // capture (e.g. ClientId) has to be set on _clientOptions BEFORE the client
+            // is created in CreateAblyClient.
+        }
+
+        private void CreateAblyClient()
+        {
+            _ably = PubSubDevice.CreateClient(_clientOptions);
             _ably.Connection.On(args =>
             {
                 Debug.Log($"Connection State is <b>{args.Current}</b>");
             });
         }
     }
+}
 ```
 
 - Check out the [Unity demo Dashboard app](./Assets/Ably/Examples/Dashboard/) for a complete Ably SDK setup, showcasing channel usage, presence, and pub-sub functionality—all integrated with a console view.
 - Also check blog on [Multiplayer game in unity with ably](https://ably.com/blog/multiplayer-game-in-unity-with-ably).
 
 ### Unsupported Platforms
-- It doesn't support **WebGL** due to incompatibility with WebSockets. Read the [Direct Socket Access](https://docs.unity3d.com/2019.3/Documentation/Manual/webgl-networking.html) section under WebGL Networking. We have active issue to add support for the same https://github.com/ably/ably-pubsub-dotnet/issues/1211.
-- To support **WebGL**, you should refer to [interation with browser javascript from WebGL](https://docs.unity3d.com/Manual/webgl-interactingwithbrowserscripting.html). You can import [ably-js](https://github.com/ably/ably-js) as a browser javascript and call it from WebGL. For more information, refer to the project [Ably Tower Defence](https://github.com/ably-labs/ably-tower-defense/tree/js-branch/).
+- **WebGL** builds are not supported, because WebGL doesn't provide direct socket access. Read the [Direct Socket Access](https://docs.unity3d.com/2019.3/Documentation/Manual/webgl-networking.html) section under WebGL Networking. To request WebGL support, comment on https://github.com/ably/ably-pubsub-dotnet/issues/1211.
+- For **WebGL**, refer to [interaction with browser javascript from WebGL](https://docs.unity3d.com/Manual/webgl-interactingwithbrowserscripting.html). You can import [ably-pubsub-js](https://github.com/ably/ably-pubsub-js) as a browser javascript and call it from WebGL. For more information, refer to the project [Ably Tower Defence](https://github.com/ably-labs/ably-tower-defense/tree/js-branch/).
 
 
 ### Contributing

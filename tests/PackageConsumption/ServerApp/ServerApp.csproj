@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A server-side app consuming Ably.PubSub.Server. Shared settings: ../Directory.Build.props. -->
+  <ItemGroup>
+    <PackageReference Include="Ably.PubSub.Server" Version="[$(AblyPackageVersion)]" />
+  </ItemGroup>
+
+</Project>
