@@ -40,7 +40,7 @@ namespace Ably.PubSub
         private static T As<T>(JToken entry)
             where T : class
         {
-            return entry is JObject obj ? obj.ToObject<T>() : null;
+            return entry is JObject obj ? obj.ToObject<T>(JsonHelper.GetPlainSerializer()) : null;
         }
 
         private static IDictionary<string, T> AsByName<T>(JToken entry)
