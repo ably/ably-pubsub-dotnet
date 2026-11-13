@@ -23,6 +23,7 @@ namespace Ably.PubSub.Push
         {
             _restClient = restClient;
             _logger = logger;
+            FcmTopics = new PushAdminFcmTopics(restClient);
         }
 
         private ClientOptions Options => _restClient.Options;
@@ -36,6 +37,11 @@ namespace Ably.PubSub.Push
         /// Exposes device registrations apis.
         /// </summary>
         public IDeviceRegistrations DeviceRegistrations => this;
+
+        /// <summary>
+        /// Exposes FCM topics apis, for subscribing devices to FCM topics and publishing to them.
+        /// </summary>
+        public PushAdminFcmTopics FcmTopics { get; }
 
         /// <summary>
         /// Register a new device
@@ -191,10 +197,7 @@ namespace Ably.PubSub.Push
             var request = _restClient.CreatePostRequest(ChannelSubUrl);
             AddFullWaitIfNecessary(request);
 
-            if (subscription.DeviceId.IsNotEmpty() && subscription.DeviceId == _restClient.Device?.Id)
-            {
-                AddDeviceAuthenticationToRequest(request, _restClient.Device);
-            }
+            AddDeviceAuthenticationIfLocal(request, _restClient, subscription.DeviceId);
 
             request.PostData = subscription;
 
@@ -239,10 +242,7 @@ namespace Ably.PubSub.Push
             AddFullWaitIfNecessary(request);
             request.AddQueryParameters(GetQueryParams());
 
-            if (subscription.DeviceId.IsNotEmpty() && subscription.DeviceId == _restClient.Device?.Id)
-            {
-                AddDeviceAuthenticationToRequest(request, _restClient.Device);
-            }
+            AddDeviceAuthenticationIfLocal(request, _restClient, subscription.DeviceId);
 
             _ = await _restClient.ExecuteRequest(request);
 
@@ -312,11 +312,7 @@ namespace Ably.PubSub.Push
 
             var request = _restClient.CreateRequest("/push/deviceRegistrations/" + details.Id, HttpMethod.Put);
             AddFullWaitIfNecessary(request);
-            var localDevice = _restClient.Device;
-            if (localDevice != null && localDevice.Id == details.Id)
-            {
-                AddDeviceAuthenticationToRequest(request, localDevice);
-            }
+            AddDeviceAuthenticationIfLocal(request, _restClient, details.Id);
 
             request.PostData = details;
             var result = await _restClient.ExecuteRequest<DeviceDetails>(request);
@@ -432,9 +428,9 @@ namespace Ably.PubSub.Push
             AddFullWaitIfNecessary(request);
             request.AddQueryParameters(deleteFilter);
 
-            if (deleteFilter.ContainsKey("deviceId") && deleteFilter["deviceId"] == _restClient.Device?.Id)
+            if (deleteFilter.TryGetValue("deviceId", out var deviceId))
             {
-                AddDeviceAuthenticationToRequest(request, _restClient.Device);
+                AddDeviceAuthenticationIfLocal(request, _restClient, deviceId);
             }
 
             await _restClient.ExecuteRequest(request);
@@ -453,6 +449,21 @@ namespace Ably.PubSub.Push
             if (Options.PushAdminFullWait)
             {
                 request.AddQueryParameters(new[] { new KeyValuePair<string, string>("fullWait", "true") });
+            }
+        }
+
+        internal static void AddDeviceAuthenticationIfLocal(AblyRequest request, PubSubHttpClient restClient, string deviceId)
+        {
+            // Check the id first: reading Device initialises the local device, which isn't needed for other devices.
+            if (deviceId.IsEmpty())
+            {
+                return;
+            }
+
+            var localDevice = restClient.Device;
+            if (localDevice != null && localDevice.Id == deviceId)
+            {
+                AddDeviceAuthenticationToRequest(request, localDevice);
             }
         }
 

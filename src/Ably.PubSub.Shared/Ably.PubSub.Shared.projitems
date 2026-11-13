@@ -45,9 +45,12 @@
     <Compile Include="$(MSBuildThisFileDirectory)Push\IPushChannelSubscriptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\ListDeviceDetailsRequest.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\ListSubscriptionsRequest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Push\FcmTopicTarget.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\LocalDevice.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PersistKeys.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdmin.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdminFcmTopic.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdminFcmTopics.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushRealtime.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushHttp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\RegistrationToken.cs" />

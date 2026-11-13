@@ -81,6 +81,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Push\ListDeviceDetailsRequestTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\ListSubscriptionsRequestTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\LocalDeviceTests.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdminFcmTopicsTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdminSandboxTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushAdminTests.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Push\PushChannelTests.cs" />
