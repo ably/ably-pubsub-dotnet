@@ -1,5 +1,27 @@
 # Change Log
 
+## [2.1.0](https://github.com/ably/ably-pubsub-dotnet/tree/2.1.0) (2026-11-13)
+
+[Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/2.0.0...2.1.0)
+
+You can now send push notifications to Android devices through FCM topics. FCM delivers one send to every device subscribed to a topic, so Ably doesn't make one FCM request per device. This suits broadcasts to large audiences, such as live match scores sent to every fan of a team.
+
+### FCM topics
+
+Push admins manage topics through `Push.Admin.FcmTopics`. Ably resolves devices to their FCM registration tokens and calls FCM with your app's service account, so your code never handles FCM credentials or tokens. Your app needs FCM configured with a service account, and the calls need the push-admin capability. [#1387](https://github.com/ably/ably-pubsub-dotnet/pull/1387)
+
+- `Get(topic)` returns a topic whose `SubscribeAsync` and `UnsubscribeAsync` subscribe and unsubscribe a single device. Its `SubscribeClientAsync` and `SubscribeChannelsAsync` subscribe every device registered for a clientId or subscribed to a set of channels, and `UnsubscribeClientAsync` unsubscribes a clientId's devices.
+- `ListAsync(deviceId)` returns the topics a device is subscribed to.
+- `PublishAsync(target, payload)` sends an FCM message and returns its message ID. Create the target with `FcmTopicTarget.Topic(...)` for one topic, or `FcmTopicTarget.Condition(...)` for a condition combining up to five topics, such as `'team-a' in topics || 'team-b' in topics`. FCM delivers a condition message once to each matching device, even if it is subscribed to more than one of the topics.
+
+```csharp
+var fcmTopics = http.Push.Admin.FcmTopics;
+await fcmTopics.Get("team-a").SubscribeAsync(deviceId);
+await fcmTopics.PublishAsync(
+    FcmTopicTarget.Condition("'team-a' in topics || 'team-b' in topics"),
+    new JObject { ["notification"] = new JObject { ["title"] = "Goal!" } });
+```
+
 ## [2.0.0](https://github.com/ably/ably-pubsub-dotnet/tree/2.0.0) (2026-11-03)
 
 [Full Changelog](https://github.com/ably/ably-pubsub-dotnet/compare/1.2.19...2.0.0)
