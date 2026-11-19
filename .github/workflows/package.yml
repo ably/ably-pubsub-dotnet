@@ -23,6 +23,11 @@ on:
       version:
         description: 'Ably version, e.g. 2.0.1 (must equal src/CommonAssemblyInfo.cs on the chosen branch)'
         required: true
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
 
 permissions:
   contents: read

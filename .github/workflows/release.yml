@@ -1,0 +1,155 @@
+# ============================================================================
+# RELEASE: checks and packs Ably.PubSub.Core, .Device and .Server for release.
+# Publishing isn't part of this workflow yet.
+#
+#   gh workflow run release.yml --ref main -f version=2.0.1 -f dry_run=true
+#   gh workflow run release.yml --ref main -f version=2.0.1 -f dry_run=false
+#
+# Don't break:
+# - The file name. nuget.org Trusted Publishing trusts only release.yml, and only
+#   a NuGet/login in this file (the publish job, added later) in environment `nuget`.
+# - The `version` input's name. package.yml, called by `pack`, reads
+#   github.event.inputs.version.
+#
+# The checks are in cake-build/release.cake ("Release targets" in cake-build/README.md).
+# ============================================================================
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Keep the name `version`: package.yml reads github.event.inputs.version.
+      version:
+        description: 'Version to release, e.g. 2.0.1. Must equal the top CHANGELOG.md entry and the committed version files on main.'
+        required: true
+        type: string
+      dry_run:
+        description: 'Check, pack and test only. Push nothing, create no tag or release.'
+        required: true
+        type: boolean
+        default: true
+
+permissions: {}
+
+# One real release at a time, never cancelled (a cancelled publish can leave Core
+# without the doors). Each dry run gets its own group.
+concurrency:
+  group: ${{ inputs.dry_run && format('release-dry-run-{0}', github.run_id) || 'release-nuget' }}
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  prechecks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: true
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      # A failing step, not a job-level `if:`, so a wrong ref fails the run instead of skipping it.
+      - name: Refuse anything but main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::release.yml only runs on main (dispatched on $GITHUB_REF)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      # The repo's .NET 6 baseline; global.json (rollForward: latestMajor) may pick a newer preinstalled SDK.
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 6.0.428
+
+      - name: Restore the Cake tool
+        run: dotnet tool restore
+
+      # On a dry run, "already on nuget.org, tagged or released" only warns.
+      - name: Check the version, CHANGELOG.md, and that it isn't released yet
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: dotnet cake cake-build/release.cake -- --target=Release.Preflight "--version=$VERSION" "--dryRun=$DRY_RUN"
+
+  pack:
+    needs: prechecks
+    # A called workflow can only narrow the token it is given: this grants package.yml's contents: read.
+    permissions:
+      contents: read
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ inputs.version }}
+
+  plan:
+    needs: pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: true
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: output-package
+          path: output-package
+
+      # The repo's .NET 6 baseline; global.json (rollForward: latestMajor) may pick a newer preinstalled SDK.
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 6.0.428
+
+      - name: Restore the Cake tool
+        run: dotnet tool restore
+
+      - name: Extract the release notes
+        run: dotnet cake cake-build/release.cake -- --target=Release.Notes "--version=$VERSION" --output=release-notes/release-notes.md
+
+      # overwrite: re-running this job replaces the notes with the same content.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-notes
+          path: release-notes/release-notes.md
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Summarise the release
+        run: |
+          {
+            echo "### Release $VERSION ($([ "$DRY_RUN" = true ] && echo 'DRY RUN' || echo 'REAL'))"
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo
+            echo "Push order: Ably.PubSub.Core, wait for nuget.org, then Ably.PubSub.Device and Ably.PubSub.Server."
+            echo
+            echo '<pre>'
+            (cd output-package && sha256sum -- *)
+            echo '</pre>'
+            echo
+            echo '<details><summary>Release notes</summary>'
+            echo
+            cat release-notes/release-notes.md
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Until the publish job exists, say so, so a green REAL run isn't taken for a release.
+      - name: Warn that nothing was published
+        if: ${{ !inputs.dry_run }}
+        run: |
+          msg="Publishing isn't part of release.yml yet: this dry_run=false run pushed nothing to nuget.org and created no tag or GitHub release."
+          echo "::warning::$msg"
+          printf '\n**Warning:** %s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the Unity package contents
+        run: dotnet cake cake-build/release.cake -- --target=Release.VerifyUnityPackage "--version=$VERSION" "--unityPackage=output-package/ably.pubsub.$VERSION.unitypackage"
