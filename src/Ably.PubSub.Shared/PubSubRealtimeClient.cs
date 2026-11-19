@@ -216,7 +216,7 @@ namespace Ably.PubSub
         {
             var result = new JObject
             {
-                ["options"] = JObject.FromObject(Options),
+                ["options"] = JObject.FromObject(Options, JsonHelper.GetPlainSerializer()),
                 ["state"] = State.WhatDoIHave(),
                 ["channels"] = Channels.GetCurrentState(),
                 ["isDisposed"] = Disposed,

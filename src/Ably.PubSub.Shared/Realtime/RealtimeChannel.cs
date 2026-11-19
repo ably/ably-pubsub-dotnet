@@ -1043,16 +1043,19 @@ namespace Ably.PubSub.Realtime
 
         public JObject GetCurrentState()
         {
+            var serializer = JsonHelper.GetPlainSerializer();
             var state = new JObject
             {
                 ["name"] = Name,
-                ["options"] = JObject.FromObject(_options),
-                ["state"] = JToken.FromObject(_state),
-                ["timers"] = JObject.FromObject(new
-                {
-                    awaitTimer = AttachedAwaiter.Waiting,
-                    detachTimer = DetachedAwaiter.Waiting,
-                }),
+                ["options"] = JObject.FromObject(_options, serializer),
+                ["state"] = JToken.FromObject(_state, serializer),
+                ["timers"] = JObject.FromObject(
+                    new
+                    {
+                        awaitTimer = AttachedAwaiter.Waiting,
+                        detachTimer = DetachedAwaiter.Waiting,
+                    },
+                    serializer),
                 ["emitters"] = GetState(),
                 ["handlers"] = _handlers.GetState(),
                 ["presence"] = Presence.GetState(),

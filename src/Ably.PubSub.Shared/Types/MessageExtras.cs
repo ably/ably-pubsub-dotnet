@@ -54,7 +54,7 @@ namespace Ably.PubSub.Types
                 var deltaProp = dataObject[DeltaProperty];
                 if (deltaProp != null && deltaProp is JObject deltaObject)
                 {
-                    delta = deltaObject.ToObject<DeltaExtras>();
+                    delta = deltaObject.ToObject<DeltaExtras>(JsonHelper.GetPlainSerializer());
                 }
             }
 

@@ -876,12 +876,16 @@ namespace Ably.PubSub.Realtime
             SyncCompletedEventHandler?.Invoke(this, EventArgs.Empty);
         }
 
-        internal JToken GetState() => new JObject
+        internal JToken GetState()
         {
-            ["handlers"] = _handlers.GetState(),
-            ["members"] = MembersMap.GetState(),
-            ["pendingQueue"] = new JArray(PendingPresenceQueue.Select(x => JObject.FromObject(x.Message))),
-        };
+            var serializer = JsonHelper.GetPlainSerializer();
+            return new JObject
+            {
+                ["handlers"] = _handlers.GetState(),
+                ["members"] = MembersMap.GetState(),
+                ["pendingQueue"] = new JArray(PendingPresenceQueue.Select(x => JObject.FromObject(x.Message, serializer))),
+            };
+        }
 
         /// <summary>
         /// Dispose(bool disposing) executes in two distinct scenarios. If disposing equals true, the method has

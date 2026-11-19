@@ -37,7 +37,19 @@ namespace Ably.PubSub
         {
             var settings = GetJsonSettings();
 
-            return JsonSerializer.CreateDefault(settings);
+            // Create, not CreateDefault: CreateDefault would apply the app's JsonConvert.DefaultSettings
+            // first and let them change the SDK's wire format.
+            return JsonSerializer.Create(settings);
+        }
+
+        /// <summary>
+        /// Creates a serializer with Newtonsoft's built-in defaults. Pass it to JToken.ToObject and JToken.FromObject
+        /// instead of calling the overloads without a serializer, which pick up the app's JsonConvert.DefaultSettings.
+        /// </summary>
+        /// <returns>a new serializer with Newtonsoft's built-in defaults.</returns>
+        internal static JsonSerializer GetPlainSerializer()
+        {
+            return JsonSerializer.Create();
         }
 
         private static JsonSerializerSettings _settings;
